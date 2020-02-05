@@ -1,0 +1,56 @@
+! General configuration flags
+&status
+idir = "in/"
+odir = "out/"
+tdir = "../tables/"
+stat = 0         ! last binary file if restarting an old run
+bench = 0        ! benchmark mode if 1
+outs = 0         ! controls the amount of output
+/
+
+! Boz size
+! Lenghts are in units of 2.pi for periodic directions
+! and units of 1 for non-periodic directions.
+&boxparams
+Lx = 1.00        ! Length of the box in x
+Ly = 1.00        ! Length of the box in y
+Lz = 1.00        ! Length of the box in z
+/
+
+! Parameters for time integration
+&parameter
+dt =  1e-3       ! time step
+step = 10001     ! total number of steps
+tstep = 100      ! number of steps between binary output
+cstep = 5        ! number of steps between writing global quantities
+seed = 1000      ! seed for the random number generator
+/
+
+! Parameters for the velocity field
+&velocity
+f0 = 1.0         ! amplitude of the mechanical forcing
+u0 = 1.00        ! amplitude of the initial velocity field
+kdn = 2.00       ! minimum wavenumber
+kup = 4.00       ! maximum wavenumber
+nu = 1.e-3       ! kinematic viscosity
+fparam0 = 1.0    ! fparam0-9 can be used to control the forcing
+vparam0 = 0.1    ! idem for the initial velocity field
+/
+
+! Parameters for Bousinessq equation's
+&boussinesq
+gama = 1.0      ! amplitude of bouyancy term
+xmom = 1.0      ! prefactor of bouyancy term in momentum equation 
+xtemp = 1.0     ! prefactor of bouyancy term in temperature equation
+/
+
+! Parameters for the passive/active scalar
+&scalar
+s0 = 1.0        ! amplitude of the scalar's forcing
+c0 = .5         ! amplitude of the initial scalar concentration
+skdn = 3.00     ! scalar minimum wavenumber
+skup = 8.00     ! scalar maximum wavenumber
+kappa = 1e-3    ! scalar difussivity
+sparam0 = 0.0   ! sparam0-9 can be used to control the scalar's forcing
+cparam0 = 2.0   ! idem for the initial concentration field
+/

@@ -1,0 +1,22 @@
+! Initial condition for the scalar field.
+! This file contains the expression used for the initial
+! scalar field. You can use temporary real arrays R1-R3
+! of size (1:nx,1:ny,ksta:kend) and temporary complex arrays
+! C1-C8 of size (1:nz,1:ny,ista:iend) to do intermediate
+! computations. The variable c0 should control the global
+! amplitude of the scalar, and variables cparam0-9 can be
+! used to control the amplitudes of individual terms. At the
+! end, the scalar field in spectral space should be stored
+! in the array th.
+
+! Null initial concentration for the scalar
+
+!$omp parallel do if (iend-ista.ge.nth) private (j,k,rmp)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k,rmp)
+         DO j = 1,ny
+            DO k = 1,nz
+               th(k,j,i) = real(0.0, kind=GP) 
+            END DO
+         END DO
+      END DO
