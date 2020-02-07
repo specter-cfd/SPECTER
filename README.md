@@ -50,7 +50,7 @@ For non-periodic directions, **SPECTER** uses tables to compute appropriate peri
 To get the best out of **SPECTER** we recommend reading the information provided in `src/README.txt` for a detailed explanation of each compilation and runtime parameter.
 
 ## References
-- Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. arXiv: [arXiv:2002.01392](https://arxiv.org/abs/2002.01392).
+- Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. arXiv: [2002.01392](https://arxiv.org/abs/2002.01392).
 - Bruno, O. P. & Lyon, M: *High-order unconditionally stable FC-AD solvers for general smooth domains I. Basic elements*. JCP.  229, (2010). DOI: [10.1016/j.jcp.2009.11.020](https://doi.org/10.1016/j.jcp.2009.11.020).
 - Mininni P. D., Rosenberg D. L., Reddy R. & Pouquet A.; *A hybrid MPI–OpenMP scheme for scalable parallel pseudospectral computations for fluid turbulence*. P. Comp. 37, 123 (2011). DOI: [10.1016/j.parco.2011.05.004](https://doi.org/10.1016/j.parco.2011.05.004).
 - Rosenberg D. L., Mininni P. D., Reddy R. & Pouquet A.; ArXiV (2018). *GPU parallelization of a hybrid pseudospectral fluid turbulence framework using CUDA*. arXiv: [arXiv:1808.01309](https://arxiv.org/abs/1808.01309).
@@ -59,5 +59,5 @@ To get the best out of **SPECTER** we recommend reading the information provided
 If you use **SPECTER** for a publication, we kindly ask you to cite the following article **Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. arXiv: [arXiv:2002.01392](https://arxiv.org/abs/2002.01392)**.
 
 ## Authors
-- Mauro Fontana - Physics Department at University of Buenos Aires
-- Pablo D. Mininni - Physics Department at University of Buenos Aires
+- Mauro Fontana - Physics Department at University of Buenos Aires.
+- Pablo D. Mininni - Physics Department at University of Buenos Aires.

@@ -1,18 +1,18 @@
 SPECTER code: Special PEriodic Continuation Turbulence solvER
 ==============================================================
 
-The code and different solvers provided here numerically integrate the 
-hydrodynamic/Bousinessq equations in 3 dimensions with periodic or 
-Dirichlet boundary conditions. Different solvers are provided 
-(check the Makefile and the comments in 'specter.fpp' for the 
-current list of supported solvers). A pseudo-spectral method is used 
-to compute spatial derivatives, while a Runge-Kutta method of 
+The code and different solvers provided here numerically integrate the
+hydrodynamic/Bousinessq equations in 3 dimensions with periodic or
+Dirichlet boundary conditions. Different solvers are provided
+(check the Makefile and the comments in 'specter.fpp' for the
+current list of supported solvers). A pseudo-spectral method is used
+to compute spatial derivatives, while a Runge-Kutta method of
 adjustable order is used to evolve the system in the time domain. For
 non-periodic boundary conditions, an FC-Gram continuation is performed
 before transforming real fields. To compile, you need the FFTW library
 installed on your system and some flavor of MPI. Note that only serial
 transforms in the FFTW package are used, since the MPI version of FFTW
-implements blocking communications. Instead, a non-blocking parallel 
+implements blocking communications. Instead, a non-blocking parallel
 FFT (FFTP) based on FFTW is used.
 
 1. Installing FFTW
@@ -20,26 +20,26 @@ FFT (FFTP) based on FFTW is used.
 
 The parallel FFT based on FFTW 'fftp'. Only FFTW versions >= 3.0 are
 supported, as the API of FFTW 2.x is incompatible with that of FFTW 3.x,
-and as a result also incompatible with fftp-3. 
+and as a result also incompatible with fftp-3.
 
-To compile FFTW 3.x (freely available at http://www.fftw.org/), 'cd' to 
+To compile FFTW 3.x (freely available at http://www.fftw.org/), 'cd' to
 the directory containing the source and type
 
 --------------------------------------------------------------------
 ./configure
 make
 make install
-make distclean 
+make distclean
 ./configure --enable-float
 make
 make install
 --------------------------------------------------------------------
 
-The first pass installs the double precision libraries, and the 
-second pass installs the single precision libraries. By default, 
-the libraries are installed in '/usr/local/lib', '/usr/local/man', 
-etc. You can specify an installation prefix other than '/usr/local' 
-(e.g. the user's home directory) by giving `configure' the option 
+The first pass installs the double precision libraries, and the
+second pass installs the single precision libraries. By default,
+the libraries are installed in '/usr/local/lib', '/usr/local/man',
+etc. You can specify an installation prefix other than '/usr/local'
+(e.g. the user's home directory) by giving `configure' the option
 '--prefix=PATH'.
 
 2. Compiling the code
@@ -47,8 +47,8 @@ etc. You can specify an installation prefix other than '/usr/local'
 
 2.1. Setting code options:
 
-The linear resolution is set before compilation in the file 
-Makefile.in. The lines 
+The linear resolution is set before compilation in the file
+Makefile.in. The lines
 
 --------------------------------------------------------------------
 NX       = 64
@@ -56,8 +56,8 @@ NY       = 64
 NZ       = 64
 --------------------------------------------------------------------
 
-set the number of grid points (including continuation regions) in 
-each direction. Then the lines 
+set the number of grid points (including continuation regions) in
+each direction. Then the lines
 
 --------------------------------------------------------------------
 CX       = 0
@@ -65,8 +65,8 @@ CY       = 0
 CZ       = 25
 --------------------------------------------------------------------
 
-set the number of continuation points to use in each direction. 
-For periodic directions the desired variable should be set to zero 
+set the number of continuation points to use in each direction.
+For periodic directions the desired variable should be set to zero
 (i.e. CX=0 implies that X is periodic). Similarly, the section
 
 --------------------------------------------------------------------
@@ -84,7 +84,7 @@ The variable
 ORD      = 2
 --------------------------------------------------------------------
 
-controls the number of iterations in the Runge-Kutta method. 
+controls the number of iterations in the Runge-Kutta method.
 
 The set of PDEs and boundary conditions are defined by the variable
 
@@ -103,11 +103,11 @@ PRECISION = SINGLE
 adjust the usage of single or double precision for the representaton
 of floating point numbers in the code.
 
-The remaining options in this section are optional and the defaults 
-give good performance in most computers. But if needed, you can set 
-three more variables for optimization purposes in the file 
-Makefile.in (again, the default values work fine in most computers, 
-don't change the values if you are unsure about the meaning of 
+The remaining options in this section are optional and the defaults
+give good performance in most computers. But if needed, you can set
+three more variables for optimization purposes in the file
+Makefile.in (again, the default values work fine in most computers,
+don't change the values if you are unsure about the meaning of
 these variables). The lines
 
 -------------------------------------------------------------------
@@ -116,29 +116,29 @@ CSIZE    = 32
 NSTRIP   = 1
 -------------------------------------------------------------------
 
-set the variables 'ikind', 'csize', and 'nstrip' used in the 
-parallel FFTs. 'IKIND' is the size of C pointers. For optimal 
-results, it should be 4 in 32-bits machines, and 8 in 64-bits 
-machines. 'CSIZE' is used by the parallel FFT to do cache-friendly 
-transpositions. The optimal value for a particular machine can be 
-adjusted doing benchmarks, but rule of thumb values are 8 if the L1 
-cache is smaller or equal to 64 kb, and 16 if the L1 cache is 
-larger than 64 kb (24 or 32 may be best in some processors with 
-large cache). The variable 'NSTRIP' controls strip mining during 
-the transpositions. The default value is 1 and in that case no 
+set the variables 'ikind', 'csize', and 'nstrip' used in the
+parallel FFTs. 'IKIND' is the size of C pointers. For optimal
+results, it should be 4 in 32-bits machines, and 8 in 64-bits
+machines. 'CSIZE' is used by the parallel FFT to do cache-friendly
+transpositions. The optimal value for a particular machine can be
+adjusted doing benchmarks, but rule of thumb values are 8 if the L1
+cache is smaller or equal to 64 kb, and 16 if the L1 cache is
+larger than 64 kb (24 or 32 may be best in some processors with
+large cache). The variable 'NSTRIP' controls strip mining during
+the transpositions. The default value is 1 and in that case no
 strip mining is done.
 
-Finally, if required, the users can change the number of digits 
-used to label spectrum, transfer and binary files. The variables 
-in the module 'filefmt' (in the file 'pseudo/pseudospec3D_mod.fpp') 
+Finally, if required, the users can change the number of digits
+used to label spectrum, transfer and binary files. The variables
+in the module 'filefmt' (in the file 'pseudo/pseudospec3D_mod.fpp')
 control the length of the time label used to name these files.
 
 2.2 Compiling the code:
 =======================
 
-Initial conditions for the fields and the external forcings are 
-defined in the files 'initial*.f90'. Examples of these files can 
-be found in the directory 'examples'. 
+Initial conditions for the fields and the external forcings are
+defined in the files 'initial*.f90'. Examples of these files can
+be found in the directory 'examples'.
 
 Note that the name of all files in the directory 'examples' finish
 with '_example-name'. To use any of these files, you must copy the
@@ -155,22 +155,22 @@ Check the Makefile to see all paths and variables are correct. This
 includes the variables explained above as well as  the relevant
 compilers, MPI libraries and their respective flags.
 
-The path to the FFTW libraries can be changed by editting the 
-variable FFTWDIR in 'Makefile.in'. In addition, the Makefile 
+The path to the FFTW libraries can be changed by editting the
+variable FFTWDIR in 'Makefile.in'. In addition, the Makefile
 supports 'make clean', 'make dist', and extra options to make code
 for data analysis after the runs are finished.
 
 2.3 Parallelization models
 
-By default, GHOST uses 1D domain decomposition with pure MPI 
-parallelization. This behavior can be changed with two settings 
-in the Makefile.in file, or equivalently with two variables that 
+By default, SPECTER uses 1D domain decomposition with pure MPI
+parallelization. This behavior can be changed with two settings
+in the Makefile.in file, or equivalently with two variables that
 can be passed to make at compile time.
 
 2.3.1 Hybrid parallelization
 
 The code provides support for OpenMP-MPI hybridization, for use in
-supercomputers with multi-core processors and for simulations using 
+supercomputers with multi-core processors and for simulations using
 a large number of cores. When the variable
 
 -------------------------------------------------------------------
@@ -179,9 +179,9 @@ P_HYBRID=yes
 
 is defined in Makefile.in, a hybrid parallelization model is used.
 Then, the number of MPI jobs and the number of threads in each job
-can be set independently at run time. To define the number 
-of threads (in this example, set to 4 threads) in a Bourne-like 
-shell set the environment variable 
+can be set independently at run time. To define the number
+of threads (in this example, set to 4 threads) in a Bourne-like
+shell set the environment variable
 
 -------------------------------------------------------------------
 export OMP_NUM_THREADS=4
@@ -193,40 +193,40 @@ and in a C-like shell do
 setenv OMP_NUM_THREADS 4
 -------------------------------------------------------------------
 
-For the hybrid code to scale properly, processor affinity and/or 
-binding are crucial. How to set processor affinity and binding is 
-platform dependent; check the platform documentation where you are 
+For the hybrid code to scale properly, processor affinity and/or
+binding are crucial. How to set processor affinity and binding is
+platform dependent; check the platform documentation where you are
 running for more information.
 
 2.3.2 CUDA support
 
-SPECTER has experimental support for GPU-based computation of FFTs 
-using CUDA. To use this option, the NVIDIA CUDA Toolkit (the CUDA 
-compilers plus the GPU-accelerated math libraries) must be 
-installed in the system. Paths to the CUDA compiler and libraries 
-must be declared in the file Makefile.in (check all the variables 
+SPECTER has experimental support for GPU-based computation of FFTs
+using CUDA. To use this option, the NVIDIA CUDA Toolkit (the CUDA
+compilers plus the GPU-accelerated math libraries) must be
+installed in the system. Paths to the CUDA compiler and libraries
+must be declared in the file Makefile.in (check all the variables
 defined in the section "CUDA compilers" of Makefile.in).
 
-To enable this option, pass the following variable to make at 
+To enable this option, pass the following variable to make at
 compile time:
 
 -------------------------------------------------------------------
 P_CUDA=yes
 -------------------------------------------------------------------
 
-Only one GPU can be used per MPI task. In systems with multiple 
-GPUs, the GPU binded to a given MPI task should be the one with 
-the fastest access to the CPU in which the MPI task is running. 
-How to set affinity between CPUs and GPUs is platform dependent; 
-check the platform documentation where you are running for more 
+Only one GPU can be used per MPI task. In systems with multiple
+GPUs, the GPU binded to a given MPI task should be the one with
+the fastest access to the CPU in which the MPI task is running.
+How to set affinity between CPUs and GPUs is platform dependent;
+check the platform documentation where you are running for more
 information.
 
 2.4 About the solvers:
 
-The main program 'specter.fpp' includes files for the different 
-solvers at compile time from the directory 'include'. The files 
+The main program 'specter.fpp' includes files for the different
+solvers at compile time from the directory 'include'. The files
 in 'include' are named 'solver/solver_component.f90' where 'solver'
-is the name of the solver (in lowercase) and 'component' indicates 
+is the name of the solver (in lowercase) and 'component' indicates
 what action is done by the file. Most common components are
 
 validate : verifies compatibility of options with the solver
@@ -238,15 +238,15 @@ rkstep2  : second step of Runge-Kutta (contains the equations)
 3. Running the code
 ===================
 
-The codes can be executed using mpirun or the correspondent vendor 
-equivalent. The first node then reads the parameters for the run 
-from the input file, and passes the values to the rest of the 
-nodes. 
+The codes can be executed using mpirun or the correspondent vendor
+equivalent. The first node then reads the parameters for the run
+from the input file, and passes the values to the rest of the
+nodes.
 
 3.1. Input file:
 
-The input file for all the solvers is named 'parameter.inp'. The 
-file is separated into several 'lists', which have the following 
+The input file for all the solvers is named 'parameter.inp'. The
+file is separated into several 'lists', which have the following
 syntax:
 
 -------------------------------------------------------------------
@@ -264,11 +264,11 @@ variable4 = 4.00 ! Another comment
 ...
 -------------------------------------------------------------------
 
-The number of lists required depends on the solver. An example with 
-the list of all variables for all the solvers is given in the 
-directory 'examples'. Note all variables are not needed for all the 
-solvers. The order of the lists in the file 'parameter.inp', and 
-the order of the variables inside each list, are not important. All 
+The number of lists required depends on the solver. An example with
+the list of all variables for all the solvers is given in the
+directory 'examples'. Note all variables are not needed for all the
+solvers. The order of the lists in the file 'parameter.inp', and
+the order of the variables inside each list, are not important. All
 solvers need at least a list 'status' with variables
 
 -------------------------------------------------------------------
@@ -287,12 +287,12 @@ The variables in this list are
 idir  : directory for binary input
 odir  : directory for binary output
 tdir  : directory for binary output
-status: the number of the last binary file available if a 
+status: the number of the last binary file available if a
         simulation is restarted. If zero, a new simulation is done.
 benchmark: if 1, performs a benchmark run.
 output: controls the amount of output written in the binary files.
 
-All runs also read a list with parameters for the integration, 
+All runs also read a list with parameters for the integration,
 named 'parameter'
 
 -------------------------------------------------------------------
@@ -307,8 +307,8 @@ seed = 1000      ! random seed
 
 The variables in this list are
 
-dt  : sets the time step, which must satisfy the CFL condition 
-      dt <= 1/(u*n), where u is a characteristic speed, and n is 
+dt  : sets the time step, which must satisfy the CFL condition
+      dt <= 1/(u*n), where u is a characteristic speed, and n is
       the linear resolution.
 step: controls the total number of time steps the code will do.
 tstep and cstep: number of time steps done between exporting global
@@ -334,10 +334,10 @@ These variables are:
 
 f0  : amplitude of the external force.
 u0  : amplitude of the initial velocity field.
-kdn and kup: lower and upper bounds in Fourier space for the 
+kdn and kup: lower and upper bounds in Fourier space for the
       external force and/or the initial velocity field.
 nu  : kinematic viscosity
-fparam0-9: variables that can be used to adjust the amplitude of 
+fparam0-9: variables that can be used to adjust the amplitude of
 individual terms in the expressions of the external force. See the
 files 'initialf*' in the directory 'examples' for more details.
 vparam0-9: idem for the initial velocity field.
@@ -347,7 +347,7 @@ Similar lists are used for other solvers See the file
 
 3.2. Output files:
 
-When the code is not running in benchmark mode, it writes several 
+When the code is not running in benchmark mode, it writes several
 files with global quantities and components of the fields.
 Global quantities is written to text files in the directory where
 the binary was executed, while binary files are written to the
@@ -357,14 +357,14 @@ Binary files are named by the field name, component, and a number
 that labels the time of the snapshot of the field. As an example,
 the x-component of the velocity field in a hydrodynamic simulation
 is stored as 'vx.NNN.out', where NNN is proportional to the time at
-which the snapshot was taken. The actual time can be computed as 
-t = dt*tstep*(NNN-1). 
+which the snapshot was taken. The actual time can be computed as
+t = dt*tstep*(NNN-1).
 
-The code also writes text files with quantities integrated over all 
+The code also writes text files with quantities integrated over all
 volume ('helicity.txt', 'balance.txt', etc.).  In a hydrodynamic run,
 the file 'balance.txt' has four columns with the time (t), two times
-the energy (2.E), two times the enstrophy (2.Omega), and the energy 
-injection rate (eps). 
+the energy (2.E), two times the enstrophy (2.Omega), and the energy
+injection rate (eps).
 
 A description of the contents of all output files for a specific
 solver is automatically generated at compile time, named
@@ -376,12 +376,16 @@ comments for a given output file can be found).
 
 Examples of simple scripts to read and plot output from SPECTER
 using Python can be found in the directory '../contrib'. These
-examples also include some explanantions on the contents in the 
-output files. 
+examples also include some explanantions on the contents in the
+output files.
 
 4. References:
 
-The FC-Gram technique is explained in: Bruno, O. P., & Lyon, M. 
+The Navier-Stokes solver is explained in:  Fontana, M., Bruno, O. P.,
+Mininni P. D. & Dmitruk P.; Fourier continuation method for
+incompressible fluids with boundaries. arXiv: 2002.01392.
+
+The FC-Gram technique is explained in: Bruno, O. P., & Lyon, M.
 (2010). High-order unconditionally stable FC-AD solvers for general
 smooth domains I. Basic elements. Journal of Computational Physics,
 229(6), 2009–2033. https://doi.org/10.1016/j.jcp.2009.11.020
@@ -393,11 +397,12 @@ turbulence. Parallel Computing, 37(6–7), 316–326.
 https://doi.org/10.1016/j.parco.2011.05.004
 
 CUDA paralellization is described in: Rosenberg, D., Mininni, P. D.,
-Reddy, R., & Pouquet, A. (2018). GPU parallelization of a hybrid 
+Reddy, R., & Pouquet, A. (2018). GPU parallelization of a hybrid
 pseudospectral fluid turbulence framework using CUDA.
 Available at http://arxiv.org/abs/1808.01309
 
 We ask users to cite this paper when referencing SPECTER.
-
-#TODO
+Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; Fourier
+continuation method for incompressible fluids with boundaries.
+arXiv: 2002.01392.
 
