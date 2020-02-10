@@ -56,7 +56,7 @@ To get the best out of **SPECTER** we recommend reading the information provided
 - Rosenberg D. L., Mininni P. D., Reddy R. & Pouquet A.; ArXiV (2018). *GPU parallelization of a hybrid pseudospectral fluid turbulence framework using CUDA*. arXiv: [arXiv:1808.01309](https://arxiv.org/abs/1808.01309).
 
 ## Citation
-If you use **SPECTER** for a publication, we kindly ask you to cite the following article **Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. arXiv: [arXiv:2002.01392](https://arxiv.org/abs/2002.01392)**.
+If you use **SPECTER** for a publication, we kindly ask you to cite the following article **Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. arXiv: [2002.01392](https://arxiv.org/abs/2002.01392)**.
 
 ## Authors
 - Mauro Fontana - Physics Department at University of Buenos Aires.

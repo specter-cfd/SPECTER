@@ -50,7 +50,7 @@ IF (myrank .eq. 0) PRINT*, "Maximum error in original data vs 3D ", &
 ! Diagnostic derivatives
 ! -----------------------------------------
 ! Numerical derivatives
-CALL derivk3(C1,C4,1); CALL derivk3(C1,C5,2); CALL derivk3(C1,C6,3)
+CALL derivk(C1,C4,1); CALL derivk(C1,C5,2); CALL derivk(C1,C6,3)
 
 ! ...........
 ! X direction
