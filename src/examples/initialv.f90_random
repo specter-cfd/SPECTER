@@ -18,11 +18,11 @@
 ! Derivatives in z direction are calculated analytically, to have a
 ! more accurate initial condition (specially the no-slip)
 
-! fparam0 and fparam1 are the minimum and maximum Chandrasekhar-Reid
+! vparam0 and vparam1 are the minimum and maximum Chandrasekhar-Reid
 ! harmonics to use. kdn and kup are the miniumum and maximum
 ! perpendicular wavenumber.
 
-      DO kk = int(fparam0), int(fparam1)
+      DO kk = int(vparam0), int(vparam1)
       ! CR "wavenumbers"
       IF ( kk .eq. 1 ) THEN
          rm1 = 4.73004074
