@@ -115,7 +115,7 @@
                ! Psi
                rmp = 2*pi*randu(seed)
                DO k = 1, nz-Cz
-                  rmq = SIN(kk*pi*z(k)/Lz)/sqrt(kk2(1,j,1)+kk**2*pi**2/Lz**2)**2
+                  rmq = SIN(kk*pi*z(k)/Lz)/sqrt(kk2(1,j,i)+kk**2*pi**2/Lz**2)**2
                   C3(k,j,i) = (COS(rmp)+im*SIN(rmp))*rmq
                END DO
                ENDIF
@@ -154,7 +154,7 @@
                ! Psi
                rmp = 2*pi*randu(seed)
                DO k = 1, nz-Cz
-                  rmq = SIN(kk*pi*z(k)/Lz)/sqrt(kk2(1,j,1)+kk**2*pi**2/Lz**2)**2
+                  rmq = SIN(kk*pi*z(k)/Lz)/sqrt(kk2(1,j,i)+kk**2*pi**2/Lz**2)**2
                   C3(k,j,i) = (COS(rmp)+im*SIN(rmp))*rmq
                END DO
                ENDIF

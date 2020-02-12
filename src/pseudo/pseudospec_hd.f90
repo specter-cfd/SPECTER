@@ -478,8 +478,7 @@
       CALL fftp1d_real_to_complex_z(planrc,C2,MPI_COMM_WORLD)
       CALL fftp1d_real_to_complex_z(planrc,C3,MPI_COMM_WORLD)
 
-      ! Apply homogeneous solution in normal direction
-      ! and total pressure in periodic directions
+      ! Apply homogeneous solution
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
       DO i=ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k)
