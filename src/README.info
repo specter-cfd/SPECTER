@@ -329,6 +329,8 @@ u0 = 1.00         ! amplitude of initial velocity field
 kdn = 2.00        ! minimum wavenumber
 kup = 4.00        ! maximum wavenumber
 nu = 1.e-3        ! viscosity
+vibot = 0.0       ! value of vi at z=0 (i can be x or y)
+vitop = 0.0       ! value of vi at z=Lz (i can be x or y)
 fparam0 = 0.90    ! free parameter for the forcing
 vparam0 = 0.90    ! free parameter for the velocity
 /
@@ -341,6 +343,10 @@ u0  : amplitude of the initial velocity field.
 kdn and kup: lower and upper bounds in Fourier space for the
       external force and/or the initial velocity field.
 nu  : kinematic viscosity
+vxbot : value of vx at z=0
+vxtop : value of vx at z=Lz
+vybot : value of vy at z=0
+vytop : value of vy at z=Lz
 fparam0-9: variables that can be used to adjust the amplitude of
 individual terms in the expressions of the external force. See the
 files 'initialf*' in the directory 'examples' for more details.

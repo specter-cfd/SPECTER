@@ -34,6 +34,10 @@ u0 = 1.00        ! amplitude of the initial velocity field
 kdn = 2.00       ! minimum wavenumber
 kup = 4.00       ! maximum wavenumber
 nu = 1.e-3       ! kinematic viscosity
+vxbot = 0.0      ! vx at z=0
+vxtop = 0.0      ! vx at z=Lz
+vybot = 0.0      ! vy at z=0
+vytop = 0.0      ! vy at z=Lz
 fparam0 = 1.0    ! fparam0-9 can be used to control the forcing
 vparam0 = 0.1    ! idem for the initial velocity field
 /
