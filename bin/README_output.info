@@ -1,0 +1,20 @@
+Output for this solver includes the following files:
+(note some output files may not be created, depending
+on specific solver and options being used).
+
+From subroutines in pseudospec_mod.f90 (see file for more details):
+
+From subroutines in module_dns.f90 (see file for more details):
+
+From subroutines in pseudospec_hd.f90 (see file for more details):
+! Output files contain:
+! 'balance.txt':  time, <v^2>, <omega^2>, mechanic injection rate
+! 'helicity.txt': time, kinetic helicity
+!
+
+! Output files contain:
+! 'diagnostic.txt': time, <|div(v)|^2>, <|v_s|^2>|z=0,
+!                   <|v_s|^2>|z=Lz, <|v_n|^2>|z=0, <|v_n|^2>|z=Lz
+!
+
+

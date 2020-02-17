@@ -100,7 +100,7 @@ RAYBEN_OBJS    = $(HD_OBJS) pseudospec_phd.o
 OBJS           = $($(SOLVER)_OBJS)
 OBJSDIR        = pseudo
 SUBDIRS        = mpiio fftp fftp-cu utils $(CONTRIB)/nvidia
-EXTRASDIR      = analysis
+EXTRASDIR      = tools
 GTIMER         = $(UTILS)/gtimer_mod.o
 GUTILS         = $(UTILS)/gutils_mod.o 
 

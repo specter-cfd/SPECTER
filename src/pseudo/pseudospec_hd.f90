@@ -1455,7 +1455,7 @@
 
       IF ( myrank .eq. 0) THEN
           OPEN(1,file='diagnostic.txt',position='append')
-          WRITE(1,FMT='(1P 6E13.6)') &
+          WRITE(1,FMT='(1P 2E13.6 2E25.17 2E13.6)') &
               (t-1)*dt,tm1,tmp,tmq,tmr,tms
           CLOSE(1)
       ENDIF

@@ -4,6 +4,7 @@ idir = "in/"
 odir = "out/"
 tdir = "../tables/"
 stat = 0         ! last binary file if restarting an old run
+mult = 1         ! timestep multiplier
 bench = 0        ! benchmark mode if 1
 outs = 0         ! controls the amount of output
 /

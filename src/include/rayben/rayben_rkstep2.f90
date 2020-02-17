@@ -92,6 +92,14 @@
             ENDDO
          ENDDO
 
+         ! Add slip and mean temperature perturbation at the boundaries
+         IF ( ista .eq. 1) vx(1,1,1)    =nx*ny*vxbot
+         IF ( ista .eq. 1) vx(nz-Cz,1,1)=nx*ny*vxtop
+         IF ( ista .eq. 1) vy(1,1,1)    =nx*ny*vybot
+         IF ( ista .eq. 1) vy(nz-Cz,1,1)=nx*ny*vytop
+         IF ( ista .eq. 1) th(1,1,1)    =nx*ny*thbot
+         IF ( ista .eq. 1) th(nz-Cz,1,1)=nx*ny*thtop
+
          ! Return to (kz,ky,kx) domain
          CALL fftp1d_real_to_complex_z(planrc,vx,MPI_COMM_WORLD)
          CALL fftp1d_real_to_complex_z(planrc,vy,MPI_COMM_WORLD)

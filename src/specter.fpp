@@ -104,21 +104,23 @@
       REAL(KIND=GP)    :: dump
       REAL(KIND=GP)    :: stat
       REAL(KIND=GP)    :: f0,u0
+      REAL(KIND=GP)    :: vxtop,vxbot,vytop,vybot
       REAL(KIND=GP)    :: fparam0,fparam1,fparam2,fparam3,fparam4
       REAL(KIND=GP)    :: fparam5,fparam6,fparam7,fparam8,fparam9
       REAL(KIND=GP)    :: vparam0,vparam1,vparam2,vparam3,vparam4
       REAL(KIND=GP)    :: vparam5,vparam6,vparam7,vparam8,vparam9
 #ifdef BOUSSINESQ_
       REAL(KIND=GP)    :: gama,xmom,xtemp
+      REAL(KIND=GP)    :: thtop,thbot
 #endif
 #ifdef SCALAR_
       REAL(KIND=GP)    :: kappa
       REAL(KIND=GP)    :: skup,skdn
       REAL(KIND=GP)    :: c0,s0
-      REAL(KIND=GP)    :: cparam0,cparam1,cparam2,cparam3,cparam4
-      REAL(KIND=GP)    :: cparam5,cparam6,cparam7,cparam8,cparam9
       REAL(KIND=GP)    :: sparam0,sparam1,sparam2,sparam3,sparam4
       REAL(KIND=GP)    :: sparam5,sparam6,sparam7,sparam8,sparam9
+      REAL(KIND=GP)    :: cparam0,cparam1,cparam2,cparam3,cparam4
+      REAL(KIND=GP)    :: cparam5,cparam6,cparam7,cparam8,cparam9
 #endif
 
 !
@@ -145,26 +147,28 @@
       TYPE(IOPLAN)          :: planio
       CHARACTER(len=100)    :: odir,idir,tdir
 
+      LOGICAL               :: bbenchexist
+
 
 !
 ! Namelists for the input files
-      NAMELIST / status / idir,odir,tdir,stat,bench,outs,iswap
+      NAMELIST / status / idir,odir,tdir,stat,mult,bench,outs
       NAMELIST / parameter / dt,step,tstep,cstep,seed
       NAMELIST / boxparams / Lx,Ly,Lz
-      NAMELIST / velocity / f0,u0,kdn,kup,nu,fparam0,fparam1,fparam2
-      NAMELIST / velocity / fparam3,fparam4,fparam5,fparam6,fparam7
-      NAMELIST / velocity / fparam8,fparam9,vparam0,vparam1,vparam2
-      NAMELIST / velocity / vparam3,vparam4,vparam5,vparam6,vparam7
-      NAMELIST / velocity / vparam8,vparam9
+      NAMELIST / velocity / f0,u0,kdn,kup,nu,vxtop,vxbot,vytop,vybot
+      NAMELIST / velocity / fparam0,fparam1,fparam2,fparam3,fparam5
+      NAMELIST / velocity / fparam5,fparam6,fparam7,fparam8,fparam9
+      NAMELIST / velocity / vparam0,vparam1,vparam2,vparam3,vparam4
+      NAMELIST / velocity / vparam5,vparam6,vparam7,vparam8,vparam9
 #ifdef BOUSSINESQ_
       NAMELIST / boussinesq / gama,xmom,xtemp
 #endif
 #ifdef SCALAR_
-      NAMELIST / scalar / c0,s0,skdn,skup,kappa,cparam0,cparam1
-      NAMELIST / scalar / cparam2,cparam3,cparam4,cparam5,cparam6
-      NAMELIST / scalar / cparam7,cparam8,cparam9,sparam0,sparam1
-      NAMELIST / scalar / sparam2,sparam3,sparam4,sparam5,sparam6
-      NAMELIST / scalar / sparam7,sparam8,sparam9
+      NAMELIST / scalar / c0,s0,skdn,skup,kappa,thtop,thbot
+      NAMELIST / scalar / sparam0,sparam1,sparam2,sparam3,sparam4
+      NAMELIST / scalar / sparam5,sparam6,sparam7,sparam8,sparam9
+      NAMELIST / scalar / cparam0,cparam1,cparam2,cparam3,cparam4
+      NAMELIST / scalar / cparam5,cparam6,cparam7,sparam8,sparam9
 #endif
 
 
@@ -259,8 +263,6 @@
 !     outs : = 0 writes velocity [and vector potential (MAGFIELD_)]
 !            = 1 writes vorticity [and magnetic field (MAGFIELD_)]
 !            = 2 writes current density (MAGFIELD_)
-!     iswap  = 0 does nothing to restart binary data
-!            = 1 does a byte swap of restart binary data
 
       IF (myrank.eq.0) THEN
          OPEN(1,file='parameter.inp',status='unknown',form="formatted")
@@ -288,6 +290,10 @@
          OPEN(1,file='parameter.inp',status='unknown',form="formatted")
          READ(1,NML=parameter)
          CLOSE(1)
+         dt = dt/real(mult,kind=GP)
+         step = step*mult
+         tstep = tstep*mult
+         cstep = cstep*mult
       ENDIF
       CALL MPI_BCAST(dt,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(step,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
@@ -316,15 +322,22 @@
 
 ! Reads parameters for the velocity field from the 
 ! namelist 'velocity' on the external file 'parameter.inp' 
-!     f0   : amplitude of the mechanical forcing
-!     u0   : amplitude of the initial velocity field
-!     kdn  : minimum wave number in v/mechanical forcing
-!     kup  : maximum wave number in v/mechanical forcing
-!     nu   : kinematic viscosity
+!     f0    : amplitude of the mechanical forcing
+!     u0    : amplitude of the initial velocity field
+!     kdn   : minimum wave number in v/mechanical forcing
+!     kup   : maximum wave number in v/mechanical forcing
+!     nu    : kinematic viscosity
+!     vitop : value at z=Lz of the i-th velocity component
+!     vibot : value at z=0 of the i-th velocity component
 !     fparam0-9 : ten real numbers to control properties of 
 !            the mechanical forcing
 !     vparam0-9 : ten real numbers to control properties of
 !            the initial conditions for the velocity field
+
+      vxtop = 0.0_GP
+      vxbot = 0.0_GP
+      vytop = 0.0_GP
+      vybot = 0.0_GP
 
       IF (myrank.eq.0) THEN
          OPEN(1,file='parameter.inp',status='unknown',form="formatted")
@@ -336,6 +349,10 @@
       CALL MPI_BCAST(kdn,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(kup,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(nu,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(vxtop,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(vxbot,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(vytop,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(vybot,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(fparam0,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(fparam1,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(fparam2,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
@@ -386,11 +403,14 @@
 !     skdn : minimum wave number in concentration/source
 !     skup : maximum wave number in concentration/source
 !     kappa: diffusivity
+!     thtop : value of the scalar at z=Lz
+!     thbot : value of the scalar at z=0 
 !     sparam0-9 : ten real numbers to control properties of 
 !            the source
 !     cparam0-9 : ten real numbers to control properties of
 !            the initial concentration
-
+      thtop = 0.0_GP
+      thbot = 0.0_GP
       IF (myrank.eq.0) THEN
          OPEN(1,file='parameter.inp',status='unknown',form="formatted")
          READ(1,NML=scalar)
@@ -401,6 +421,8 @@
       CALL MPI_BCAST(skdn,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(skup,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(kappa,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(thtop,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(thbot,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sparam0,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sparam1,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sparam2,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
@@ -735,8 +757,13 @@ BIN :    IF ((timet.eq.tstep).and.(bench.eq.0)) THEN
          CALL GTStop(ihomp1)
          CALL GTStop(ihwtm1)
          IF (myrank.eq.0) THEN
+            INQUIRE( file='benchmark.txt', exist=bbenchexist )
             OPEN(1,file='benchmark.txt',position='append')
 #if defined(DEF_GHOST_CUDA_)
+            IF ( .NOT. bbenchexist ) THEN
+               WRITE(1,*) &
+	       '# nx ny nz nsteps nprocs nth nstrm TCPU TOMP TWTIME TFFT TTRA TCOM TMEM TASS TCONT TTOT'
+            ENDIF
             WRITE(1,*) nx,ny,nz,(step-ini+1),nprocs,nth, &
                        nstreams                        , &
                        GTGetTime(ihcpu1)/(step-ini+1)  , &
@@ -744,8 +771,12 @@ BIN :    IF ((timet.eq.tstep).and.(bench.eq.0)) THEN
                        GTGetTime(ihwtm1)/(step-ini+1)  , &
                        ffttime/(step-ini+1), tratime/(step-ini+1), &
                        comtime/(step-ini+1), memtime/(step-ini+1), &
-                       tottime/(step-ini+1)
+                       conttime/(step-ini+1), tottime/(step-ini+1)
 #else
+            IF ( .NOT. bbenchexist ) THEN
+               WRITE(1,*) &
+	       '# nx ny nz nsteps nprocs nth TCPU TOMP TWTIME TFFT TTRA TCOM TCONT TTOT'
+            ENDIF
             WRITE(1,*) nx,ny,nz,(step-ini+1),nprocs,nth, &
                        GTGetTime(ihcpu1)/(step-ini+1),   &
                        GTGetTime(ihomp1)/(step-ini+1),   &
