@@ -111,12 +111,12 @@
       REAL(KIND=GP)    :: vparam5,vparam6,vparam7,vparam8,vparam9
 #ifdef BOUSSINESQ_
       REAL(KIND=GP)    :: gama,xmom,xtemp
-      REAL(KIND=GP)    :: thtop,thbot
 #endif
 #ifdef SCALAR_
       REAL(KIND=GP)    :: kappa
       REAL(KIND=GP)    :: skup,skdn
       REAL(KIND=GP)    :: c0,s0
+      REAL(KIND=GP)    :: thtop,thbot
       REAL(KIND=GP)    :: sparam0,sparam1,sparam2,sparam3,sparam4
       REAL(KIND=GP)    :: sparam5,sparam6,sparam7,sparam8,sparam9
       REAL(KIND=GP)    :: cparam0,cparam1,cparam2,cparam3,cparam4
