@@ -60,9 +60,9 @@
       CALL fftp3d_complex_to_real(plancr,c1,r1,MPI_COMM_WORLD)
       CALL fftp3d_complex_to_real(plancr,c2,r2,MPI_COMM_WORLD)
 
-!$omp parallel do if (kend-ksta.ge.nth) private (j,i)
-      DO k = ksta,kend
-!$omp parallel do if (kend-ksta.lt.nth) private (i)
+!$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
+      DO k = ksta,pkend
+!$omp parallel do if (pkend-ksta.lt.nth) private (i)
          DO j = 1,ny
             DO i = 1,nx
                r3(i,j,k) = r1(i,j,k)*r2(i,j,k)
@@ -77,9 +77,9 @@
       CALL fftp3d_complex_to_real(plancr,c1,r1,MPI_COMM_WORLD)
       CALL fftp3d_complex_to_real(plancr,c2,r2,MPI_COMM_WORLD)
 
-!$omp parallel do if (kend-ksta.ge.nth) private (j,i)
-      DO k = ksta,kend
-!$omp parallel do if (kend-ksta.lt.nth) private (i)
+!$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
+      DO k = ksta,pkend
+!$omp parallel do if (pkend-ksta.lt.nth) private (i)
          DO j = 1,ny
             DO i = 1,nx
                r3(i,j,k) = r3(i,j,k)+r1(i,j,k)*r2(i,j,k)
@@ -97,9 +97,9 @@
 ! Add and normalize at the same time
       tmp = 1.0_GP/ &
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
-!$omp parallel do if (kend-ksta.ge.nth) private (j,i)
-      DO k = ksta,kend
-!$omp parallel do if (kend-ksta.lt.nth) private (i)
+!$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
+      DO k = ksta,pkend
+!$omp parallel do if (pkend-ksta.lt.nth) private (i)
          DO j = 1,ny
             DO i = 1,nx
                r3(i,j,k) = (r3(i,j,k)+r1(i,j,k)*r2(i,j,k))*tmp
