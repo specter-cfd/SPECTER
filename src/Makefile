@@ -97,6 +97,7 @@ BIN         = ../bin
 HD_OBJS        = pseudospec_mod.o module_dns.o pseudospec_hd.o
 CHANNEL_OBJS   = $(HD_OBJS)
 RAYBEN_OBJS    = $(HD_OBJS) pseudospec_phd.o
+ROTCON_OBJS    = $(RAYBEN_OBJS)
 OBJS           = $($(SOLVER)_OBJS)
 OBJSDIR        = pseudo
 SUBDIRS        = mpiio fftp fftp-cu utils $(CONTRIB)/nvidia
@@ -130,8 +131,8 @@ clean:
         done
 
 dist:
-	rm -f $(BIN)/*HD* $(BIN)/*MHD* $(BIN)/*ROT* $(BIN)/*BOUSS* \
-              $(BIN)/*GPE* $(BIN)/*ARGL* $(BIN)/boots $(BIN)/trunc \
+	rm -f $(BIN)/*HD* $(BIN)/*MHD* $(BIN)/*ROT* $(BIN)/*RAY* \
+              $(BIN)/*CHANNEL* $(BIN)/*ARGL* $(BIN)/boots $(BIN)/trunc \
               $(BIN)/vt $(BIN)/shear $(BIN)/wv $(BIN)/wt $(BIN)/README* \
               *HD* *MHD* *ROT* *BOUSS* \
               *GPE* *ARGL* boots trunc vt shear wv
