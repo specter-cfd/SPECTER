@@ -6,6 +6,7 @@ to build a solver other than the default):
 
    CHANNEL    Hydrodynamic solver inside a channel
    RAYBEN     Boussinesq solver inside a channel
+   ROTCON     Rotating convection inside a channel
 
 Analysis tools
 ==============

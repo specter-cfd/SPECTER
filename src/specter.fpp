@@ -13,9 +13,9 @@
 ! your system. More info in the attached README file or in 
 ! https://github.com/mfontanaar/SPECTER.
 !
-! Notation: index 'i' is moves in the 'x' direction (or kx)
-!           index 'j' is moves in the 'y' direction (or ky)
-!           index 'k' is moves in the 'z' direction (or kz)
+! Notation: index 'i' moves in the 'x' direction (or kx)
+!           index 'j' moves in the 'y' direction (or ky)
+!           index 'k' moves in the 'z' direction (or kz)
 !
 ! Conditional compilation options:
 !           CHANNEL    Hydrodynamic solver inside a channel
@@ -30,14 +30,10 @@
 ! Feb 2019: Initial release.          
 !
 ! References:
-! - TODO Upcoming paper
-!   doi: 
-! - Rosenberg DL, Mininni PD, Reddy R, Pouquet A.; ArXiV (2018)
-!   arXiv: arXiv:1808.01309
-! - Mininni PD, Rosenberg DL, Reddy R, Pouquet A.; P. Comp.37, 123 (2011)
-!   doi: 10.1016/j.parco.2011.05.004
-! - Bruno, O. P., & Lyon, M: JCP.  229, (2010)
-!   doi: 10.1007/978-3-0348-8579-9
+! - Fontana M, Bruno OP, Mininni PD, Dmitruk P; arXiv: 2002.01392 (2020)
+! - Rosenberg DL, Mininni PD, Reddy R, Pouquet A.; Atmosphere 11, 178 (2020)
+! - Mininni PD, Rosenberg DL, Reddy R, Pouquet A.; P. Comp. 37, 123 (2011)
+! - Bruno OP, Lyon M; JCP 229, 2009 (2010)
 !
 ! Definitions for conditional compilation
 #include "specter.h"
@@ -122,6 +118,9 @@
       REAL(KIND=GP)    :: cparam0,cparam1,cparam2,cparam3,cparam4
       REAL(KIND=GP)    :: cparam5,cparam6,cparam7,cparam8,cparam9
 #endif
+#ifdef ROTATION_
+      REAL(KIND=GP)    :: omegax,omegay,omegaz
+#endif
 
 !
 ! Book keeping variables, options holders and clocks 
@@ -170,7 +169,9 @@
       NAMELIST / scalar / cparam0,cparam1,cparam2,cparam3,cparam4
       NAMELIST / scalar / cparam5,cparam6,cparam7,sparam8,sparam9
 #endif
-
+#ifdef ROTATION_
+      NAMELIST / rotation / omegax,omegay,omegaz
+#endif
 
 ! Initializes the MPI and I/O libraries
       CALL MPI_INIT_THREAD(MPI_THREAD_FUNNELED,provided,ierr)
@@ -443,6 +444,26 @@
       CALL MPI_BCAST(cparam7,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(cparam8,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(cparam9,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+#endif
+
+#ifdef ROTATION_
+! Reads parameters for runs with rotation from the 
+! namelist 'rotation' on the external file 'parameter.inp'
+!     omegax: amplitude of the uniform rotation along x
+!     omegay: amplitude of the uniform rotation along y
+!     omegaz: amplitude of the uniform rotation along z
+
+      omegax = 0.0_GP
+      omegay = 0.0_GP
+      omegaz = 0.0_GP
+      IF (myrank.eq.0) THEN
+         OPEN(1,file='parameter.inp',status='unknown',form="formatted")
+         READ(1,NML=rotation)
+         CLOSE(1)
+      ENDIF
+      CALL MPI_BCAST(omegax,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(omegay,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(omegaz,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
 #endif
 
 !

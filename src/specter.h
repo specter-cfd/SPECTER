@@ -28,6 +28,12 @@
 #define INCLUDEFNAME_ 'rayben/rayben_
 #endif
 
+#ifdef ROTCON_SOL
+#define BOUSSINESQ_
+#define SCALAR_
+#define ROTATION_
+#define INCLUDEFNAME_ 'rotcon/rotcon_
+#endif
 
 ! Do not edit below this line!
 ! Builds the names of all files to include for each solver
