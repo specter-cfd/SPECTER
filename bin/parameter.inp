@@ -60,7 +60,7 @@ sparam0 = 0.0   ! sparam0-9 can be used to control the scalar's forcing
 cparam0 = 2.0   ! idem for the initial concentration field
 /
 
-! Parameters for the passive/active scalar
+! Parameters for the uniform rotation
 &rotation
 omegax = 0.0    ! x component of the angular velocity
 omegay = 0.0    ! y component of the angular velocity
