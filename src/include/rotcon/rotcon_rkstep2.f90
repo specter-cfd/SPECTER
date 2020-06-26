@@ -11,9 +11,9 @@
 !$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k = 1,nz             ! NL = v.grad(v) + 2 Om x v - Bouyancy
-                  C4(k,j,i) = C4(k,j,i)+2*(omegay*vz(k,j,i)-omegaz*vy(k,j,i))
-                  C5(k,j,i) = C5(k,j,i)+2*(omegaz*vx(k,j,i)-omegax*vz(k,j,i))
-                  C6(k,j,i) = C6(k,j,i)+2*(omegax*vy(k,j,i)-omegay*vx(k,j,i)) &
+                  C4(k,j,i) = C4(k,j,i)-2*(omegay*vz(k,j,i)-omegaz*vy(k,j,i))
+                  C5(k,j,i) = C5(k,j,i)-2*(omegaz*vx(k,j,i)-omegax*vz(k,j,i))
+                  C6(k,j,i) = C6(k,j,i)-2*(omegax*vy(k,j,i)-omegay*vx(k,j,i)) &
                                         - xmom*th(k,j,i)  ! 2 Om x v - Bouyancy
                   C8(k,j,i) = C8(k,j,i) - xtemp*vz(k,j,i) ! Heat current
                ENDDO
