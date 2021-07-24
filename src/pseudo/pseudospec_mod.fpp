@@ -19,12 +19,21 @@
       INTEGER, PARAMETER :: ny = NY_
       INTEGER, PARAMETER :: nz = NZ_
 
-
 !
 ! Lx, Ly, Lz, are the lengths of the sides of the physical (i.e.
 ! non-continued) box, either in units of 2.pi (if periodic
 ! direction) or 1 (non-periodic case)
       REAL(KIND=GP) :: Lx,Ly,Lz
+
+!
+! Global number of continuation points and derivative order.
+      INTEGER, PARAMETER :: Cx = CX_
+      INTEGER, PARAMETER :: Cy = CY_
+      INTEGER, PARAMETER :: Cz = CZ_
+      INTEGER, PARAMETER :: ox = OX_
+      INTEGER, PARAMETER :: oy = OY_
+      INTEGER, PARAMETER :: oz = OZ_
+
 
 ! Unidimensional grids
       REAL(KIND=GP), ALLOCATABLE, DIMENSION(:) :: x,y,z
@@ -32,20 +41,6 @@
 
   END MODULE grid
 
-!=================================================================
-
-  MODULE fcgram
-!
-! Number of continuation points in each direction
-      INTEGER, PARAMETER :: Cx = CX_
-      INTEGER, PARAMETER :: Cy = CY_
-      INTEGER, PARAMETER :: Cz = CZ_
-!
-! Number of matching points in each direction
-      INTEGER, PARAMETER :: ox = OX_
-      INTEGER, PARAMETER :: oy = OY_
-      INTEGER, PARAMETER :: oz = OZ_
-  END MODULE fcgram
 !=================================================================
 
   MODULE order
@@ -71,9 +66,8 @@
 !=================================================================
 
   MODULE fft
-      USE fftplans
-      TYPE(FFTPLAN) :: planrc, plancr
-      SAVE
+      USE fcgram
+      TYPE(FCPLAN), SAVE :: planfc
 
   END MODULE fft
 !=================================================================

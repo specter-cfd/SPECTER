@@ -16,7 +16,7 @@
 ! and Psi~k^-2 => v_psi~k^-1.
 
 ! Derivatives in z direction are calculated analytically, to have a
-! more accurate initial condition (specially the no-slip)
+! more accurate initial condition
 
 ! vparam0 and vparam1 are the minimum and maximum Chandrasekhar-Reid
 ! harmonics to use. kdn and kup are the miniumum and maximum
@@ -42,11 +42,10 @@
          rm1 = (2*kk + 0.5)*pi
       ENDIF
 
-
       IF (ista.eq.1) THEN
 !$omp parallel do private (k,rmp,rmq)
-         DO j = 2,ny/2+1
-            IF ((kk2(1,j,1).le.kup**2).and.(kk2(1,j,1).ge.kdn**2)) THEN
+          DO j = 1,ny/2+1
+            IF ((kk2(1,j,1).le.kup**2) .AND. (kk2(1,j,1).ge.kdn**2)) THEN
                rmp = 2*pi*randu(seed)                       ! Phase
                rmq = randu(seed)/sqrt(kk2(1,j,1)+rm1**2)**3 ! Amplitude
 
@@ -75,7 +74,11 @@
                END DO
                
                !Psi
-               rmp = 2*pi*randu(seed)                                  ! Phase
+               IF ( MODULO(kk, 2) .eq. 1 ) THEN
+                   rmp = rmp 
+               ELSE
+                   rmp = pi/2 + rmp
+               ENDIF
                rmq = randu(seed)/sqrt(kk2(1,j,1)+kk**2*pi**2/Lz**2)**2 ! Amp
                DO k = 1, nz-Cz
                   C3(k,j,1) = C3(k,j,1) + rmq*(COS(rmp)+im*SIN(rmp))*SIN(kk*pi*z(k)/Lz)
@@ -88,7 +91,7 @@
          DO i = 2,iend
 !$omp parallel do if (iend-ista-1.lt.nth) private (k,rmp,rmq)
             DO j = 1,ny
-               IF ((kk2(1,j,i).le.kup**2).and.(kk2(1,j,i).ge.kdn**2)) THEN
+               IF ((kk2(1,j,i).le.kup**2) .AND. (kk2(1,j,i).ge.kdn**2)) THEN
                rmp = 2*pi*randu(seed)                       ! Phase
                rmq = randu(seed)/sqrt(kk2(1,j,i)+rm1**2)**3 ! Amplitude
 
@@ -113,7 +116,11 @@
                   ENDIF
                END DO
 
-               rmp = 2*pi*randu(seed)                                  ! Phase
+               IF ( MODULO(kk, 2) .eq. 1 ) THEN
+                   rmp = rmp 
+               ELSE
+                   rmp = pi/2 + rmp
+               ENDIF
                rmq = randu(seed)/sqrt(kk2(1,j,i)+kk**2*pi**2/Lz**2)**2 ! Amp
                DO k = 1, nz-Cz
                   C3(k,j,i) = C3(k,j,i) + rmq*(COS(rmp)+im*SIN(rmp))*SIN(kk*pi*z(k)/Lz)
@@ -126,7 +133,7 @@
          DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k,rmp,rmq)
             DO j = 1,ny
-               IF ((kk2(1,j,i).le.kup**2).and.(kk2(1,j,i).ge.kdn**2)) THEN
+               IF ((kk2(1,j,i).le.kup**2) .AND. (kk2(1,j,i).ge.kdn**2)) THEN
                rmp = 2*pi*randu(seed)                        ! Phase
                rmq = randu(seed)/sqrt(kk2(1,j,i)+rm1**2)**3  ! Amplitude
 
@@ -152,7 +159,11 @@
                END DO
 
                ! Psi
-               rmp = 2*pi*randu(seed)                                  ! Phase
+               IF ( MODULO(kk, 2) .eq. 1 ) THEN
+                   rmp = rmp 
+               ELSE
+                   rmp = pi/2 + rmp
+               ENDIF
                rmq = randu(seed)/sqrt(kk2(1,j,i)+kk**2*pi**2/Lz**2)**2 ! Amp
                DO k = 1, nz-Cz
                   C3(k,j,i) = C3(k,j,i) + rmq*(COS(rmp)+im*SIN(rmp))*SIN(kk*pi*z(k)/Lz)
@@ -163,31 +174,40 @@
       ENDIF
       END DO
 
-
       ! v normal
       CALL derivk(C2,C4,1)
       CALL derivk(C4,C5,1)
       CALL derivk(C2,C4,2)
       CALL derivk(C4,C6,2)
-      vz = -(C5+C6)
+      C6 = -(C5+C6)
 
       ! v tangential
       ! Poloidal
       CALL derivk(C1,C4,1)
       CALL derivk(C1,C5,2)
-      vx = C4
-      vy = C5
+      C1 = C4
+      C2 = C5
 
       ! Toroidal 
       CALL derivk(C3,C4,2)
       CALL derivk(C3,C5,1)
-      vx = vx+C4
-      vy = vy-C5
+      C1 = C1+C4
+      C2 = C2-C5
 
       ! 3D Fourier
-      CALL fftp1d_real_to_complex_z(planfc,vx,MPI_COMM_WORLD)
-      CALL fftp1d_real_to_complex_z(planfc,vy,MPI_COMM_WORLD)
-      CALL fftp1d_real_to_complex_z(planfc,vz,MPI_COMM_WORLD)
+      CALL fftp1d_real_to_complex_z(planfc,C1,MPI_COMM_WORLD)
+      CALL fftp1d_real_to_complex_z(planfc,C2,MPI_COMM_WORLD)
+      CALL fftp1d_real_to_complex_z(planfc,C6,MPI_COMM_WORLD)
 
-      ! Normalize
-      CALL normvec(vx,vy,vz,u0,1)
+      CALL energy(vx,vy,vz,tmp,1)
+      CALL MPI_BCAST(tmp,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+
+      ! Normalize to vparam0 relative noise amplitude
+      CALL normvec(C1,C2,C6,vparam9*tmp,1)
+
+      vx = vx + C1
+      vy = vy + C2
+      vz = vz + C6
+
+      ! Return to original energy
+      CALL normvec(vx,vy,vz,tmp,1)

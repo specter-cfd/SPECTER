@@ -27,6 +27,7 @@
 ! 30 Aug 2009: SINGLE/DOUBLE precision (D. Rosenberg & P. Mininni)
 !  3 Jan 2017: Anisotropic boxes (P. Mininni)
 ! 29 Aug 2019: FC-Gram (M. Fontana)
+!    Dec 2020: Updated calls to MPI3 and MPI4 practices. (P. Mininni)
 !
 ! References:
 ! Lyon, M.; SIAM J. Sci. Comp., 33(6) (2011). DOI:10.1137/11082436X
@@ -39,7 +40,6 @@
 !*****************************************************************
       SUBROUTINE fftp3d_init_threads(err)
 !-----------------------------------------------------------------
-!
 ! Initializes FFTW threads.
 !
 ! Parameters
@@ -58,143 +58,8 @@
       END SUBROUTINE fftp3d_init_threads
 
 !*****************************************************************
-      SUBROUTINE fftp3d_create_plan_rc(plan,n,C,o,tdir,flags)
+      SUBROUTINE fftp3d_create_plan_rc(plan,n,flags)
 !-----------------------------------------------------------------
-!
-! Creates plans for the FFTW in each node.
-!
-! Parameters
-!     plan   : contains the parallel 3D plan [OUT]
-!     n      : the size of the dimensions of the input array [IN]
-!     C      : number of continuation points in each direction [IN]
-!     d      : number of matching points in each direction [IN]
-!     tdir   : directory containing the FC-Gram tables [IN]
-!     flags  : flags for the FFTW [IN]
-!              FFTW_ESTIMATE (sub-optimal but faster)
-!              FFTW_MEASURE (optimal but slower to create plans)
-!              FFTW_PATIENT AND FFTW_EXHAUSTIVE are also available
-!              for extra performance, but may take a long time to
-!              create plans (specially when using OpenMP)
-!-----------------------------------------------------------------
-
-      USE mpivars
-      USE fftplans
-!$    USE threads
-      USE gtimer
-      IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: n(3),C(3),o(3)
-      INTEGER, INTENT(IN) :: flags
-      CHARACTER(len=*), INTENT(IN) :: tdir
-      TYPE(FFTPLAN), INTENT(OUT) :: plan
-
-      DOUBLE PRECISION, ALLOCATABLE :: A(:,:),Q(:,:)
-      INTEGER :: i,j
-      CHARACTER(len=5) :: cstr,dstr
-
-      ALLOCATE ( plan%ccarr(n(3),n(2),ista:iend)    )
-      ALLOCATE ( plan%carr(n(1)/2+1,n(2),ksta:kend) )
-      ALLOCATE ( plan%rarr(n(1),n(2),ksta:kend)     )
-!$    CALL GPMANGLE(plan_with_nthreads)(nth)
-
-      CALL GPMANGLE(plan_many_dft_r2c)(plan%planr,2,(/n(1),n(2)/),    &
-                         kend-ksta+1,plan%rarr,                       &
-                         (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),     &
-                         plan%carr,(/n(1)/2+1,n(2)*(kend-ksta+1)/),1, &
-                         (n(1)/2+1)*n(2),flags)
-      CALL GPMANGLE(plan_many_dft)(plan%planc,1,n(3),n(2)*(iend-ista+1), &
-                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),      &
-                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),      &
-                         -1,flags)
-      plan%nx = n(1)
-      plan%ny = n(2)
-      plan%nz = n(3)
-      ALLOCATE( plan%itype1(0:nprocs-1) )
-      ALLOCATE( plan%itype2(0:nprocs-1) )
-      CALL fftp3d_create_block(n,nprocs,myrank,plan%itype1, &
-                              plan%itype2)
-
-      plan%Cx = C(1)
-      plan%Cy = C(2)
-      plan%Cz = C(3)
-      plan%ox = o(1)
-      plan%oy = o(2)
-      plan%oz = o(3)
-     
-      ! Load continuation matrices. Note that only the transpose of Q
-      ! is needed.
-      IF ( plan%Cx .ne. 0 ) THEN
-         ALLOCATE( A(plan%Cx,plan%ox), Q(plan%ox,plan%ox) )
-         WRITE(cstr,'(I5)') plan%Cx
-         WRITE(dstr,'(I5)') plan%ox
-
-         OPEN(10, FILE=trim(tdir) // '/A' // trim(adjustl(cstr)) // '-' // &
-              trim(adjustl(dstr)) //  '.dat', &
-              FORM='unformatted', ACCESS='stream', ACTION='read')
-         READ(10) A
-         CLOSE(10)
-         OPEN(10, FILE=trim(tdir) // '/Q' // trim(adjustl(dstr)) // '.dat',&
-              FORM='unformatted', ACCESS='stream', ACTION='read')
-         READ(10) Q
-         CLOSE(10)
-         Q = TRANSPOSE(Q)
-         plan%Gxf = MATMUL(A(plan%Cx:1:-1,:),Q)
-         plan%Gxl = MATMUL(A,Q)
-         DEALLOCATE(A,Q)
-      ENDIF
-      IF ( plan%Cy .ne. 0 ) THEN
-         ALLOCATE( A(plan%Cy,plan%oy), Q(plan%oy,plan%oy) )
-         WRITE(cstr,'(I5)') plan%Cy
-         WRITE(dstr,'(I5)') plan%oy
-
-         OPEN(10, FILE=trim(tdir) // '/A' // trim(adjustl(cstr)) // '-' // &
-              trim(adjustl(dstr)) //  '.dat', &
-              FORM='unformatted', ACCESS='stream', ACTION='read')
-         READ(10) A
-         CLOSE(10)
-         OPEN(10, FILE=trim(tdir) // '/Q' // trim(adjustl(dstr)) // '.dat',&
-              FORM='unformatted', ACCESS='stream', ACTION='read')
-         READ(10) Q
-         CLOSE(10)
-         Q = TRANSPOSE(Q)
-         plan%Gyf = MATMUL(A(plan%Cy:1:-1,:),Q)
-         plan%Gyl = MATMUL(A,Q)
-         DEALLOCATE(A,Q)
-     ENDIF
-      IF ( plan%Cz .ne. 0 ) THEN
-         ALLOCATE( A(plan%Cz,plan%oz), Q(plan%oz,plan%oz) )
-         WRITE(cstr,'(I5)') plan%Cz
-         WRITE(dstr,'(I5)') plan%oz
-
-         OPEN(10, FILE=trim(tdir) // '/A' // trim(adjustl(cstr)) // '-' // &
-              trim(adjustl(dstr)) //  '.dat', &
-              FORM='unformatted', ACCESS='stream', ACTION='read')
-         READ(10) A
-         CLOSE(10)
-         OPEN(10, FILE=trim(tdir) // '/Q' // trim(adjustl(dstr)) // '.dat',&
-              FORM='unformatted', ACCESS='stream', ACTION='read')
-         READ(10) Q
-         CLOSE(10)
-         Q = TRANSPOSE(Q)
-         plan%Gzf = MATMUL(A(plan%Cz:1:-1,:),Q(:,plan%oz:1:-1))
-         plan%Gzl = MATMUL(A,Q)
-        DEALLOCATE(A,Q)
-    ENDIF
-
-      CALL GTStart(hcom,GT_WTIME)
-      CALL GTStart(hfft,GT_WTIME)
-      CALL GTStart(htra,GT_WTIME)
-      CALL GTStart(hcont,GT_WTIME)
-      CALL GTStart(htot,GT_WTIME)
-
-
-      RETURN
-      END SUBROUTINE fftp3d_create_plan_rc
-
-!*****************************************************************
-      SUBROUTINE fftp3d_create_plan_cr(plan,n,flags)
-!-----------------------------------------------------------------
-!
 ! Creates plans for the FFTW in each node.
 !
 ! Parameters
@@ -223,26 +88,101 @@
       ALLOCATE ( plan%rarr(n(1),n(2),ksta:kend)     )
 !$    CALL GPMANGLE(plan_with_nthreads)(nth)
 
-      CALL GPMANGLE(plan_many_dft_c2r)(plan%planr,2,(/n(1),n(2)/),    &
-                         kend-ksta+1,plan%carr,                       &
-                         (/n(1)/2+1,n(2)*(kend-ksta+1)/),1,           &
-                         (n(1)/2+1)*n(2),plan%rarr,                   &
-                         (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),flags)
+      ! Create XY -> Z plan
+      CALL GPMANGLE(plan_many_dft_r2c)(plan%planrxy,2,(/n(1),n(2)/),          &
+                         kend-ksta+1,plan%rarr,                               &
+                         (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),             &
+                         plan%carr,(/n(1)/2+1,n(2)*(kend-ksta+1)/),1,         &
+                         (n(1)/2+1)*n(2),flags)
+      CALL GPMANGLE(plan_many_dft)(plan%plancz,1,n(3),n(2)*(iend-ista+1),     &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
+                         -1,flags)
 
-      CALL GPMANGLE(plan_many_dft)(plan%planc,1,n(3),n(2)*(iend-ista+1), &
-                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),      &
-                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),      &
-                         1,flags)
+      ! Create X -> YZ plan
+      CALL GPMANGLE(plan_many_dft_r2c)(plan%planrx,1,n(1),                    &
+                         n(2)*(kend-ksta+1),plan%rarr,n(1)*n(2)*(kend-ksta+1),&
+                         1,n(1),plan%carr,(n(1)/2+1)*n(2)*(kend-ksta+1),1,    &
+                         (n(1)/2+1),flags)
+      CALL GPMANGLE(plan_many_dft)(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),&
+                         plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
+                         plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
+                         -1,flags)
       plan%nx = n(1)
       plan%ny = n(2)
       plan%nz = n(3)
+      ALLOCATE( plan%itype1(0:nprocs-1) )
+      ALLOCATE( plan%itype2(0:nprocs-1) )
+      CALL fftp3d_create_block(n,nprocs,myrank,plan%itype1, &
+                              plan%itype2)
 
-      plan%Cx = 0
-      plan%Cy = 0
-      plan%Cz = 0
-      plan%ox = 0
-      plan%oy = 0
-      plan%oz = 0
+      CALL GTStart(hcom,GT_WTIME)
+      CALL GTStart(hfft,GT_WTIME)
+      CALL GTStart(htra,GT_WTIME)
+      CALL GTStart(hcont,GT_WTIME)
+      CALL GTStart(htot,GT_WTIME)
+
+
+      RETURN
+      END SUBROUTINE fftp3d_create_plan_rc
+
+!*****************************************************************
+      SUBROUTINE fftp3d_create_plan_cr(plan,n,flags)
+!-----------------------------------------------------------------
+! Creates plans for the FFTW in each node.
+!
+! Parameters
+!     plan   : contains the parallel 3D plan [OUT]
+!     n      : the size of the dimensions of the input array [IN]
+!     flags  : flags for the FFTW [IN]
+!              FFTW_ESTIMATE (sub-optimal but faster)
+!              FFTW_MEASURE (optimal but slower to create plans)
+!              FFTW_PATIENT AND FFTW_EXHAUSTIVE are also available
+!              for extra performance, but may take a long time to
+!              create plans (specially when using OpenMP)
+!-----------------------------------------------------------------
+
+      USE mpivars
+      USE fftplans
+!$    USE threads
+      USE gtimer
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: n(3)
+      INTEGER, INTENT(IN) :: flags
+      TYPE(FFTPLAN), INTENT(OUT) :: plan
+
+      ALLOCATE ( plan%ccarr(n(3),n(2),ista:iend)    )
+      ALLOCATE ( plan%carr(n(1)/2+1,n(2),ksta:kend) )
+      ALLOCATE ( plan%rarr(n(1),n(2),ksta:kend)     )
+!$    CALL GPMANGLE(plan_with_nthreads)(nth)
+
+      ! Create Z -> YX plan
+      CALL GPMANGLE(plan_many_dft_c2r)(plan%planrxy,2,(/n(1),n(2)/),          &
+                         kend-ksta+1,plan%carr,                               &
+                         (/n(1)/2+1,n(2)*(kend-ksta+1)/),1,                   &
+                         (n(1)/2+1)*n(2),plan%rarr,                           &
+                         (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),flags)
+
+      CALL GPMANGLE(plan_many_dft)(plan%plancz,1,n(3),n(2)*(iend-ista+1),     &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
+                         1,flags)
+
+      ! Create ZY -> X plan
+      CALL GPMANGLE(plan_many_dft_c2r)(plan%planrx,1,n(1),n(2)*(kend-ksta+1), &
+                         plan%carr,(n(1)/2+1)*n(2)*(kend-ksta+1),1,n(1)/2+1,  &
+                         plan%rarr,n(1)*n(2)*(kend-ksta+1),1,n(1),flags)
+
+      CALL GPMANGLE(plan_many_dft)(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),&
+                         plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
+                         plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
+                         1,flags)
+
+
+      plan%nx = n(1)
+      plan%ny = n(2)
+      plan%nz = n(3)
 
       ALLOCATE( plan%itype1(0:nprocs-1) )
       ALLOCATE( plan%itype2(0:nprocs-1) )
@@ -264,7 +204,6 @@
 !*****************************************************************
       SUBROUTINE fftp3d_destroy_plan(plan)
 !-----------------------------------------------------------------
-!
 ! Destroys FFTW plans in each node.
 !
 ! Parameters
@@ -277,17 +216,16 @@
 
       TYPE(FFTPLAN), INTENT(INOUT) :: plan
 
-      CALL GPMANGLE(destroy_plan)(plan%planr)
-      CALL GPMANGLE(destroy_plan)(plan%planc)
+      CALL GPMANGLE(destroy_plan)(plan%planrxy)
+      CALL GPMANGLE(destroy_plan)(plan%planrx)
+      CALL GPMANGLE(destroy_plan)(plan%plancyz)
+      CALL GPMANGLE(destroy_plan)(plan%plancz)
+
       DEALLOCATE( plan%ccarr  )
       DEALLOCATE( plan%carr   )
       DEALLOCATE( plan%rarr   )
       DEALLOCATE( plan%itype1 )
       DEALLOCATE( plan%itype2 )
-
-      IF ( plan%Cx .ne. 0 ) DEALLOCATE( plan%Gxf,plan%Gxl )
-      IF ( plan%Cy .ne. 0 ) DEALLOCATE( plan%Gyf,plan%Gyl )
-      IF ( plan%Cz .ne. 0 ) DEALLOCATE( plan%Gzf,plan%Gzl )
 
       CALL GTFree(hcom)
       CALL GTFree(hfft)
@@ -301,7 +239,6 @@
 !*****************************************************************
       SUBROUTINE fftp3d_create_block(n,nprocs,myrank,itype1,itype2)
 !-----------------------------------------------------------------
-!
 ! Defines derived data types for sending and receiving 
 ! blocks of the 3D matrix between processors. The data 
 ! types are used to transpose the matrix during the FFT.
@@ -347,13 +284,14 @@
 !*****************************************************************
       SUBROUTINE fftp3d_real_to_complex(plan,in,out,comm)
 !-----------------------------------------------------------------
-!
 ! Computes the 3D real-to-complex FFT in parallel. The
 ! complex output has the same structure than the output
-! of the 3D FFTW, but the output is transposed.
+! of the 3D FFTW, but the output is transposed. If the input
+! is non-periodic FC-Gram periodic extensions are appropriately
+! computed.
 !
 ! Parameters
-!     plan : the 3D plan created with fftp3d_create_plan [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
 !     in   : real input array [IN]
 !     out  : complex output array [OUT]
 !     comm : the MPI communicator (handle) [IN]
@@ -362,114 +300,23 @@
       USE commtypes
       USE fprecision
       USE mpivars
-      USE fftplans
-      USE gtimer
-!$    USE threads
+      USE fcgram
       IMPLICIT NONE
 
-      TYPE(FFTPLAN), INTENT(IN) :: plan
+      TYPE(FCPLAN), INTENT(IN) :: plan
 
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(plan%nz,plan%ny,ista:iend) :: out
-      COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%ny,plan%nz)           :: c1
-      REAL(KIND=GP), INTENT(IN), DIMENSION(plan%nx,plan%ny,ksta:kend) :: IN
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: out
+      REAL(KIND=GP), INTENT(IN), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: in
 
-      DOUBLE PRECISION                    :: t0, t1
- 
-      INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
-      INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
       INTEGER, INTENT(IN)                 :: comm
 
-
-      INTEGER :: i,j,k
-      INTEGER :: ii,jj,kk
-      INTEGER :: irank
-      INTEGER :: isendTo,igetFrom
-      INTEGER :: istrip,iproc
-
-      CALL GTStart(htot)
-!
-! 2D FFT in each node using the FFTW library
-!
-      CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft_r2c)(plan%planr,in,plan%carr)
-      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft); 
-   
-!
-!
-! Transposes the result between nodes using 
-! strip mining when nstrip>1 (rreddy@psc.edu)
-!
-      CALL GTStart(hcom)
-      do iproc = 0, nprocs-1, nstrip
-         do istrip=0, nstrip-1
-            irank = iproc + istrip
-
-            isendTo = myrank + irank
-            if ( isendTo .ge. nprocs ) isendTo = isendTo - nprocs
-
-            igetFrom = myrank - irank
-            if ( igetFrom .lt. 0 ) igetFrom = igetFrom + nprocs
-            CALL MPI_IRECV(c1,1,plan%itype2(igetFrom),igetFrom,      & 
-                          1,comm,ireq2(irank),ierr)
-
-            CALL MPI_ISEND(plan%carr,1,plan%itype1(isendTo),isendTo, &
-                          1,comm,ireq1(irank),ierr)
-         enddo
-
-         do istrip=0, nstrip-1
-            irank = iproc + istrip
-            CALL MPI_WAIT(ireq1(irank),istatus,ierr)
-            CALL MPI_WAIT(ireq2(irank),istatus,ierr)
-         enddo
-      enddo
-      CALL GTStop(hcom); comtime = comtime + GTGetTime(hcom)
-!
-! Cache friendly transposition
-!
-      CALL GTStart(htra)
-!$omp parallel do if ((iend-ista)/csize.ge.nth) private (jj,kk,i,j,k)
-      DO ii = ista,iend,csize
-!$omp parallel do if ((iend-ista)/csize.lt.nth) private (kk,i,j,k)
-         DO jj = 1,plan%ny,csize
-            DO kk = 1,plan%nz,csize
-               DO i = ii,min(iend,ii+csize-1)
-               DO j = jj,min(plan%ny,jj+csize-1)
-               DO k = kk,min(plan%nz,kk+csize-1)
-                  out(k,j,i) = c1(i,j,k)
-               END DO
-               END DO
-               END DO
-            END DO
-         END DO
-      END DO
-      CALL GTStop(htra); tratime = tratime + GTGetTime(htra)
-
-      CALL GTStart(hcont)
-! Continuation in Z direction, where the box is nonperiodic
-!TODO Explore performance benefits of manual MATMUL 
-!$omp parallel do if ((iend-ista)/csize.ge.nth) private (j)
-      DO i= ista,iend
-!$omp parallel do if ((iend-ista)/csize.lt.nth)
-         DO j =1,plan%ny
-            ! Continuation using last o points
-            out(plan%nz-plan%Cz+1:plan%nz,j,i) = &
-               MATMUL(plan%Gzl, out(plan%nz-plan%Cz-plan%oz+1:plan%nz-plan%Cz,j, i))
-   
-            ! Continuation using first o points
-            out(plan%nz-plan%Cz+1:plan%nz,j,i) = out(plan%nz-plan%Cz+1:plan%nz,&
-                    j, i) + MATMUL(plan%Gzf, out(1:plan%oz,j,i))
-         ENDDO
-      ENDDO
-      CALL GTStop(hcont); conttime = conttime + GTGetTime(hcont)
-
-!
-! 1D FFT in each node using the FFTW library
-!
-      CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft)(plan%planc,out,out)
-      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
-
-      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
+      IF (plan%y%C .gt. 0) THEN
+         CALL fftp1d_real_to_complex_x(plan,in,out,comm)
+         CALL fftp2d_real_to_complex_yz(plan,out,comm)
+      ELSE
+         CALL fftp2d_real_to_complex_xy(plan,in,out,comm)
+         CALL fftp1d_real_to_complex_z(plan,out,comm)
+      ENDIF
 
       RETURN
       END SUBROUTINE fftp3d_real_to_complex
@@ -477,13 +324,12 @@
 !*****************************************************************
       SUBROUTINE fftp2d_real_to_complex_xy(plan,in,out,comm)
 !-----------------------------------------------------------------
-!
-! Computes the 3D real-to-complex FFT in parallel. The
-! complex output has the same structure than the output
-! of the 3D FFTW, but the output is transposed.
+! Computes a local 2D real-to-complex FFT in the first two indices
+! and transposes the result. If the input has shape (nx,ny,nz) the
+! output's shape is (nz,ny,nx/2+1).
 !
 ! Parameters
-!     plan : the 3D plan created with fftp3d_create_plan [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
 !     in   : real input array [IN]
 !     out  : complex output array [OUT]
 !     comm : the MPI communicator (handle) [IN]
@@ -492,16 +338,16 @@
       USE commtypes
       USE fprecision
       USE mpivars
-      USE fftplans
+      USE fcgram
       USE gtimer
 !$    USE threads
       IMPLICIT NONE
 
-      TYPE(FFTPLAN), INTENT(IN) :: plan
+      TYPE(FCPLAN), INTENT(IN) :: plan
 
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(plan%nz,plan%ny,ista:iend) :: out
-      COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%ny,plan%nz)          :: c1
-      REAL(KIND=GP), INTENT(IN), DIMENSION(plan%nx,plan%ny,ksta:kend) :: IN
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: out
+      COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%y%n,plan%z%n)          :: c1
+      REAL(KIND=GP), INTENT(IN), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: IN
 
       INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
       INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
@@ -517,7 +363,7 @@
 ! 2D FFT in each node using the FFTW library
 !
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft_r2c)(plan%planr,in,plan%carr)
+      CALL GPMANGLE(execute_dft_r2c)(plan%planrc%planrxy,in,plan%planrc%carr)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft); 
    
 !
@@ -535,10 +381,10 @@
 
             igetFrom = myrank - irank
             if ( igetFrom .lt. 0 ) igetFrom = igetFrom + nprocs
-            CALL MPI_IRECV(c1,1,plan%itype2(igetFrom),igetFrom,      & 
+            CALL MPI_IRECV(c1,1,plan%planrc%itype2(igetFrom),igetFrom,      & 
                           1,comm,ireq2(irank),ierr)
 
-            CALL MPI_ISEND(plan%carr,1,plan%itype1(isendTo),isendTo, &
+            CALL MPI_ISEND(plan%planrc%carr,1,plan%planrc%itype1(isendTo),isendTo, &
                           1,comm,ireq1(irank),ierr)
          enddo
 
@@ -556,11 +402,11 @@
 !$omp parallel do if ((iend-ista)/csize.ge.nth) private (jj,kk,i,j,k)
       DO ii = ista,iend,csize
 !$omp parallel do if ((iend-ista)/csize.lt.nth) private (kk,i,j,k)
-         DO jj = 1,plan%ny,csize
-            DO kk = 1,plan%nz,csize
+         DO jj = 1,plan%y%n,csize
+            DO kk = 1,plan%z%n,csize
                DO i = ii,min(iend,ii+csize-1)
-               DO j = jj,min(plan%ny,jj+csize-1)
-               DO k = kk,min(plan%nz,kk+csize-1)
+               DO j = jj,min(plan%y%n,jj+csize-1)
+               DO k = kk,min(plan%z%n,kk+csize-1)
                   out(k,j,i) = c1(i,j,k)
                END DO
                END DO
@@ -575,57 +421,268 @@
       END SUBROUTINE fftp2d_real_to_complex_xy
 
 !*****************************************************************
-      SUBROUTINE fftp1d_real_to_complex_z(plan,inout,comm)
+      SUBROUTINE fftp2d_real_to_complex_yz(plan,inout,comm)
 !-----------------------------------------------------------------
-!
-! Computes the 3D real-to-complex FFT in parallel. The
-! complex output has the same structure than the output
-! of the 3D FFTW, but the output is transposed.
+! Computes the 2D forward FFT along the first two indices of the
+! input array. In the case the input array is non-periodic, a 
+! suitable FC-Gram periodic extension is computed. The operation
+! is performed inplace.
 !
 ! Parameters
-!     plan : the 3D plan created with fftp3d_create_plan [IN]
-!     in   : contains f(z,ky,kx) as input and returns f*(kz,ky,kx) [INOUT]
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     in   : contains f(z,y,kx) as input and returns f(kz,ky,kx) [INOUT]
 !     comm : the MPI communicator (handle) [IN]
 !-----------------------------------------------------------------
 
       USE commtypes
       USE fprecision
       USE mpivars
-      USE fftplans
+      USE gtimer
+      USE fcgram
+!$    USE threads
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout
+      INTEGER, INTENT(IN)                 :: comm
+
+      INTEGER :: ny,Cy,dy,nz,Cz,dz
+      INTEGER :: i,j,ii,jj
+
+      ny = plan%y%n
+      Cy = plan%y%C
+      dy = plan%y%d
+
+      nz = plan%z%n
+      Cz = plan%z%C
+      dz = plan%z%d
+
+      CALL GTStart(htot)
+      CALL GTStart(hcont)
+
+      ! Continuation in Y direction
+!$omp paralleldo if ((iend-ista)/csize.ge.nth) private (j,ii,jj)
+      DO i= ista,iend
+!$omp parallel do if ((iend-ista)/csize.lt.nth) private (ii,jj)
+      DO j =1,nz-Cz
+         DO ii=1,Cy
+            inout(j,ny-Cy+ii,i) = plan%y%dir(ii,1)*inout(j,ny-Cy-dy+1,i) +&
+                                plan%y%dir(Cy-ii+1,1)*inout(j,dy,i)
+         ENDDO
+         DO jj=2,dy
+            DO ii=1,Cy
+               inout(j,ny-Cy+ii,i) = inout(j,ny-Cy+ii,i) +&
+                                   plan%y%dir(ii,jj)*inout(j,ny-Cy-dy+jj,i) +&
+                                   plan%y%dir(Cy-ii+1,jj)*inout(j,dy-jj+1,i)
+            ENDDO
+         ENDDO
+      ENDDO
+      ENDDO
+
+
+!$omp paralleldo if ((iend-ista)/csize.ge.nth) private (j,ii,jj)
+      DO i= ista,iend
+!$omp parallel do if ((iend-ista)/csize.lt.nth) private (ii,jj)
+      DO j =1,ny
+         DO ii=1,Cz
+            inout(nz-Cz+ii,j,i) = plan%z%dir(ii,1)*inout(nz-Cz-dz+1,j,i) +&
+                                  plan%z%dir(Cz-ii+1,1)*inout(dz,j,i)
+         ENDDO
+         DO jj=2,dz
+            DO ii=1,Cz
+               inout(nz-Cz+ii,j,i) = inout(nz-Cz+ii,j,i) +&
+                                   plan%z%dir(ii,jj)*inout(nz-Cz-dz+jj,j,i) +&
+                                   plan%z%dir(Cz-ii+1,jj)*inout(dz-jj+1,j,i)
+            ENDDO
+         ENDDO
+      ENDDO
+      ENDDO
+
+      CALL GTStop(hcont); conttime = conttime + GTGetTime(hcont)
+
+!
+! 2D FFT in each node using the FFTW library
+!
+      CALL GTStart(hfft)
+      CALL GPMANGLE(execute_dft)(plan%planrc%plancyz,inout,inout)
+      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
+
+      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
+
+      RETURN
+      END SUBROUTINE fftp2d_real_to_complex_yz
+
+
+!*****************************************************************
+      SUBROUTINE fftp1d_real_to_complex_x(plan,in,out,comm)
+!-----------------------------------------------------------------
+! Computes the 1D real-to-complex FFT along the first index of
+! the input array and transposes the result. If the input has 
+! shape (nx,ny,nz) the output's shape is (nz,ny,nx/2+1).
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     in   : real input array [IN]
+!     out  : complex output array [OUT]
+!     comm : the MPI communicator (handle) [IN]
+!-----------------------------------------------------------------
+
+      USE commtypes
+      USE fprecision
+      USE mpivars
+      USE fcgram
       USE gtimer
 !$    USE threads
       IMPLICIT NONE
 
-      TYPE(FFTPLAN), INTENT(IN) :: plan
-      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%nz,plan%ny,ista:iend) :: inout
+      TYPE(FCPLAN), INTENT(IN) :: plan
+
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: out
+      COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%y%n,plan%z%n)          :: c1
+      REAL(KIND=GP), INTENT(IN), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: IN
+
+      INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
+      INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
+      INTEGER, INTENT(IN)                 :: comm
+      INTEGER :: i,j,k
+      INTEGER :: ii,jj,kk
+      INTEGER :: irank
+      INTEGER :: isendTo,igetFrom
+      INTEGER :: istrip,iproc
+
+      CALL GTStart(htot)
+!
+! 1D FFT in each node using the FFTW library
+!
+      CALL GTStart(hfft)
+      CALL GPMANGLE(execute_dft_r2c)(plan%planrc%planrx,in,plan%planrc%carr)
+      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft); 
+   
+!
+!
+! Transposes the result between nodes using 
+! strip mining when nstrip>1 (rreddy@psc.edu)
+!
+      CALL GTStart(hcom)
+      do iproc = 0, nprocs-1, nstrip
+         do istrip=0, nstrip-1
+            irank = iproc + istrip
+
+            isendTo = myrank + irank
+            if ( isendTo .ge. nprocs ) isendTo = isendTo - nprocs
+
+            igetFrom = myrank - irank
+            if ( igetFrom .lt. 0 ) igetFrom = igetFrom + nprocs
+            CALL MPI_IRECV(c1,1,plan%planrc%itype2(igetFrom),igetFrom,      & 
+                          1,comm,ireq2(irank),ierr)
+
+            CALL MPI_ISEND(plan%planrc%carr,1,plan%planrc%itype1(isendTo),isendTo, &
+                          1,comm,ireq1(irank),ierr)
+         enddo
+
+         do istrip=0, nstrip-1
+            irank = iproc + istrip
+            CALL MPI_WAIT(ireq1(irank),istatus,ierr)
+            CALL MPI_WAIT(ireq2(irank),istatus,ierr)
+         enddo
+      enddo
+      CALL GTStop(hcom); comtime = comtime + GTGetTime(hcom)
+!
+! Cache friendly transposition
+!
+      CALL GTStart(htra)
+!$omp parallel do if ((iend-ista)/csize.ge.nth) private (jj,kk,i,j,k)
+      DO ii = ista,iend,csize
+!$omp parallel do if ((iend-ista)/csize.lt.nth) private (kk,i,j,k)
+         DO jj = 1,plan%y%n,csize
+            DO kk = 1,plan%z%n,csize
+               DO i = ii,min(iend,ii+csize-1)
+               DO j = jj,min(plan%y%n,jj+csize-1)
+               DO k = kk,min(plan%z%n,kk+csize-1)
+                  out(k,j,i) = c1(i,j,k)
+               END DO
+               END DO
+               END DO
+            END DO
+         END DO
+      END DO
+      CALL GTStop(htra); tratime = tratime + GTGetTime(htra)
+      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
+
+      RETURN
+      END SUBROUTINE fftp1d_real_to_complex_x
+
+
+!*****************************************************************
+      SUBROUTINE fftp1d_real_to_complex_z(plan,inout,comm)
+!-----------------------------------------------------------------
+! Computes the 1D forward FFT along the first index of the input
+! array. In the case the input array is non-periodic, a suitable 
+! FC-Gram periodic extension is computed. The operation is
+! performed inplace.
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     in   : contains f(z,ky,kx) as input and returns f(kz,ky,kx) [INOUT]
+!     comm : the MPI communicator (handle) [IN]
+!-----------------------------------------------------------------
+
+      USE commtypes
+      USE fprecision
+      USE mpivars
+      USE gtimer
+      USE fcgram
+!$    USE threads
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout
       INTEGER, INTENT(IN)                 :: comm
 
-      INTEGER :: i,j,k
+      INTEGER :: n,C,d
+      INTEGER :: i,j,ii,jj
+
+      n = plan%z%n
+      C = plan%z%C
+      d = plan%z%d
 
       CALL GTStart(htot)
       CALL GTStart(hcont)
-! Continuation in Z direction, where the box is nonperiodic
-! Q is already transposed
-!$omp paralleldo if ((iend-ista)/csize.ge.nth) private (j)
-      DO i= ista,iend
-!$omp parallel do if ((iend-ista)/csize.lt.nth)
-         DO j =1,plan%ny
-            ! Continuation using last o points
-            inout(plan%nz-plan%Cz+1:plan%nz,j,i) = &
-               MATMUL(plan%Gzl, inout(plan%nz-plan%Cz-plan%oz+1:plan%nz-plan%Cz,j, i))
 
-            ! Continuation using first o points
-            inout(plan%nz-plan%Cz+1:plan%nz,j,i) = inout(plan%nz-plan%Cz+1:plan%nz,&
-                    j, i) + MATMUL(plan%Gzf, inout(1:plan%oz,j,i))
+      IF (plan%z%C .ge. 0) THEN
+!$omp paralleldo if ((iend-ista)/csize.ge.nth) private (j,ii,jj)
+      DO i= ista,iend
+!$omp parallel do if ((iend-ista)/csize.lt.nth) private (ii,jj)
+      DO j =1,plan%y%n
+         DO ii=1,C
+            inout(n-C+ii,j,i) = plan%z%dir(ii,1)*inout(n-C-d+1,j,i) +&
+                                plan%z%dir(C-ii+1,1)*inout(d,j,i)
          ENDDO
+         DO jj=2,d
+            DO ii=1,C
+               inout(n-C+ii,j,i) = inout(n-C+ii,j,i) +&
+                                   plan%z%dir(ii,jj)*inout(n-C-d+jj,j,i) +&
+                                   plan%z%dir(C-ii+1,jj)*inout(d-jj+1,j,i)
+            ENDDO
+         ENDDO
+
+! Old approach
+!            ! Continuation using last o points
+!            inout(n-C+1:n,j,i) = MATMUL(planfc%z%dir, inout(n-C-d+1:n-C,j,i))
+!
+!            ! Continuation using first o points
+!            inout(n-C+1:n,j,i) = inout(n-C+1:n,j, i) + &
+!                MATMUL(planfc%z%dir(C:1:-1,:), inout(d:1:-1,j,i))
       ENDDO
+      ENDDO
+      ENDIF
       CALL GTStop(hcont); conttime = conttime + GTGetTime(hcont)
 
 !
 ! 1D FFT in each node using the FFTW library
 !
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft)(plan%planc,inout,inout)
+      CALL GPMANGLE(execute_dft)(plan%planrc%plancz,inout,inout)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
 
       CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
@@ -636,7 +693,6 @@
 !*****************************************************************
       SUBROUTINE fftp3d_complex_to_real(plan,in,out,comm)
 !-----------------------------------------------------------------
-!
 ! Computes the 3D complex-to-real FFT in parallel. The 
 ! complex input has the same structure than the input 
 ! of the 3D FFTW, but should be transposed. The real 
@@ -644,115 +700,41 @@
 ! The input data is destroyed during the computation.
 !
 ! Parameters
-!     plan : the 3D plan created with fftp3d_create_plan [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
 !     in   : complex input array [IN]
 !     out  : real output array [OUT]
 !     comm : the MPI communicator (handle) [IN]
+!
 !-----------------------------------------------------------------
 
       USE fprecision
       USE mpivars
-      USE commtypes
-      USE fftplans
-      USE gtimer
-!$    USE threads
+      USE fcgram
       IMPLICIT NONE
 
-      TYPE(FFTPLAN), INTENT(IN) :: plan
+      TYPE(FCPLAN), INTENT(IN) :: plan
 
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(plan%nz,plan%ny,ista:iend) :: in 
-      COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%ny,plan%nz)           :: c1
-      REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%nx,plan%ny,ksta:kend) :: out
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: in 
+      REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
 
-      INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
-      INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
       INTEGER, INTENT(IN)                 :: comm
-      INTEGER :: i,j,k
-      INTEGER :: ii,jj,kk
-      INTEGER :: irank
-      INTEGER :: isendTo, igetFrom
-      INTEGER :: istrip,iproc
 
-
-      CALL GTStart(htot)
-
-!
-! 1D FFT in each node using the FFTW library
-      CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft)(plan%planc,in,in)
-      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
-
-      CALL GTStart(htra)
-!
-! Cache friendly transposition
-!
-!$omp parallel do if ((iend-ista)/csize.ge.nth) private (jj,kk,i,j,k)
-      DO ii = ista,iend,csize
-!$omp parallel do if ((iend-ista)/csize.lt.nth) private (kk,i,j,k)
-         DO jj = 1,plan%ny,csize
-            DO kk = 1,plan%nz,csize
-               DO i = ii,min(iend,ii+csize-1)
-               DO j = jj,min(plan%ny,jj+csize-1)
-               DO k = kk,min(plan%nz,kk+csize-1)
-                  c1(i,j,k) = in(k,j,i)
-               END DO
-               END DO
-               END DO
-            END DO
-         END DO
-      END DO
-      CALL GTStop(htra); tratime = tratime + GTGetTime(htra)
-!
-! Transposes the result between nodes using 
-! strip mining when nstrip>1 (rreddy@psc.edu)
-!
-      CALL GTStart(hcom)
-      do iproc = 0, nprocs-1, nstrip
-         do istrip=0, nstrip-1
-            irank = iproc + istrip
-
-            isendTo = myrank + irank
-            if ( isendTo .ge. nprocs ) isendTo = isendTo - nprocs
-
-            igetFrom = myrank - irank
-            if ( igetFrom .lt. 0 ) igetFrom = igetFrom + nprocs
-            CALL MPI_IRECV(plan%carr,1,plan%itype1(igetFrom),igetFrom, & 
-                          1,comm,ireq2(irank),ierr)
-            CALL MPI_ISEND(c1,1,plan%itype2(isendTo),isendTo, &
-                          1,comm,ireq1(irank),ierr)
-         enddo
-
-         do istrip=0, nstrip-1
-            irank = iproc + istrip
-            CALL MPI_WAIT(ireq1(irank),istatus,ierr)
-            CALL MPI_WAIT(ireq2(irank),istatus,ierr)
-         enddo
-      enddo
-      CALL GTStop(hcom); comtime = comtime + GTGetTime(hcom)
-!
-! 2D FFT in each node using the FFTW library
-!
-      CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft_c2r)(plan%planr,plan%carr,out)
-      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
-      
-      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
-
+      CALL fftp1d_complex_to_real_z(plan,in,comm)
+      CALL fftp2d_complex_to_real_xy(plan,in,out,comm)
+     
       RETURN
       END SUBROUTINE fftp3d_complex_to_real
 
 !*****************************************************************
       SUBROUTINE fftp2d_complex_to_real_xy(plan,in,out,comm)
 !-----------------------------------------------------------------
-!
-! Computes the 3D complex-to-real FFT in parallel. The 
-! complex input has the same structure than the input 
-! of the 3D FFTW, but should be transposed. The real 
-! output has the same order than the output of the FFTW.
-! The input data is destroyed during the computation.
+! Computes the 2D real-to-complex FFT along the last couple of
+! indices of the input array and transposes the result.
+! If the input has shape (nz,ny,nx/2+1) the output's shape is
+! (nx,ny,nz). The input data is destroyed during the computation.
 !
 ! Parameters
-!     plan : the 3D plan created with fftp3d_create_plan [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
 !     in   : complex input array f*(z,ky,kx) [IN]
 !     out  : real output array f(x,y,z) [OUT]
 !     comm : the MPI communicator (handle) [IN]
@@ -761,16 +743,16 @@
       USE fprecision
       USE mpivars
       USE commtypes
-      USE fftplans
+      USE fcgram
       USE gtimer
 !$    USE threads
       IMPLICIT NONE
 
-      TYPE(FFTPLAN), INTENT(IN) :: plan
+      TYPE(FCPLAN), INTENT(IN) :: plan
 
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(plan%nz,plan%ny,ista:iend) :: in 
-      COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%ny,plan%nz)           :: c1
-      REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%nx,plan%ny,ksta:kend) :: out
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: in 
+      COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%y%n,plan%z%n)           :: c1
+      REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
 
       INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
       INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
@@ -789,11 +771,11 @@
 !$omp parallel do if ((iend-ista)/csize.ge.nth) private (jj,kk,i,j,k)
       DO ii = ista,iend,csize
 !$omp parallel do if ((iend-ista)/csize.lt.nth) private (kk,i,j,k)
-         DO jj = 1,plan%ny,csize
-            DO kk = 1,plan%nz,csize
+         DO jj = 1,plan%y%n,csize
+            DO kk = 1,plan%z%n,csize
                DO i = ii,min(iend,ii+csize-1)
-               DO j = jj,min(plan%ny,jj+csize-1)
-               DO k = kk,min(plan%nz,kk+csize-1)
+               DO j = jj,min(plan%y%n,jj+csize-1)
+               DO k = kk,min(plan%z%n,kk+csize-1)
                   c1(i,j,k) = in(k,j,i)
                END DO
                END DO
@@ -816,9 +798,9 @@
 
             igetFrom = myrank - irank
             if ( igetFrom .lt. 0 ) igetFrom = igetFrom + nprocs
-            CALL MPI_IRECV(plan%carr,1,plan%itype1(igetFrom),igetFrom, & 
+            CALL MPI_IRECV(plan%plancr%carr,1,plan%plancr%itype1(igetFrom),igetFrom, & 
                           1,comm,ireq2(irank),ierr)
-            CALL MPI_ISEND(c1,1,plan%itype2(isendTo),isendTo, &
+            CALL MPI_ISEND(c1,1,plan%plancr%itype2(isendTo),isendTo, &
                           1,comm,ireq1(irank),ierr)
          enddo
 
@@ -833,7 +815,7 @@
 ! 2D FFT in each node using the FFTW library
 !
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft_c2r)(plan%planr,plan%carr,out)
+      CALL GPMANGLE(execute_dft_c2r)(plan%plancr%planrxy,plan%plancr%carr,out)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
       
       CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
@@ -842,17 +824,13 @@
       END SUBROUTINE fftp2d_complex_to_real_xy
 
 !*****************************************************************
-      SUBROUTINE fftp1d_complex_to_real_z(plan,inout,comm)
+      SUBROUTINE fftp2d_complex_to_real_yz(plan,inout,comm)
 !-----------------------------------------------------------------
-!
-! Computes the 3D complex-to-real FFT in parallel. The 
-! complex input has the same structure than the input 
-! of the 3D FFTW, but should be transposed. The real 
-! output has the same order than the output of the FFTW.
-! The input data is destroyed during the computation.
+! Computes the 2D backward FFT along the first couple of indices 
+! of the input array. The operation is performed inplace.
 !
 ! Parameters
-!     plan : the 3D plan created with fftp3d_create_plan [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
 !     in   : f*(kz,ky,kx) at input, f(z,ky,kx) at output [INOUT]
 !     comm : the MPI communicator (handle) [IN]
 !-----------------------------------------------------------------
@@ -860,13 +838,13 @@
       USE fprecision
       USE mpivars
       USE commtypes
-      USE fftplans
+      USE fcgram
       USE gtimer
 !$    USE threads
       IMPLICIT NONE
 
-      TYPE(FFTPLAN), INTENT(IN) :: plan
-      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%nz,plan%ny,ista:iend) :: inout 
+      TYPE(FCPLAN), INTENT(IN) :: plan
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout 
       INTEGER, INTENT(IN)                 :: comm
 
       INTEGER :: i,j,k
@@ -875,7 +853,145 @@
 ! 1D FFT in each node using the FFTW library
       CALL GTStart(htot)
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft)(plan%planc,inout,inout)
+      CALL GPMANGLE(execute_dft)(plan%plancr%plancyz,inout,inout)
+      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
+      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
+
+      RETURN
+      END SUBROUTINE fftp2d_complex_to_real_yz
+
+
+
+!*****************************************************************
+      SUBROUTINE fftp1d_complex_to_real_x(plan,in,out,comm)
+!-----------------------------------------------------------------
+! Computes the 1D real-to-complex FFT along the last index
+! of the input array and transposes the result. If the input has
+! shape (nz,ny,nx/2+1) the output's shape is  (nx,ny,nz).
+! The input data is destroyed during the computation.
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     in   : complex input array f(z,y,kx) [IN]
+!     out  : real output array f(x,y,z) [OUT]
+!     comm : the MPI communicator (handle) [IN]
+!-----------------------------------------------------------------
+
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      USE fcgram
+      USE gtimer
+!$    USE threads
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: in 
+      COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%y%n,plan%z%n)           :: c1
+      REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
+
+      INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
+      INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
+      INTEGER, INTENT(IN)                 :: comm
+      INTEGER :: i,j,k
+      INTEGER :: ii,jj,kk
+      INTEGER :: irank
+      INTEGER :: isendTo, igetFrom
+      INTEGER :: istrip,iproc
+
+      CALL GTStart(htot)
+      CALL GTStart(htra)
+!
+! Cache friendly transposition
+!
+!$omp parallel do if ((iend-ista)/csize.ge.nth) private (jj,kk,i,j,k)
+      DO ii = ista,iend,csize
+!$omp parallel do if ((iend-ista)/csize.lt.nth) private (kk,i,j,k)
+         DO jj = 1,plan%y%n,csize
+            DO kk = 1,plan%z%n,csize
+               DO i = ii,min(iend,ii+csize-1)
+               DO j = jj,min(plan%y%n,jj+csize-1)
+               DO k = kk,min(plan%z%n,kk+csize-1)
+                  c1(i,j,k) = in(k,j,i)
+               END DO
+               END DO
+               END DO
+            END DO
+         END DO
+      END DO
+      CALL GTStop(htra); tratime = tratime + GTGetTime(htra)
+!
+! Transposes the result between nodes using 
+! strip mining when nstrip>1 (rreddy@psc.edu)
+!
+      CALL GTStart(hcom)
+      do iproc = 0, nprocs-1, nstrip
+         do istrip=0, nstrip-1
+            irank = iproc + istrip
+
+            isendTo = myrank + irank
+            if ( isendTo .ge. nprocs ) isendTo = isendTo - nprocs
+
+            igetFrom = myrank - irank
+            if ( igetFrom .lt. 0 ) igetFrom = igetFrom + nprocs
+            CALL MPI_IRECV(plan%plancr%carr,1,plan%plancr%itype1(igetFrom),igetFrom, & 
+                          1,comm,ireq2(irank),ierr)
+            CALL MPI_ISEND(c1,1,plan%plancr%itype2(isendTo),isendTo, &
+                          1,comm,ireq1(irank),ierr)
+         enddo
+
+         do istrip=0, nstrip-1
+            irank = iproc + istrip
+            CALL MPI_WAIT(ireq1(irank),istatus,ierr)
+            CALL MPI_WAIT(ireq2(irank),istatus,ierr)
+         enddo
+      enddo
+      CALL GTStop(hcom); comtime = comtime + GTGetTime(hcom)
+!
+! 1D FFT in each node using the FFTW library
+!
+      CALL GTStart(hfft)
+      CALL GPMANGLE(execute_dft_c2r)(plan%plancr%planrx,plan%plancr%carr,out)
+      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
+      
+      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
+
+      RETURN
+      END SUBROUTINE fftp1d_complex_to_real_x
+
+
+!*****************************************************************
+      SUBROUTINE fftp1d_complex_to_real_z(plan,inout,comm)
+!-----------------------------------------------------------------
+! Computes the 1D backward FFT along the first index of the input
+! array. The operation is performed inplace.
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     in   : f*(kz,ky,kx) at input, f(z,ky,kx) at output [INOUT]
+!     comm : the MPI communicator (handle) [IN]
+!-----------------------------------------------------------------
+
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      USE fcgram
+      USE gtimer
+!$    USE threads
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout 
+      INTEGER, INTENT(IN)                 :: comm
+
+      INTEGER :: i,j,k
+
+!
+! 1D FFT in each node using the FFTW library
+      CALL GTStart(htot)
+      CALL GTStart(hfft)
+      CALL GPMANGLE(execute_dft)(plan%plancr%plancz,inout,inout)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
       CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
 
@@ -938,3 +1054,36 @@
 
       RETURN
       END SUBROUTINE block3d
+
+!*****************************************************************
+      SUBROUTINE range(n1,n2,nprocs,irank,ista,iend)
+!-----------------------------------------------------------------
+! Soubroutine for computing the local coordinate range 
+! when splitting the original array into the nodes
+!
+! Parameters
+!     n1     : the minimum value in the splitted dimension [IN]
+!     n2     : the maximum value in the splitted dimension [IN]
+!     nprocs : the number of processors [IN]
+!     irank  : the rank of the processor [IN]
+!     ista   : start value for the local coordinate [OUT]
+!     iend   : end value for the local coordinate [OUT]
+!-----------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN)  :: n1,n2
+      INTEGER, INTENT(IN)  :: nprocs,irank
+      INTEGER, INTENT(OUT) :: ista,iend
+
+      INTEGER :: myrank
+      INTEGER :: iwork1,iwork2
+
+      iwork1 = (n2-n1+1)/nprocs
+      iwork2 = MOD(n2-n1+1,nprocs)
+      ista = irank*iwork1+n1+MIN(irank,iwork2)
+      iend = ista+iwork1-1
+      IF (iwork2.gt.irank) iend = iend+1
+
+      RETURN
+      END SUBROUTINE range

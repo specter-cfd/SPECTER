@@ -71,7 +71,7 @@
       END DO
 
       ! 3D Fourier
-      CALL fftp1d_real_to_complex_z(planrc,th,MPI_COMM_WORLD)
+      CALL fftp1d_real_to_complex_z(planfc,th,MPI_COMM_WORLD)
 
       ! Normalize
       CALL normsca(th,c0,1)

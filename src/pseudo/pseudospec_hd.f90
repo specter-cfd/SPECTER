@@ -18,6 +18,12 @@
 !      e-mail: mfontana@df.uba.ar
 !=================================================================
 
+!******************************************************************
+!  TODO: benchmark populating with zeros after nz-Cz and summing up
+! to nz to see if it helps vectorization. (Energy and related
+! subroutines)
+!******************************************************************
+
 !*****************************************************************
       SUBROUTINE derivk(a,b,dir)
 !-----------------------------------------------------------------
@@ -240,10 +246,10 @@
       CALL derivk(a,c2,1)
       CALL derivk(b,c3,1)
       CALL derivk(c,c4,1)
-      CALL fftp3d_complex_to_real(plancr,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c2,r2,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c3,r3,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c4,r4,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c3,r3,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c4,r4,MPI_COMM_WORLD)
 
 !$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
       DO k = ksta,pkend
@@ -263,10 +269,10 @@
       CALL derivk(a,c2,2)
       CALL derivk(b,c3,2)
       CALL derivk(c,c4,2)
-      CALL fftp3d_complex_to_real(plancr,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c2,r2,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c3,r3,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c4,r4,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c3,r3,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c4,r4,MPI_COMM_WORLD)
 
 !$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
       DO k = ksta,pkend
@@ -286,10 +292,10 @@
       CALL derivk(a,c2,3)
       CALL derivk(b,c3,3)
       CALL derivk(c,c4,3)
-      CALL fftp3d_complex_to_real(plancr,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c2,r2,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c3,r3,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c4,r4,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c3,r3,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c4,r4,MPI_COMM_WORLD)
 
       tmp = 1.0_GP/ &
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
@@ -305,9 +311,9 @@
          END DO
       END DO
 
-      CALL fftp3d_real_to_complex(planrc,rx,d,MPI_COMM_WORLD)
-      CALL fftp3d_real_to_complex(planrc,ry,e,MPI_COMM_WORLD)
-      CALL fftp3d_real_to_complex(planrc,rz,f,MPI_COMM_WORLD)
+      CALL fftp3d_real_to_complex(planfc,rx,d,MPI_COMM_WORLD)
+      CALL fftp3d_real_to_complex(planfc,ry,e,MPI_COMM_WORLD)
+      CALL fftp3d_real_to_complex(planfc,rz,f,MPI_COMM_WORLD)
 
       RETURN
       END SUBROUTINE gradre
@@ -351,9 +357,9 @@
       CALL curlk(b,c,d,1)
       CALL curlk(a,c,e,2)
       CALL curlk(a,b,f,3)
-      CALL fftp3d_complex_to_real(plancr,d,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,e,r2,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,f,r3,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,d,r1,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,e,r2,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,f,r3,MPI_COMM_WORLD)
 !
 ! Computes A
 !
@@ -368,9 +374,9 @@
             END DO
          END DO
       END DO
-      CALL fftp3d_complex_to_real(plancr,d,r4,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,e,r5,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,f,r6,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,d,r4,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,e,r5,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,f,r6,MPI_COMM_WORLD)
 !
 ! Computes curl(A)xA
 !
@@ -388,242 +394,12 @@
          END DO
       END DO
 
-      CALL fftp3d_real_to_complex(planrc,r7,d,MPI_COMM_WORLD)
-      CALL fftp3d_real_to_complex(planrc,r3,e,MPI_COMM_WORLD)
-      CALL fftp3d_real_to_complex(planrc,r1,f,MPI_COMM_WORLD)
+      CALL fftp3d_real_to_complex(planfc,r7,d,MPI_COMM_WORLD)
+      CALL fftp3d_real_to_complex(planfc,r3,e,MPI_COMM_WORLD)
+      CALL fftp3d_real_to_complex(planfc,r1,f,MPI_COMM_WORLD)
 
       RETURN
       END SUBROUTINE prodre
-
-!*****************************************************************
-      SUBROUTINE pressure(a,b,c,d)
-!-----------------------------------------------------------------
-!     Solves the Poisson equation laplacian(p') = div(v) with 
-!     boundary  conditions such that v_z - deriv(p,z) = 0 on the
-!     surface. Then applies v = v - grad(p'). The pressure
-!     in the mixed (z,ky,kx) domain is returned.
-!     p' = dt*p for convenience.
-!
-! Parameters
-!     a, b, c : x,y,z components of v, respectively (kz,ky,kx) [INOUT]
-!     d       : solution to the Poisson equation p' (z,ky,kx)  [OUT]
-!
-!TODO benchmark applying p_i and p_h separatedly in x and y components
-! vs applying them together at the end. In z it is necessary to apply
-! them in order to generate the boundary condition.
-      USE grid
-      USE var
-      USE kes
-      USE fcgram
-      USE commtypes
-      USE mpivars
-      USE fft
-!$    USE threads
-
-      IMPLICIT NONE
-
-      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(nz,ny,ista:iend) :: a,b,c
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend)   :: d
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend)           :: C1,C2,C3
-
-      REAL(KIND=GP)    :: tmp
-      INTEGER          :: i,j,k
-
-      ! Solve Poisson
-      CALL poisson(a,b,c,d)
-
-      ! Apply inhomogeneous solution
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j=1,ny
-            DO k=1,nz
-               a(k,j,i) = a(k,j,i) - im*kx(i)*d(k,j,i)
-               b(k,j,i) = b(k,j,i) - im*ky(j)*d(k,j,i)
-               c(k,j,i) = c(k,j,i) - im*kz(k)*d(k,j,i)
-            ENDDO
-         ENDDO
-      ENDDO
-
-      ! Boundary condition
-      tmp = 1.0_GP/nz
-      C1 = c
-      CALL fftp1d_complex_to_real_z(plancr,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j=1,ny
-            DO k=1,nz
-               C1(k,j,i) = C1(k,j,i)*tmp
-            ENDDO
-         ENDDO
-      ENDDO
-
-      ! Solve Laplace equation and construct p_h(z,ky,kx)
-      CALL laplace(C1(1,:,:),C1(nz-Cz,:,:),C2,C3)
-
-      ! Total pressure in (z,ky,kx) domain
-      CALL fftp1d_complex_to_real_z(plancr,d,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j=1,ny
-            DO k=1,nz
-               d(k,j,i) = d(k,j,i)*tmp + C2(k,j,i)
-            ENDDO
-         ENDDO
-      ENDDO
-
-      ! Hom. pressure and normal derivative in (kz,ky,kx) domain
-      CALL fftp1d_real_to_complex_z(planrc,C2,MPI_COMM_WORLD)
-      CALL fftp1d_real_to_complex_z(planrc,C3,MPI_COMM_WORLD)
-
-      ! Apply homogeneous solution
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j=1,ny
-            DO k=1,nz
-               a(k,j,i) = a(k,j,i) - im*kx(i)*C2(k,j,i)
-               b(k,j,i) = b(k,j,i) - im*ky(j)*C2(k,j,i)
-               c(k,j,i) = c(k,j,i) - C3(k,j,i)
-            ENDDO
-         ENDDO
-      ENDDO
-
-      RETURN
-      END SUBROUTINE pressure
-
-!*****************************************************************
-      SUBROUTINE poisson(a,b,c,d)
-!-----------------------------------------------------------------
-!
-! Solves the inhomogeneous part of the Poisson equation
-! laplacian(p') = div(v). It takes the components of v as input
-! matrixes and p'_inhom in Fourier space. Note that the boundary
-! conditions must be enforced via the homogeneous solution a
-! a posteriori.
-!
-! Parameters
-!     a  : input matrix in the x-direction
-!     b  : input matrix in the y-direction
-!     c  : input matrix in the z-direction
-!     d  : at the output contains the result in Fourier space
-!
-      USE fprecision
-      USE var
-      USE kes
-      USE grid
-      USE mpivars
-      USE commtypes
-!$    USE threads
-      IMPLICIT NONE
-
-      COMPLEX(KIND=GP), INTENT (IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend) :: d
-      INTEGER             :: i,j,k
-
-!NOTE: This generates a NaN, but shouldn't propagate to relevant
-!variables. Written this way is easier for the compiler to vectorize
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               d(k,j,i) = -im*(kx(i)*a(k,j,i) + ky(j)*b(k,j,i) + &
-                               kz(k)*c(k,j,i))/kk2(k,j,i)
-            END DO
-          END DO
-      END DO
-      IF (ista.eq.1) d(1,1,1) = 0.0_GP 
-
-
-      RETURN
-      END SUBROUTINE poisson
-
-!*****************************************************************
-      SUBROUTINE laplace(bb,tb,a,b)
-!-----------------------------------------------------------------
-! Returns the gradient of phi in (z,ky,kx) coordinates, where  phi
-! is a Laplace equation solution satisfing dphi/dz|z=0 = bb and
-! dphi/dz|z=L = tb.
-
-! Parameters
-!     bb : input matrix for the bottom boundary condition
-!     tb : input matrix for the top boundary condition
-!     a  : at the output contains the result in the mixed
-!          (z,ky,kx) space
-
-      USE kes
-      USE var
-      USE grid
-      USE fcgram
-      USE mpivars
-      USE fft
-!$    USE threads
-
-
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(ny,ista:iend)     :: bb,tb
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend) :: a,b
-
-      COMPLEX(KIND=GP)             :: coef1, coef2
-      REAL(KIND=GP)                :: tmp
-
-      INTEGER                      :: i,j,k
-
-      IF (ista.eq.1) THEN
-!$omp parallel do
-         DO k=1,nz-Cz
-            a(k,1,1) = real(bb(1,1), kind=GP)*z(k)
-            b(k,1,1) = real(bb(1,1), kind=GP)
-         ENDDO
-!$omp parallel do private (k,tmp,coef1,coef2)
-         DO j = 2,ny
-            tmp = 1.0_GP/(khom(j,1)*(1-exp(-2*khom(j,1)*Lz)))
-            coef1 = (tb(j,1)-bb(j,1)*exp(-khom(j,1)*Lz))*tmp
-            coef2 = - (bb(j,1)-tb(j,1)*exp(-khom(j,1)*Lz))*tmp
-            DO k=1,nz-Cz
-               a(k,j,1) = coef1*exp(khom(j,1)*(z(k)-Lz)) + &
-                          coef2*exp(-khom(j,1)*z(k))
-               b(k,j,1) = khom(j,1)*(coef1*exp(khom(j,1)*(z(k)-Lz)) - &
-                          coef2*exp(-khom(j,1)*z(k)))
-            END DO
-         END DO
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp,coef1,coef2)
-         DO i = 2,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp,coef1,coef2)
-            DO j = 1,ny
-               tmp = 1.0_GP/(khom(j,i)*(1-exp(-2*khom(j,i)*Lz)))
-               coef1 = (tb(j,i)-bb(j,i)*exp(-khom(j,i)*Lz))*tmp
-               coef2 = - (bb(j,i)-tb(j,i)*exp(-khom(j,i)*Lz))*tmp
-               DO k=1,nz-Cz
-                  a(k,j,i) = coef1*exp(khom(j,i)*(z(k)-Lz)) + &
-                             coef2*exp(-khom(j,i)*z(k))
-                  b(k,j,i) = khom(j,i)*(coef1*exp(khom(j,i)*(z(k)-Lz)) - &
-                             coef2*exp(-khom(j,i)*z(k)))
-               END DO
-            END DO
-         END DO
-      ELSE 
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp,coef1,coef2)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp,coef1,coef2)
-            DO j = 1,ny
-               tmp = 1.0_GP/(khom(j,i)*(1-exp(-2*khom(j,i)*Lz)))
-               coef1 = (tb(j,i)-bb(j,i)*exp(-khom(j,i)*Lz))*tmp
-               coef2 = - (bb(j,i)-tb(j,i)*exp(-khom(j,i)*Lz))*tmp
-               DO k=1,nz-Cz
-                  a(k,j,i) = coef1*exp(khom(j,i)*(z(k)-Lz)) + &
-                             coef2*exp(-khom(j,i)*z(k))
-                  b(k,j,i) = khom(j,i)*(coef1*exp(khom(j,i)*(z(k)-Lz)) - &
-                             coef2*exp(-khom(j,i)*z(k)))
-               END DO
-            END DO
-         END DO
-      ENDIF
-
-      RETURN
-      END SUBROUTINE laplace
 
 !*****************************************************************
       SUBROUTINE energy(a,b,c,d,kin)
@@ -638,16 +414,15 @@
 !     b  : input matrix in the y-direction
 !     c  : input matrix in the z-direction
 !     d  : at the output contains the energy
-!     kin: =0 computes the magnetic energy
-!          =1 computes the kinetic energy
-!          =2 computes the magnetic enstrophy
+!     kin: =0 computes the energy of the curl of the field
+!          =1 computes the energy of the field
+!          =2 computes the energy of the curl^2 of the field
 !
       USE fprecision
       USE commtypes
       USE grid
-      USE fcgram
-      USE mpivars
       USE fft
+      USE mpivars
 !$    USE threads
       IMPLICIT NONE
 
@@ -655,7 +430,7 @@
       INTEGER, INTENT(IN)           :: kin
       DOUBLE PRECISION, INTENT(OUT) :: d
 
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: C1
+      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: C1,C2,C3,C4
       REAL(KIND=GP), DIMENSION(nz,ny,ista:iend)    :: R1
 
       DOUBLE PRECISION  :: dloc
@@ -670,58 +445,160 @@
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2/ &
             real((nz-Cz),kind=GP)
 
-! Computes the energy of field (a,b,c)
+      ! Computes the energy of field (a,b,c)
       IF (kin .eq. 1) THEN
-         C1 = a
-      ELSE IF (kin.eq.0) THEN
-         CALL curlk(b,c,c1,1)
-      ENDIF
-      CALL fftp1d_complex_to_real_z(plancr,c1,MPI_COMM_WORLD)
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
+         DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k)
-      DO j = 1,ny
-      DO k = 1,nz
-         R1(k,j,i) = real(C1(k,j,i), kind=GP)**2+aimag(C1(k,j,i))**2
-      ENDDO
-      ENDDO
-      ENDDO
-
-      IF (kin .eq. 1) THEN
-         C1 = b
-      ELSE IF (kin.eq.0) THEN
-         CALL curlk(a,c,c1,2)
-      ENDIF
-      c1 = b
-      CALL fftp1d_complex_to_real_z(plancr,c1,MPI_COMM_WORLD)
+            DO j = 1,ny
+               DO k = 1,nz
+                  C1(k,j,i) = a(k,j,i)
+               END DO
+            END DO
+         END DO
+         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
+         DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k)
-      DO j = 1,ny
-      DO k = 1,nz
-         R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
-                        aimag(C1(k,j,i))**2
-      ENDDO
-      ENDDO
-      ENDDO
+            DO j = 1,ny
+               DO k = 1,nz
+                  R1(k,j,i) = real(C1(k,j,i), kind=GP)**2+aimag(C1(k,j,i))**2
+               ENDDO
+            ENDDO
+         ENDDO
 
-      IF (kin .eq. 1) THEN
-         C1 = c
-      ELSE IF (kin.eq.0) THEN
-         CALL curlk(a,b,c1,3)
-      ENDIF
-      CALL fftp1d_complex_to_real_z(plancr,c1,MPI_COMM_WORLD)
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
+         DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k)
-      DO j = 1,ny
-      DO k = 1,nz
-         R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
-                        aimag(C1(k,j,i))**2
-      ENDDO
-      ENDDO
-      ENDDO
+            DO j = 1,ny
+               DO k = 1,nz
+                  C1(k,j,i) = b(k,j,i)
+               END DO
+            END DO
+         END DO
+         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
+                                 aimag(C1(k,j,i))**2
+               ENDDO
+            ENDDO
+         ENDDO
 
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  C1(k,j,i) = c(k,j,i)
+               END DO
+            END DO
+         END DO
+         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
+                                 aimag(C1(k,j,i))**2
+               ENDDO
+            ENDDO
+         ENDDO
+
+
+      ! Compute the energy of the curl of the field (a,b,c)
+      ELSE IF (kin .eq. 0) THEN
+         CALL curlk(b,c,C1,1)
+         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  R1(k,j,i) = real(C1(k,j,i), kind=GP)**2+aimag(C1(k,j,i))**2
+               ENDDO
+            ENDDO
+         ENDDO
+
+         CALL curlk(a,c,C1,2)
+         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
+                                 aimag(C1(k,j,i))**2
+               ENDDO
+            ENDDO
+         ENDDO
+
+         CALL curlk(a,c,C1,2)
+         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
+                                 aimag(C1(k,j,i))**2
+               ENDDO
+            ENDDO
+         ENDDO
+
+
+      ! Compute the energy of the curl^2 of the field (a,b,c)
+      ELSE IF (kin .eq. 2) THEN
+         CALL curlk(b,c,C1,1)
+         CALL curlk(a,c,C2,2)
+         CALL curlk(a,b,C3,3)
+         
+         CALL curlk(C2,C3,C4,1)
+         CALL curlk(C1,C3,C3,2)
+         CALL curlk(C1,C2,C1,3)
+
+         CALL fftp1d_complex_to_real_z(planfc,C4,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  R1(k,j,i) = real(C4(k,j,i), kind=GP)**2+aimag(C4(k,j,i))**2
+               ENDDO
+            ENDDO
+         ENDDO
+
+         CALL fftp1d_complex_to_real_z(planfc,C3,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  R1(k,j,i) = R1(k,j,i) + real(C3(k,j,i), kind=GP)**2 +&
+                                 aimag(C3(k,j,i))**2
+               ENDDO
+            ENDDO
+         ENDDO
+
+         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
+                                 aimag(C1(k,j,i))**2
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDIF
+
+
+      ! Compute mean value
       IF (ista.eq.1) THEN
 !$omp parallel do private (k) reduction(+:dloc)
          DO j = 1,ny
@@ -774,7 +651,6 @@
       USE commtypes
       USE fft
       USE grid
-      USE fcgram
       USE mpivars
 !$    USE threads
       IMPLICIT NONE
@@ -783,6 +659,7 @@
       DOUBLE PRECISION, INTENT(OUT) :: d
 
       COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend)             :: c1,c2
+      REAL(KIND=GP), DIMENSION(nz,ny,ista:iend)                :: r1
 
       DOUBLE PRECISION :: dloc
       REAL(KIND=GP)    :: tmp
@@ -795,79 +672,79 @@
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2 / &
             real(nz-Cz,kind=GP)
 
-      c1 = a
+      ! Compute the pointwise helicity
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+         DO j = 1,ny
+            DO k = 1,nz
+               c1(k,j,i) = a(k,j,i)
+            END DO
+         END DO
+      END DO
       CALL curlk(b,c,c2,1)
-      CALL fftp1d_complex_to_real_z(plancr,c1,MPI_COMM_WORLD)
-      CALL fftp1d_complex_to_real_z(plancr,c2,MPI_COMM_WORLD)
-      IF (ista.eq.1) THEN
-!$omp parallel do private (k) reduction(+:dloc)
+      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
          DO j = 1,ny
-            DO k = 1,nz-Cz
-                 dloc = dloc+real(c1(k,j,1)*conjg(c2(k,j,1)))*tmp
+            DO k = 1,nz
+               r1(k,j,i) = real(c1(k,j,i)*conjg(c2(k,j,i)))
             END DO
          END DO
-!$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:dloc)
-         DO i = 2,iend
-!$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:dloc)
-            DO j = 1,ny
-               DO k = 1,nz-Cz
-                  dloc = dloc+2*real(c1(k,j,i)*conjg(c2(k,j,i)))*tmp
-               END DO
-            END DO
-         END DO
-      ELSE
-!$omp parallel do if (iend-ista.ge.nth) private (j,k) reduction(+:dloc)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k) reduction(+:dloc)
-            DO j = 1,ny
-               DO k = 1,nz-Cz
-                  dloc = dloc+2*real(c1(k,j,i)*conjg(c2(k,j,i)))*tmp
-               END DO
-            END DO
-         END DO
-      ENDIF
+      END DO
 
-      C1 = b
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+         DO j = 1,ny
+            DO k = 1,nz
+               c1(k,j,i) = b(k,j,i)
+            END DO
+         END DO
+      END DO
       CALL curlk(a,c,c2,2)
-      CALL fftp1d_complex_to_real_z(plancr,c1,MPI_COMM_WORLD)
-      CALL fftp1d_complex_to_real_z(plancr,c2,MPI_COMM_WORLD)
-      IF (ista.eq.1) THEN
-!$omp parallel do private (k) reduction(+:dloc)
+      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
          DO j = 1,ny
-            DO k = 1,nz-Cz
-               dloc = dloc+real(c1(k,j,1)*conjg(c2(k,j,1)))*tmp
+            DO k = 1,nz
+               r1(k,j,i) = r1(k,j,i) + real(c1(k,j,i)*conjg(c2(k,j,i)))
             END DO
          END DO
-!$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:dloc)
-         DO i = 2,iend
-!$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:dloc)
-            DO j = 1,ny
-               DO k = 1,nz-Cz
-                  dloc = dloc+2*real(c1(k,j,i)*conjg(c2(k,j,i)))*tmp
-               END DO
-            END DO
-         END DO
-      ELSE
-!$omp parallel do if (iend-ista.ge.nth) private (j,k) reduction(+:dloc)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k) reduction(+:dloc)
-            DO j = 1,ny
-               DO k = 1,nz-Cz
-                  dloc = dloc+2*real(c1(k,j,i)*conjg(c2(k,j,i)))*tmp
-               END DO
-            END DO
-         END DO
-      ENDIF
+      END DO
 
-      C1 = c
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+         DO j = 1,ny
+            DO k = 1,nz
+               c1(k,j,i) = c(k,j,i)
+            END DO
+         END DO
+      END DO
       CALL curlk(a,b,c2,3)
-      CALL fftp1d_complex_to_real_z(plancr,c1,MPI_COMM_WORLD)
-      CALL fftp1d_complex_to_real_z(plancr,c2,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+         DO j = 1,ny
+            DO k = 1,nz
+               r1(k,j,i) = r1(k,j,i) + real(c1(k,j,i)*conjg(c2(k,j,i)))
+            END DO
+         END DO
+      END DO
+
+      ! Compute average values
       IF (ista.eq.1) THEN
 !$omp parallel do private (k) reduction(+:dloc)
          DO j = 1,ny
             DO k = 1,nz-Cz
-               dloc = dloc+real(c1(k,j,1)*conjg(c2(k,j,1)))*tmp
+                 dloc = dloc+r1(k,j,1)*tmp
             END DO
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:dloc)
@@ -875,7 +752,7 @@
 !$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:dloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  dloc = dloc+2*real(c1(k,j,i)*conjg(c2(k,j,i)))*tmp
+                  dloc = dloc+2*r1(k,j,i)*tmp
                END DO
             END DO
          END DO
@@ -885,7 +762,7 @@
 !$omp parallel do if (iend-ista.lt.nth) private (k) reduction(+:dloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  dloc = dloc+2*real(c1(k,j,i)*conjg(c2(k,j,i)))*tmp
+                  dloc = dloc+2*r1(k,j,i)*tmp
                END DO
             END DO
          END DO
@@ -921,7 +798,6 @@
       USE kes
       USE fft
       USE grid
-      USE fcgram
       USE mpivars
 !$    USE threads
       IMPLICIT NONE
@@ -945,58 +821,120 @@
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2/ &
             real(nz-Cz, kind=GP)
 
-! Computes the averaged inner product between the fields
+      ! Computes the pointwise inner product between the fields
       IF (kin.eq.1) THEN
-         c1 = a
-         c2 = d
-         CALL fftp1d_complex_to_real_z(plancr,c1,MPI_COMM_WORLD)
-         CALL fftp1d_complex_to_real_z(plancr,c2,MPI_COMM_WORLD)
-         r1 = real(c1*conjg(c2))
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  c1(k,j,i) = a(k,j,i)
+                  c2(k,j,i) = d(k,j,i)
+               END DO
+            END DO
+         END DO
+      ELSE
+         CALL curlk(b,c,c1,1)
+         CALL curlk(e,f,c2,1)
+      ENDIF 
+      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+         DO j = 1,ny
+            DO k = 1,nz
+               r1(k,j,i) = real(c1(k,j,i)*conjg(c2(k,j,i)))
+            END DO
+         END DO
+      END DO
 
-         c1 = b
-         c2 = e
-         CALL fftp1d_complex_to_real_z(plancr,c1,MPI_COMM_WORLD)
-         CALL fftp1d_complex_to_real_z(plancr,c2,MPI_COMM_WORLD)
-         r1 = r1 + real(c1*conjg(c2))
+      IF (kin.eq.1) THEN
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  c1(k,j,i) = b(k,j,i)
+                  c2(k,j,i) = e(k,j,i)
+               END DO
+            END DO
+         END DO
+      ELSE
+         CALL curlk(a,c,c1,2)
+         CALL curlk(d,f,c2,2)
+      ENDIF
+      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+         DO j = 1,ny
+            DO k = 1,nz
+               r1(k,j,i) = r1(k,j,i) + real(c1(k,j,i)*conjg(c2(k,j,i)))
+            END DO
+         END DO
+      END DO
 
-         c1 = c
-         c2 = f
-         CALL fftp1d_complex_to_real_z(plancr,c1,MPI_COMM_WORLD)
-         CALL fftp1d_complex_to_real_z(plancr,c2,MPI_COMM_WORLD)
-         r1 = r1 + real(c1*conjg(c2))
+      IF (kin.eq.1) THEN
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+            DO j = 1,ny
+               DO k = 1,nz
+                  c1(k,j,i) = c(k,j,i)
+                  c2(k,j,i) = f(k,j,i)
+               END DO
+            END DO
+         END DO
+      ELSE
+         CALL curlk(a,b,c1,3)
+         CALL curlk(d,e,c2,3)
+      ENDIF
+      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+         DO j = 1,ny
+            DO k = 1,nz
+               r1(k,j,i) = r1(k,j,i) + real(c1(k,j,i)*conjg(c2(k,j,i)))
+            END DO
+         END DO
+      END DO
 
-         IF (ista.eq.1) THEN
+      ! Compute average value
+      IF (ista.eq.1) THEN
 !$omp parallel do private (k) reduction(+:gloc)
+         DO j = 1,ny
+            DO k = 1,nz-Cz
+               gloc = gloc+r1(k,j,1)*tmp
+            END DO
+         END DO
+!$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:gloc)
+         DO i = 2,iend
+!$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:gloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  gloc = gloc+r1(k,j,1)*tmp
+                  gloc = gloc+2*r1(k,j,i)*tmp
                END DO
             END DO
-!$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:gloc)
-            DO i = 2,iend
-!$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:gloc)
-               DO j = 1,ny
-                  DO k = 1,nz-Cz
-                     gloc = gloc+2*r1(k,j,i)*tmp
-                  END DO
-               END DO
-            END DO
-         ELSE
+         END DO
+      ELSE
 !$omp parallel do if (iend-ista.ge.nth) private (j,k) reduction(+:gloc)
-            DO i = ista,iend
+         DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k) reduction(+:gloc)
-               DO j = 1,ny
-                  DO k = 1,nz-Cz
-                     gloc = gloc+2*r1(k,j,i)*tmp
-                  END DO
+            DO j = 1,ny
+               DO k = 1,nz-Cz
+                  gloc = gloc+2*r1(k,j,i)*tmp
                END DO
             END DO
-         ENDIF
+         END DO
       ENDIF
 
-! Computes the reduction between nodes
+      ! Computes the reduction between nodes
       CALL MPI_REDUCE(gloc,g,1,MPI_DOUBLE_PRECISION,MPI_SUM,0, &
-                         MPI_COMM_WORLD,ierr)
+                          MPI_COMM_WORLD,ierr)
 
       RETURN
       END SUBROUTINE cross
@@ -1039,29 +977,26 @@
       INTEGER, INTENT(IN) :: t
       INTEGER             :: i,j,k
 
-!
 ! Computes the mean energy, enstrophy, and kinetic helicity
-!
       CALL energy(a,b,c,eng,1)
       CALL energy(a,b,c,ens,0)
       IF (hel.eq.1) THEN
          CALL helicity(a,b,c,khe)
       ENDIF
-!
+
 ! Computes the energy injection rate
-!
       CALL cross(a,b,c,d,e,f,pot,1)
-!
+
 ! Creates external files to store the results
-!
       IF (myrank.eq.0) THEN
          OPEN(1,file='balance.txt',position='append')
-         WRITE(1,10) (t-1)*dt,eng,ens,pot
-   10    FORMAT( 1P E13.6,2E23.16,E24.16 )
+   10       FORMAT( 1P E13.6,2E23.16,E24.16 )
+            WRITE(1,10) (t-1)*dt,eng,ens,pot
          CLOSE(1)
          IF (hel.eq.1) THEN
             OPEN(1,file='helicity.txt',position='append')
-            WRITE(1,FMT='(1P E13.6,E24.16)') (t-1)*dt,khe
+   11          FORMAT( 1P E13.6,E24.16 )
+               WRITE(1,11) (t-1)*dt,khe
             CLOSE(1)
          ENDIF
       ENDIF
@@ -1123,21 +1058,20 @@
             END DO
          END DO
       ENDIF
-      CALL fftp3d_complex_to_real(plancr,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c2,r2,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c3,r3,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c3,r3,MPI_COMM_WORLD)
       dloc = 0.0_GP
 !$omp parallel do if (pkend-ksta.ge.nth) private (j,i) reduction(max:dloc)
       DO k = ksta,pkend
 !$omp parallel do if (pkend-ksta.lt.nth) private (i) reduction(max:dloc)
          DO j = 1,ny
             DO i = 1,nx
-               dloc = max(dloc, &
-                          sqrt(r1(i,j,k)**2+r2(i,j,k)**2+r3(i,j,k)**2))
+               dloc = max(dloc, r1(i,j,k)**2+r2(i,j,k)**2+r3(i,j,k)**2)
             END DO
          END DO
       END DO
-      dloc = dloc/(real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
+      dloc = sqrt(dloc)/(real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
       CALL MPI_REDUCE(dloc,d,1,GC_REAL,MPI_MAX,0,MPI_COMM_WORLD,ierr)
 
       RETURN
@@ -1195,10 +1129,9 @@
 !
       USE var
       USE grid
-      USE fcgram
+      USE fft
       USE mpivars
       USE commtypes
-      USE fft
 !$    USE threads
       IMPLICIT NONE
 
@@ -1221,42 +1154,52 @@
       d = 0d0
       dloc = 0d0
 
+      ! Get pointwise divergence
       CALL derivk(a,C1,1)
-      C2 = C1
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+         DO j = 1,ny
+            DO k = 1,nz
+               C2(k,j,i) = C1(k,j,i)
+            ENDDO
+         ENDDO
+      ENDDO
 
       CALL derivk(b,C1,2)
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
       DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k)
-      DO j = 1,ny
-      DO k = 1,nz
-         C2(k,j,i) = C2(k,j,i) + C1(k,j,i)
-      ENDDO
-      ENDDO
+         DO j = 1,ny
+            DO k = 1,nz
+               C2(k,j,i) = C2(k,j,i) + C1(k,j,i)
+            ENDDO
+         ENDDO
       ENDDO
 
       CALL derivk(c,C1,3)
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
       DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k)
-      DO j = 1,ny
-      DO k = 1,nz
-         C2(k,j,i) = C2(k,j,i) + C1(k,j,i)
-      ENDDO
-      ENDDO
+         DO j = 1,ny
+            DO k = 1,nz
+               C2(k,j,i) = C2(k,j,i) + C1(k,j,i)
+            ENDDO
+         ENDDO
       ENDDO
 
-      CALL fftp1d_complex_to_real_z(plancr,C2,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,C2,MPI_COMM_WORLD)
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
       DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k)
-      DO j = 1,ny
-      DO k = 1,nz
-         R1(k,j,i) = real(c2(k,j,i), kind=GP)**2 + aimag(c2(k,j,i))**2
-      ENDDO
-      ENDDO
+         DO j = 1,ny
+            DO k = 1,nz
+               R1(k,j,i) = real(c2(k,j,i),kind=GP)**2 + aimag(c2(k,j,i))**2
+            ENDDO
+         ENDDO
       ENDDO
 
+      ! Compute mean value
       IF (ista.eq.1) THEN
 !$omp parallel do private (k) reduction(+:dloc)
          DO j = 1,ny
@@ -1290,178 +1233,6 @@
 
       RETURN
       END SUBROUTINE divergence
-
-!*****************************************************************
-      SUBROUTINE bouncheck(a,b,c,d,e,f,g)
-!-----------------------------------------------------------------
-!
-! Computes the mean squared values of the tangential and normal
-! components of a vector field at the boundaries.
-! The output is only valid in the first node.
-!
-! Parameters
-!     a: input matrix in the x-direction
-!     b: input matrix in the y-direction
-!     c: input matrix in the z-direction
-!     d: at the output contains the mean squared value of the
-!          tangential component at z=0.
-!     d: at the output contains the mean squared value of the
-!          tangential component at z=Lz.
-!     d: at the output contains the mean squared value of the
-!          normal component at z=0.
-!     d: at the output contains the mean squared value of the
-!          normal component at z=Lz.
-!
-      USE var
-      USE grid
-      USE fcgram
-      USE mpivars
-      USE commtypes
-      USE fft
-!$    USE threads
-      IMPLICIT NONE
-
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
-      DOUBLE PRECISION, INTENT(OUT) :: d,e,f,g
-
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend)  :: C1
-      REAL(KIND=GP), DIMENSION(ny,ista:iend)        :: R1,R2,R3,R4
-
-      DOUBLE PRECISION   :: dloc,eloc,floc,gloc
-      REAL(KIND=GP)      :: tmp
-
-      INTEGER  :: i,j,k
-
-      tmp = 1.0_GP/ &
-            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
-
-      d = 0d00; e = 0d0; f = 0d0; g = 0d0
-      dloc = 0d0; eloc = 0d0; floc = 0d0; gloc = 0d0
-
-      ! Slip
-      C1 = a
-      CALL fftp1d_complex_to_real_z(plancr,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth)
-      DO j = 1,ny
-         R1(j,i) = real(C1(1,j,i), kind=GP)**2 + aimag(c1(1,j,i))**2
-         R2(j,i) = real(C1(nz-Cz,j,i), kind=GP)**2 +&
-                     aimag(c1(nz-Cz,j,i))**2
-      ENDDO
-      ENDDO
-
-      C1 = b
-      CALL fftp1d_complex_to_real_z(plancr,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth)
-      DO j = 1,ny
-         R1(j,i) = R1(j,i) + real(C1(1,j,i), kind=GP)**2 +&
-                      aimag(c1(1,j,i))**2
-         R2(j,i) = R2(j,i) + real(C1(nz-Cz,j,i), kind=GP)**2 +&
-                     aimag(c1(nz-Cz,j,i))**2
-      ENDDO
-      ENDDO
-
-      ! Normal
-      C1 = c
-      CALL fftp1d_complex_to_real_z(plancr,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth)
-      DO j = 1,ny
-         R3(j,i) = real(C1(1,j,i), kind=GP)**2 + aimag(c1(1,j,i))**2
-         R4(j,i) = real(C1(nz-Cz,j,i), kind=GP)**2 +&
-                     aimag(c1(nz-Cz,j,i))**2
-      ENDDO
-      ENDDO
-
-      IF (ista.eq.1) THEN
-!$omp parallel do reduction(+:dloc,eloc,floc,gloc)
-         DO j = 1,ny
-               dloc = dloc + R1(j,1)*tmp
-               eloc = eloc + R2(j,1)*tmp
-               floc = floc + R3(j,1)*tmp
-               gloc = gloc + R4(j,1)*tmp
-         END DO
-!$omp parallel do if (iend-2.ge.nth) private (j) &
-!$omp& reduction(+:dloc,eloc,floc,gloc)
-         DO i = 2,iend
-            DO j = 1,ny
-                  dloc = dloc + 2*R1(j,i)*tmp
-                  eloc = eloc + 2*R2(j,i)*tmp
-                  floc = floc + 2*R3(j,i)*tmp
-                  gloc = gloc + 2*R4(j,i)*tmp
-            END DO
-         END DO
-      ELSE
-!$omp parallel do if (iend-ista.ge.nth) private (j) &
-!$omp& reduction(+:dloc,eloc,floc,gloc)
-         DO i = ista,iend
-           DO j = 1,ny
-               dloc = dloc + 2*R1(j,i)*tmp
-               eloc = eloc + 2*R2(j,i)*tmp
-               floc = floc + 2*R3(j,i)*tmp
-               gloc = gloc + 2*R4(j,i)*tmp
-           END DO
-        END DO
-      ENDIF
-
-      CALL MPI_REDUCE(dloc,d,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,&
-          MPI_COMM_WORLD,ierr)
-      CALL MPI_REDUCE(eloc,e,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,&
-          MPI_COMM_WORLD,ierr)
-      CALL MPI_REDUCE(floc,f,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,&
-          MPI_COMM_WORLD,ierr)
-      CALL MPI_REDUCE(gloc,g,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,&
-          MPI_COMM_WORLD,ierr)
-
-      RETURN
-      END SUBROUTINE bouncheck
-
-!*****************************************************************
-      SUBROUTINE diagnostic(a,b,c,t,dt)
-!-----------------------------------------------------------------
-!
-!  Computes the mean squared divergence in the bulk of the fluid
-!  as well as the mean squared slip velocity v_s and normal
-! velocity v_n  at the boundaries.
-!
-! Output files contain:
-! 'diagnostic.txt': time, <|div(v)|^2>, <|v_s|^2>|z=0,
-!                   <|v_s|^2>|z=Lz, <|v_n|^2>|z=0, <|v_n|^2>|z=Lz
-!
-! Parameters
-!     a  : velocity field in the x-direction
-!     b  : velocity field in the y-direction
-!     c  : velocity field in the z-direction
-!     t  : number of time steps made
-!     dt : time step
-!
-      USE fprecision
-      USE grid
-      USE mpivars
-
-      IMPLICIT NONE
-
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
-      REAL(KIND=GP), INTENT(IN)        :: dt
-      INTEGER, INTENT(IN)              :: t
-      DOUBLE PRECISION                 :: tmp,tmq,tmr,tms,tm1
-
-      CALL divergence(a,b,c,tm1)
-      CALL bouncheck(a,b,c,tmp,tmq,tmr,tms)
-
-      IF ( myrank .eq. 0) THEN
-          OPEN(1,file='diagnostic.txt',position='append')
-          WRITE(1,FMT='(1P 2E13.6, 2E25.17, 2E13.6)') &
-              (t-1)*dt,tm1,tmp,tmq,tmr,tms
-          CLOSE(1)
-      ENDIF
-
-      RETURN
-      END SUBROUTINE diagnostic
 
 !*****************************************************************
       SUBROUTINE normvec(a,b,c,d,kin)
@@ -1502,13 +1273,13 @@
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
       DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k)
-      DO j = 1,ny
-      DO k = 1,nz
-         a(k,j,i) = a(k,j,i)*rmp
-         b(k,j,i) = b(k,j,i)*rmp
-         c(k,j,i) = c(k,j,i)*rmp
-      ENDDO
-      ENDDO
+         DO j = 1,ny
+            DO k = 1,nz
+               a(k,j,i) = a(k,j,i)*rmp
+               b(k,j,i) = b(k,j,i)*rmp
+               c(k,j,i) = c(k,j,i)*rmp
+            ENDDO
+        ENDDO
       ENDDO
 
       RETURN

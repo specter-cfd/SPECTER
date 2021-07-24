@@ -66,14 +66,15 @@
 
       INTEGER :: nfiles,nmt,np,npt,ntprocs,npkeep
       INTEGER :: nxt,nyt,nzt
+      INTEGER :: oxt,oyt,ozt
       INTEGER :: i,ib,ie,ind,itsta,itend,j,k,ktsta,ktend
       INTEGER :: istak,iendk,kstak,kendk
       INTEGER :: commtrunc, fh, groupworld, flags, grouptrunc
       INTEGER :: iExclude(3,1), iInclude(3,1)
       INTEGER :: Czt, Czn, Czkeep, GCD
 
-      TYPE(IOPLAN)  :: planio, planiot
-      TYPE(FFTPLAN) :: planrct
+      TYPE(IOPLAN) :: planio, planiot
+      TYPE(FCPLAN) :: planfct
 
       CHARACTER(len=19)  :: suff
       CHARACTER(len=100) :: odir,idir,tdir
@@ -83,6 +84,7 @@
 
 !
       NAMELIST / regrid / idir, odir, tdir, fnlist, nxt, nyt, nzt
+      NAMELIST / order  / oxt, oyt, ozt
 
 
 
@@ -99,8 +101,9 @@
       nxt    = 0
       nyt    = 0
       nzt    = 0
+
 !
-! Reads from the external file 'boots.txt' the
+! Reads from the external file 'boots.inp' the
 ! parameters that will be used to compute the transfer
 !     idir   : directory for unformatted input (field components)
 !     odir   : directory for unformatted output (prolongated data)
@@ -122,12 +125,33 @@
       CALL MPI_BCAST(nxt   ,1   ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(nyt   ,1   ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(nzt   ,1   ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
+      !  n, here refers to the prolongated grid, and nt is the grid size
+      !  of the 'old grid'
+
+
+! Optional order namelist (to prevent recompiling if a table is missing)
+!     ox    : order of FC-Gram to use at x boundaries
+!     oy    : order of FC-Gram to use at y boundaries
+!     oz    : order of FC-Gram to use at z boundaries
+
+      oxt     = 0
+      oyt     = 0
+      ozt     = 0
+
+      IF (myrank.eq.0) THEN
+         OPEN(1,file='boots.inp',status='unknown',form="formatted")
+         READ(1,NML=order)
+         CLOSE(1)
+      ENDIF
+      CALL MPI_BCAST(oxt  ,1   ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(oyt  ,1   ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(ozt  ,1   ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
+
+      IF (oxt .eq. 0 .AND. ox .ne. 0) oxt = ox
+      IF (oxt .eq. 0 .AND. ox .ne. 0) oyt = oy
+      IF (oxt .eq. 0 .AND. ox .ne. 0) ozt = oz
 
       !
-      !  n, here refers to the prolongated grid, and nt
-      !  is the grid size of the 'old grid'
-
-
       ! Check input
       IF ( nxt .GT. nx .OR. nxt .LT. 1 ) THEN
         IF ( myrank .eq. 0) PRINT*, 'MAIN: prolongation specification incorrect; input nxt must be less than Nx'
@@ -135,12 +159,12 @@
         STOP
       ENDIF
       IF ( nyt .GT. ny .OR. nyt .LT. 1 ) THEN
-        IF ( myrank .eq. 0) PRINT*, 'MAIN: prolongation specification incorrect; input nxt must be less than Nx'
+        IF ( myrank .eq. 0) PRINT*, 'MAIN: prolongation specification incorrect; input nyt must be less than Ny'
         CALL MPI_Finalize(ierr)
         STOP
       ENDIF
       IF ( nzt .GT. nz .OR. nzt .LT. 1 ) THEN
-        IF ( myrank .eq. 0) PRINT*, 'MAIN: prolongation specification incorrect; input nxt must be less than Nx'
+        IF ( myrank .eq. 0) PRINT*, 'MAIN: prolongation specification incorrect; input nzt must be less than Nz'
         CALL MPI_Finalize(ierr)
         STOP
       ENDIF
@@ -164,9 +188,10 @@
       ! Continuation points in both grids
       ! Cz = FC points at compilation time
       ! Czt = FC points required in the old grid
-      ! Czn = FC points in the new grid (won't be stored in output)
-      Czt = nzt/GCD(nzt-1,nz-Cz-1) - 1
-      Czn = (nz-Cz)/GCD(nzt-1,nz-Cz-1) - 1
+      ! Czn = FC points required  in the new grid (won't be stored in output)
+      Czt = (nzt-1)/GCD(nzt-1,nz-Cz-1) - 1
+      Czn = (nz-Cz-1)/GCD(nzt-1,nz-Cz-1) - 1
+      IF ( myrank .eq. 0 ) PRINT*, "Continuation points required: ", Czt
 
       ! Indexes for the largest array necesary and ioplan for the output
       CALL range(1,nx/2+1,nprocs,myrank,ista,iend)
@@ -210,7 +235,9 @@
 
       CALL io_init(myrank,(/nxt,nyt,nzt/),ktsta,ktend,planiot)
       flags  = FFTW_MEASURE
-      CALL fftp3d_create_plan_cr(plancr,(/nx,ny,nz-Cz+Czn/),flags)
+      ! Create plan as fully periodic, I will be used only the IFFT.
+      CALL fcgram_create_plan(planfc,(/nx,ny,nz-Cz+Czn/),(/0,0,0/),(/0,0,0/),&
+              (/0.0_GP,0.0_GP,0.0_GP/),"something ",flags)
 
       ib = 1
       ie = len(fnlist)
@@ -240,8 +267,8 @@
         npkeep = nprocs; nprocs = ntprocs
         CALL range(1,nzt+Czt,ntprocs,myrank,ksta,kend)
         CALL range(1,nxt/2+1,ntprocs,myrank,ista,iend)
-        CALL fftp3d_create_plan_rc(planrct,(/nxt,nyt,nzt+Czt/),(/Cx,Cy,Czt/), &
-                                   (/ox,oy,oz/),tdir,flags)
+        CALL fcgram_create_plan(planfct,(/nxt,nyt,nzt+Czt/),(/Cx,Cy,Czt/), &
+                (/oxt,oyt,ozt/),(/0.0_GP,0.0_GP,0.0_GP/),tdir,flags)
         nprocs = npkeep
         CALL range(1,nx/2+1,nprocs,myrank,ista,iend)
         CALL range(1,nz-Cz+Czn,nprocs,myrank,ksta,kend)
@@ -258,7 +285,7 @@
          nprocs = ntprocs
          CALL range(1,nzt+Czt,ntprocs,myrank,ksta,kend)
          CALL range(1,nxt/2+1,ntprocs,myrank,ista,iend)
-         CALL fftp3d_real_to_complex(planrct,vvt,C1t,commtrunc)
+         CALL fftp3d_real_to_complex(planfct,vvt,C1t,commtrunc)
          nprocs = npkeep
          CALL range(1,nx/2+1,nprocs,myrank,ista,iend)
          CALL range(1,nz-Cz+Czn,nprocs,myrank,ksta,kend)
@@ -289,7 +316,7 @@
          END DO
 
 ! Compute inverse FT of prolongated variable:
-         CALL fftp3d_complex_to_real(plancr,B1,br,MPI_COMM_WORLD)
+         CALL fftp3d_complex_to_real(planfc,B1,br,MPI_COMM_WORLD)
 
 !
 ! Put to disk:
@@ -302,9 +329,9 @@
          ENDIF
       ENDDO ! end of file loop
 
-      CALL fftp3d_destroy_plan(plancr)
+      CALL fcgram_destroy_plan(planfc)
       IF ( myrank .LT. ntprocs ) THEN
-        CALL fftp3d_destroy_plan(planrct)
+        CALL fcgram_destroy_plan(planfct)
         CALL MPI_COMM_FREE(commtrunc, ierr)
         CALL MPI_GROUP_FREE(grouptrunc, ierr)
       ENDIF

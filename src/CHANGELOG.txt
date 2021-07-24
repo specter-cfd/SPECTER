@@ -1,0 +1,11 @@
+v2.0 - 7/21/21:
+- fcgram module moved from `pseudo` to `fftp` and it now incorporates
+  all the required datatypes and helper functions.
+- New module `boundary` to deal with boudary conditions for each field.
+- Solvers renamed to reflect the bulk PDEs they are solving.
+- Added new solver `MHD`.
+- Poisson solvers for Robin and Dirichlet boundary conditions.
+- Boundary (and divergenceless) diagnostic routines in
+  `boundary` module.
+- Added basic support for FC-Gram in y direction. More work needed
+  before solvers with non-periodic boundaries in y are supported.

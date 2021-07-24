@@ -18,8 +18,10 @@
 ! The variable nstrip controls strip mining during the 
 ! transposition. Often set to 1.
 !
-! Gf and Gl are the Gram operators for the first l and r points
       USE fprecision
+
+      IMPLICIT NONE
+
       INCLUDE 'fftw3.f'
  
       INTEGER, PARAMETER  :: ikind = IKIND_
@@ -37,12 +39,10 @@
          COMPLEX(KIND=GP), DIMENSION (:,:,:), POINTER  :: ccarr
          COMPLEX(KIND=GP), DIMENSION (:,:,:), POINTER  :: carr
          REAL(KIND=GP),    DIMENSION (:,:,:), POINTER  :: rarr
-         DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:) :: Gxf,Gxl,Gyf
-         DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:) :: Gyl,Gzf,Gzl
          INTEGER, DIMENSION (:), POINTER :: itype1, itype2
-         INTEGER(kind=ikind) :: planr,planc
+         INTEGER(kind=ikind) :: planrxy,plancz
+         INTEGER(kind=ikind) :: planrx,plancyz
          INTEGER :: nx,ny,nz
-         INTEGER :: Cx,ox,Cy,oy,Cz,oz
       END TYPE FFTPLAN
       SAVE
 

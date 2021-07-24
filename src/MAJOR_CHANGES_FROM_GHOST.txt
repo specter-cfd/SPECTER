@@ -1,9 +1,8 @@
 - No 2/3 rule. Operations are now applied over entire arrays and results are filtered with calls to `fc_filter` when needed.
 - Module `boxsize` is now in module `grid`.
 - New module `fcgram` with information about continuation points and boundary approximation order.
-- New fft and ifft routines `{2,1}d_real_to_complex_{xy,z}`` and `{2,1}d_complex_to_real_{xy,z}`. The suffix denotes the directions accross which the FFT is performed.
 - Global quantities and spectras are now computed in a mixed (kx,ky,z) domain, as information in fully spectral domains contains the non-physical contribution of the FC-Gram continuation.
-- Remove trailing 3 in certain subroutines. New names are  `gradre`, `prodre`, `derivk`, `laplak`.
+- Remove trailing 3 in certain subroutines. New names are  `gradre`, `prodre`, `derivk`, `laplak`, `vector`.
 - `rotor` renamed `curlk` for consistency.
 - The subroutines that compute non-linear hd terms (`gradre`, `prodre`) return the three components of the result.
 - `nonlhd` renamed poisson, and now it returns the inhomogeneous pressure instead of projecting v over solenoidal space inplace.

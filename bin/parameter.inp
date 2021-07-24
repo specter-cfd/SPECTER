@@ -1,68 +1,115 @@
 ! General configuration flags
 &status
-idir = "in/"
-odir = "out/"
-tdir = "../tables/"
-stat = 0         ! last binary file if restarting an old run
-mult = 1         ! timestep multiplier
-bench = 0        ! benchmark mode if 1
-outs = 0         ! controls the amount of output
+idir = "in/"        ! location of binary input
+odir = "out/"       ! destination for binary output
+tdir = "../tables/" ! location of FC-Gram tables
+stat = 0            ! last binary file if restarting an old run
+mult = 1            ! timestep multiplier
+bench = 0           ! benchmark mode if 1
+outs = 0            ! controls the amount of output
 /
 
 ! Boz size
 ! Lenghts are in units of 2.pi for periodic directions
 ! and units of 1 for non-periodic directions.
 &boxparams
-Lx = 1.00        ! Length of the box in x
-Ly = 1.00        ! Length of the box in y
-Lz = 1.00        ! Length of the box in z
+Lx = 1.00           ! length of the box in x
+Ly = 0.50           ! length of the box in y
+Lz = 1.00           ! length of the box in z
 /
 
 ! Parameters for time integration
 &parameter
-dt =  1e-3       ! time step
-step = 10001     ! total number of steps
-tstep = 100      ! number of steps between binary output
-cstep = 5        ! number of steps between writing global quantities
-seed = 1000      ! seed for the random number generator
+dt =  1e-3          ! time step
+step = 10001        ! total number of steps
+tstep = 100         ! number of steps between binary output
+cstep = 5           ! number of steps between writing global quantities
+seed = 1000         ! seed for the random number generator
 /
 
 ! Parameters for the velocity field
 &velocity
-f0 = 1.0         ! amplitude of the mechanical forcing
-u0 = 1.00        ! amplitude of the initial velocity field
-kdn = 2.00       ! minimum wavenumber
-kup = 4.00       ! maximum wavenumber
-nu = 1.e-3       ! kinematic viscosity
-vxbot = 0.0      ! vx at z=0
-vxtop = 0.0      ! vx at z=Lz
-vybot = 0.0      ! vy at z=0
-vytop = 0.0      ! vy at z=Lz
-fparam0 = 1.0    ! fparam0-9 can be used to control the forcing
-vparam0 = 0.1    ! idem for the initial velocity field
+f0 = 1.0            ! amplitude of the mechanical forcing
+u0 = 1.00           ! amplitude of the initial velocity field
+kdn = 2.00          ! minimum wavenumber
+kup = 4.00          ! maximum wavenumber
+nu = 1.e-3          ! kinematic viscosity
+fparam0 = 1.0       ! fparam0-9 can be used to control the forcing
+vparam0 = 1.0       ! idem for the initial velocity field
+/
+
+! Parameters for the velocity boundary conditions
+&velbound
+vbczsta = "noslip"  ! velocity BC kind at z=0
+vbczend = "noslip"  ! velocity BC kind at z=Lz
+vxzsta  = 0.0       ! uniform vx at z=0
+vyzsta  = 0.0       ! uniform vy at z=0
+vxzend  = 0.0       ! uniform vx at z=Lz
+vyzend  = 0.0       ! uniform vy at z=Lz
 /
 
 ! Parameters for Bousinessq equation's
 &boussinesq
-gama = 1.0      ! amplitude of bouyancy term
-xmom = 1.0      ! prefactor of bouyancy term in momentum equation 
-xtemp = 1.0     ! prefactor of bouyancy term in temperature equation
+gama = 1.0          ! amplitude of bouyancy term
+xmom = 1.0          ! prefactor of bouyancy term in momentum equation 
+xtemp = 1.0         ! prefactor of bouyancy term in temperature equation
 /
 
 ! Parameters for the passive/active scalar
 &scalar
-s0 = 1.0        ! amplitude of the scalar's forcing
-c0 = .5         ! amplitude of the initial scalar concentration
-skdn = 3.00     ! scalar minimum wavenumber
-skup = 8.00     ! scalar maximum wavenumber
-kappa = 1e-3    ! scalar difussivity
-sparam0 = 0.0   ! sparam0-9 can be used to control the scalar's forcing
-cparam0 = 2.0   ! idem for the initial concentration field
+s0 = 1.0            ! amplitude of the scalar's forcing
+c0 = .5             ! amplitude of the initial scalar concentration
+skdn = 3.00         ! scalar minimum wavenumber
+skup = 8.00         ! scalar maximum wavenumber
+kappa = 1e-3        ! scalar difussivity
+sparam0 = 0.0       ! sparam0-9 can be used to control the scalar's forcing
+cparam0 = 2.0       ! idem for the initial concentration field
+/
+
+! Parameters for the passive/active scalar boundary conditions
+&scabound
+vbczsta = "noslip"  ! velocity BC kind at z=0
+vbczend = "noslip"  ! velocity BC kind at z=Lz
+vxzsta  = 0.0       ! uniform vx at z=0
+vyzsta  = 0.0       ! uniform vy at z=0
+vxzend  = 0.0       ! uniform vx at z=Lz
+vyzend  = 0.0       ! uniform vy at z=Lz
+/
+
+! Parameters for the magnetic field
+&magfield
+m0 = 0.0            ! amplitude of the electromotive forcing
+a0 = .0             ! amplitude of the magnetic field
+mkdn = 2.00         ! minimum wavenumber
+mkup = 4.00         ! maximum wavenumber
+mu = 5.e-3          ! magnetic diffusivity
+mparam0 = 1.00      ! mparam0-9 can be used to control the magnetic forcing
+aparam0 = 1.00      ! idem for the initial vector potential
+/
+
+! Configuration flags for runs with magnetic fields
+! A dynamo run loads a velocity field from idir
+! but loads a magnetic field from initialb.f90
+&dynamo
+dyna = 0            ! dynamo run if 1
+/
+
+! Parameters for the velocity boundary conditions
+&magbound
+bbczsta = "vacuum"  ! magnetic BC kind at z=0
+bbczend = "vacuum"  ! magnetic BC kind at z=Lz
+/
+
+! Parameters for the uniform magnetic field
+&uniformb
+bx0 = 0.0           ! uniform magnetic field in the x direction 
+by0 = 0.0           ! uniform magnetic field in the y direction 
+bz0 = 0.0           ! uniform magnetic field in the z direction 
 /
 
 ! Parameters for the uniform rotation
 &rotation
-omegax = 0.0    ! x component of the angular velocity
-omegay = 0.0    ! y component of the angular velocity
-omegaz = 1.0    ! z component of the angular velocity
+omegax = 0.0        ! x component of the angular velocity
+omegay = 0.0        ! y component of the angular velocity
+omegaz = 1.0        ! z component of the angular velocity
 /

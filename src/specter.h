@@ -1,14 +1,16 @@
 !=================================================================
-! GHOST code: Geophysical High Order Suite for Turbulence
+! SPECTER code: Special PEriodic Continuation Turbulence solvER
 !
 ! Header file with definitions for conditional compilation.
-! Main code is in main3D.fpp. See that file for more details.
+! Main code is in specter.fpp. See that file for more details.
 !
 ! 2015 Pablo D. Mininni.
 !      Department of Physics, 
 !      Facultad de Ciencias Exactas y Naturales.
 !      Universidad de Buenos Aires.
 !      e-mail: mininni@df.uba.ar
+!
+! 2020 Mauro Fontana. Refactored from GHOST to usage in SPECTER.
 !=================================================================
 
 ! The lines below define preprocessor variables for each solver.
@@ -18,21 +20,26 @@
 
 ! Fluid solvers
 
-#ifdef CHANNEL_SOL
-#define INCLUDEFNAME_ 'channel/channel_
+#ifdef HD_SOL
+#define INCLUDEFNAME_ 'hd/hd_
 #endif
 
-#ifdef RAYBEN_SOL
+#ifdef BOUSS_SOL
 #define BOUSSINESQ_
 #define SCALAR_
-#define INCLUDEFNAME_ 'rayben/rayben_
+#define INCLUDEFNAME_ 'bouss/bouss_
 #endif
 
-#ifdef ROTCON_SOL
+#ifdef ROTBOUSS_SOL
 #define BOUSSINESQ_
 #define SCALAR_
 #define ROTATION_
-#define INCLUDEFNAME_ 'rotcon/rotcon_
+#define INCLUDEFNAME_ 'rotbouss/rotbouss_
+#endif
+
+#ifdef MHD_SOL
+#define MAGFIELD_
+#define INCLUDEFNAME_ 'mhd/mhd_
 #endif
 
 ! Do not edit below this line!

@@ -34,7 +34,7 @@ make
 while in the `src/` directory. After running `make`, the output binary should be placed in the `bin/` directory, and named like the chosen solver.
 
 ## Running SPECTER
-After the compilation, a binary file with the name of the selected solver is placed in `bin/` directory. In that same directory, a file named `parameter.inp` can be found, where you can specify several important parameters like magnitude of the time step, the number of steps to perform, how often to save output information. Physical parameters like the forcing amplitude, the mmagnitude of the initial condition or the viscosity are also specified in `bin/parameter.inp/`. A full list of the parameters with their description can be found in the same file, as well as in `src/README.txt`. After setting up `parameters.inp` you can run the code with
+After the compilation, a binary file with the name of the selected solver is placed in `bin/` directory. In that same directory, a file named `parameter.inp` can be found, where you can specify several important parameters like magnitude of the time step, the number of steps to perform, how often to save output information. Physical parameters like the forcing amplitude, the mmagnitude of the initial condition or the viscosity are also specified in `bin/parameter.inp/`. A full list of the parameters with their description can be found in the same file, as well as in `src/README.info`. After setting up `parameters.inp` you can run the code with
 ```
 ./SOLVER
 ```
@@ -50,13 +50,16 @@ For non-periodic directions, **SPECTER** uses tables to compute appropriate peri
 To get the best out of **SPECTER** we recommend reading the information provided in `src/README.txt` for a detailed explanation of each compilation and runtime parameter.
 
 ## References
-- Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. arXiv: [2002.01392](https://arxiv.org/abs/2002.01392).
-- Bruno, O. P. & Lyon, M: *High-order unconditionally stable FC-AD solvers for general smooth domains I. Basic elements*. JCP.  229, (2010). DOI: [10.1016/j.jcp.2009.11.020](https://doi.org/10.1016/j.jcp.2009.11.020).
+- Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. Comp. Phys. Comm. 256, 107482 (2020).DOI: [10.1016/j.cpc.2020.107482](https://doi.org/10.1016/j.cpc.2020.107482).
+- Fontana M, Mininni PD, Bruno OP & Dmitruk P; *Vector potential-based MHD solver for non-periodic flows using Fourier continuation expansions*. (2021). arXiv: [2107.07077](https://arxiv.org/abs/2107.07077).
+- Bruno, O. P. & Lyon, M: *High-order unconditionally stable FC-AD solvers for general smooth domains I. Basic elements*. Jour. Comp. Phys.  229, (2010). DOI: [10.1016/j.jcp.2009.11.020](https://doi.org/10.1016/j.jcp.2009.11.020).
 - Mininni P. D., Rosenberg D. L., Reddy R. & Pouquet A.; *A hybrid MPI–OpenMP scheme for scalable parallel pseudospectral computations for fluid turbulence*. P. Comp. 37, 123 (2011). DOI: [10.1016/j.parco.2011.05.004](https://doi.org/10.1016/j.parco.2011.05.004).
-- Rosenberg D. L., Mininni P. D., Reddy R. & Pouquet A.; ArXiV (2018). *GPU parallelization of a hybrid pseudospectral fluid turbulence framework using CUDA*. arXiv: [arXiv:1808.01309](https://arxiv.org/abs/1808.01309).
+- Rosenberg D. L., Mininni P. D., Reddy R. & Pouquet A.; *GPU parallelization of a hybrid pseudospectral fluid turbulence framework using CUDA*.  Atmosphere 11, 178 (2020). DOI: [10.3390/atmos11020178](https://doi.org/10.3390/atmos11020178).
 
 ## Citation
-If you use **SPECTER** for a publication, we kindly ask you to cite the following article **Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. arXiv: [2002.01392](https://arxiv.org/abs/2002.01392)**.
+If you use **SPECTER** for a publication, we kindly ask you to cite the following article: **Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. Comp. Phys. Comm. 256, 107482 (2020).DOI: [10.1016/j.cpc.2020.107482](https://doi.org/10.1016/j.cpc.2020.107482)**.
+Depending on the solver, we also ask you to consider citing:
+- `MHD`: **Fontana M, Mininni PD, Bruno OP & Dmitruk P; *Vector potential-based MHD solver for non-periodic flows using Fourier continuation expansions*. (2021). arXiv: [2107.07077](https://arxiv.org/abs/2107.07077)**.
 
 ## Authors
 - Mauro Fontana - Physics Department at University of Buenos Aires.

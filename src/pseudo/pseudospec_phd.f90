@@ -5,7 +5,7 @@
 ! spectrum, transfer function, and associated global quantities 
 ! in the HD, MHD, Hall-MHD, and Boussinesq equations when a 
 ! passive or active scalar is present. You should use the 
-! FFTPLANS and MPIVARS modules (see the file 'fftp_mod.f90') in 
+! FCPLAN and MPIVARS modules (see the files 'fftp_mod.f90') in 
 ! each program that calls any of the subroutines in this file. 
 !
 ! NOTATION: index 'i' is 'x' 
@@ -57,8 +57,8 @@
 !
       c1 = a
       CALL derivk(d,c2,1)
-      CALL fftp3d_complex_to_real(plancr,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c2,r2,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
 
 !$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
       DO k = ksta,pkend
@@ -74,8 +74,8 @@
 !
       c1 = b
       CALL derivk(d,c2,2)
-      CALL fftp3d_complex_to_real(plancr,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c2,r2,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
 
 !$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
       DO k = ksta,pkend
@@ -91,8 +91,8 @@
 !
       c1 = c
       CALL derivk(d,c2,3)
-      CALL fftp3d_complex_to_real(plancr,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(plancr,c2,r2,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
+      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
 
 ! Add and normalize at the same time
       tmp = 1.0_GP/ &
@@ -107,7 +107,7 @@
          END DO
       END DO
 
-      CALL fftp3d_real_to_complex(planrc,r3,e,MPI_COMM_WORLD)
+      CALL fftp3d_real_to_complex(planfc,r3,e,MPI_COMM_WORLD)
 
       RETURN
       END SUBROUTINE advect
@@ -130,7 +130,6 @@
       USE kes
       USE grid
       USE mpivars
-      USE fcgram
       USE fft
 !$    USE threads
       IMPLICIT NONE
@@ -155,7 +154,7 @@
          at = kk2*a
       ENDIF
       
-      CALL fftp1d_complex_to_real_z(plancr,at,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,at,MPI_COMM_WORLD)
 
 !
 ! Computes the variance
@@ -212,7 +211,6 @@
       USE commtypes
       USE grid
       USE mpivars
-      USE fcgram
       USE fft
 !$    USE threads
       IMPLICIT NONE
@@ -231,8 +229,8 @@
             real((nz-Cz),kind=GP)
 
       at = a; bt = b
-      CALL fftp1d_complex_to_real_z(plancr,at,MPI_COMM_WORLD)
-      CALL fftp1d_complex_to_real_z(plancr,bt,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,at,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,bt,MPI_COMM_WORLD)
 
 !
 ! Computes the averaged inner product between the fields

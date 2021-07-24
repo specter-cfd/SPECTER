@@ -3,11 +3,11 @@
 #****************************************************************************
 
 # Spatial resolution (grid points in X,Y,Z)
-NX       = 16
-NY       = 32
-NZ       = 256
+NX       = 256
+NY       = 128
+NZ       = 512
 
-# Points used for continuation in each direction.
+# Points used for periodic continuation in each direction.
 # Note that the number of points used in each direction for the
 # physical domain is Nx-Cx.
 # C=0 implies periodic boundary conditions in that direction
@@ -15,7 +15,7 @@ CX       = 0
 CY       = 0
 CZ       = 25
 
-# Boundary values to use for continuations
+# Order at each boundary (=0 for periodic directions)
 OX       = 0
 OY       = 0
 OZ       = 5
@@ -24,7 +24,7 @@ OZ       = 5
 ORD      = 2
 
 # SOLVER:  (read the file SOLVERS for a list of options)
-SOLVER   = CHANNEL
+SOLVER   = BOUSS
 
 # PRECISION: (SINGLE or DOUBLE)
 PRECISION= DOUBLE
@@ -56,7 +56,7 @@ COMPILER   = GNU
 MPI        = OPEN
 
 # FFTWDIR contains the path to the FFTW libraries
-FFTWDIR = /usr/lib64
+FFTWDIR = /home/mfontana/fftw/3.3.8
 
 #****************************************************************************
 # Compiler and MPI library dependent section
@@ -111,9 +111,15 @@ FC_GNU        = gfortran
 CC_GNU        = gcc
 FFLAGS_GNU    = -O3 -funroll-loops
 FPSPEC_GNU    = -O3 -funroll-loops
+# GCC 10 specific options, uncomment if using GCC > v10.0
+#FFLAGS_GNU   += -w -fallow-argument-mismatch
+#FPSPEC_GNU   += -w -fallow-argument-mismatch
 CFLAGS_GNU    = -O3
 GNU_OMP       = -fopenmp
 TARGET_GNU    = -mtune=native -mfpmath=both
+# Fully optimize for compiling CPU, turn off for heterogeneous clusters
+# TARGET_GNU   += -march=native
+
 #
 # G95 compiler (G95)
 CPP_G95       = /usr/bin/cpp -traditional-cpp -P
@@ -136,12 +142,13 @@ MPILD_MPICH   = -lmpich -lmpichf90 -lfmpich -lpthread -lrt -lmpich \
   -lpthread -lrt -luuid
 #
 # OPENMPI (OPEN)
-MPIINC_OPEN   = -I/usr/include/openmpi-x86_64
-MPILIB_OPEN   = -L/usr/lib64/openmpi/lib
-MPILD_OPEN    = -I/usr/include/openmpi-x86_64 -pthread \
-  -I/usr/lib64/openmpi/lib -Wl,-rpath -Wl,/usr/lib64/openmpi/lib \
-  -Wl,--enable-new-dtags -L/usr/lib64/openmpi/lib -lmpi_usempif08 \
-  -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi
+MPIINC_OPEN   = -I/opt/ohpc/pub/mpi/openmpi3-gnu7/3.1.6/include
+MPILIB_OPEN   = -L/opt/ohpc/pub/mpi/openmpi3-gnu7/3.1.6/lib
+MPILD_OPEN    = -I/opt/ohpc/pub/mpi/openmpi3-gnu7/3.1.6/include -pthread \
+                -I/opt/ohpc/pub/mpi/openmpi3-gnu7/3.1.6/lib -Wl,-rpath \
+                -Wl,/opt/ohpc/pub/mpi/openmpi3-gnu7/3.1.6/lib -Wl,--enable-new-dtags \
+                -L/opt/ohpc/pub/mpi/openmpi3-gnu7/3.1.6/lib -lmpi_usempif08 \
+                -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi
 #
 # MPICH-GM (GM)
 MPIINC_GM     = -I/usr/local/mpich-gm-62/include
@@ -186,4 +193,4 @@ NSTREAMS        = 1
 #                 Can be overridden at runtime by setting MPI_PPN env.
 #                 variable. This variable is only used when P_CUDA=yes.
 PPN             = 4
-#****************************************************************************
+BOUSS**************************************************************************

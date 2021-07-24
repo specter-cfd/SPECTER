@@ -5,6 +5,5 @@
          CALL pscheck(th,fs,t,dt)
 
          ! Print diagnostic quantities
-         ! Mean squared divergence, <vx^2+vy^2> at z=0,Lz
-         ! and <vz^2> at z=0,Lz
-         CALL diagnostic(vx,vy,vz,t,dt)
+         CALL vdiagnostic(vplanbc,planfc,vx,vy,vz,t,dt)
+         CALL vdiagnostic(splanbc,planfc,th,t,dt)

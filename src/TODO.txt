@@ -1,8 +1,0 @@
-Support for ducts:
-- FC-Gram FFT in y too.
-- Solve Laplace with 4 walls and 1 periodic direction.
-- Define gam depending on type of Laplace solution.
-- Separate pseudo into pseudo (non-boundary dependant subroutines), pseudo_z (subroutines valid when walls in z) and pseudo_yz (subroutines for two pairs of walls)
-
-Performance:
-- Profile I/O of energy, helicity, divergence and boundaries and, if important, investigate accumulating 3 times instead of summing the arrays for each component and then accumulate at the end. More verbose, potentially up to 3x faster.
