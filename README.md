@@ -47,7 +47,7 @@ The expressions for the forcing fields and the initial conditions must be specif
 For non-periodic directions, **SPECTER** uses tables to compute appropriate periodic extensions. A collection of commonly employed tables can be found in the `tables/` directory. However, a supplementary **Fortran** program to generate these tables is available at [https://github.com/mfontanaar/fctables](https://github.com/mfontanaar/fctables).
 
 ## More information
-To get the best out of **SPECTER** we recommend reading the information provided in `src/README.txt` for a detailed explanation of each compilation and runtime parameter.
+To get the best out of **SPECTER** we recommend reading the information provided in `src/README.info` for a detailed explanation of each compilation and runtime parameter.
 
 ## References
 - Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. Comp. Phys. Comm. 256, 107482 (2020).DOI: [10.1016/j.cpc.2020.107482](https://doi.org/10.1016/j.cpc.2020.107482).
@@ -58,6 +58,7 @@ To get the best out of **SPECTER** we recommend reading the information provided
 
 ## Citation
 If you use **SPECTER** for a publication, we kindly ask you to cite the following article: **Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. Comp. Phys. Comm. 256, 107482 (2020).DOI: [10.1016/j.cpc.2020.107482](https://doi.org/10.1016/j.cpc.2020.107482)**.
+
 Depending on the solver, we also ask you to consider citing:
 - `MHD`: **Fontana M, Mininni PD, Bruno OP & Dmitruk P; *Vector potential-based MHD solver for non-periodic flows using Fourier continuation expansions*. (2021). arXiv: [2107.07077](https://arxiv.org/abs/2107.07077)**.
 
