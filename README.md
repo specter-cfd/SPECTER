@@ -70,6 +70,7 @@ If you use **SPECTER** for a publication, we kindly ask you to cite the followin
 Depending on the solver, we also ask you to consider citing:
 - `MHD`: **Fontana M, Mininni PD, Bruno OP & Dmitruk P; *Vector potential-based MHD solver for non-periodic flows using Fourier continuation expansions*. (2021). arXiv: [2107.07077](https://arxiv.org/abs/2107.07077)**.
 
+---
 ### Authors
 - Mauro Fontana - Physics Department at University of Buenos Aires.
 - Pablo D. Mininni - Physics Department at University of Buenos Aires.
