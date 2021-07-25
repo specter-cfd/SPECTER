@@ -1,11 +1,11 @@
 This directory contains a set of the precomputed tables required to
 perform FC-Gram periodic extensions. Currently the tables in this
 directory span all the cases with matching values (O) from 3 to 9
-and continuation points (C) from 10 to 50.
+and continuation points (C) from 15 to 34.
 
-Note that a few extra tables (C=114,238,496, with O=7) which are
-used to perform spectral interpolation betweeen frequent resolutions
-are also provided.
+Note that a few extra tables which are used to perform spectral 
+interpolation betweeen frequent resolutions are also provided in
+directory `boots`.
 
 If another combination of parameters is required, it can be generated
 using the Fortran program available at:

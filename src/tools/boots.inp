@@ -1,0 +1,14 @@
+&regrid
+idir   = "./"               ! location of input binary files
+odir   = "./"               ! destination of output binary files
+tdir   = "../tables/boots"  ! location of appropriate FC-Gram tables
+fnlist = "vx.0001.out;vy.0001.out;vz.0001.out;pr.0001.out"
+! fnlist is a colon delimited list of files to process
+nxt    = 256                ! x resolution of the old grid
+nyt    = 128                ! y resolution of the old grid
+nzt    = 487                ! z resolution of the old grid
+/
+
+&order
+ozt    = 5                  ! FC-Gram order to use for the interpolation
+/
