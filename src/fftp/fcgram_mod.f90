@@ -6,9 +6,9 @@
 !   Module-wide notation: boundaries 1, 2, 3, 4, 5, 6 represent
 ! boundaries located at x=0, x=Lx, y=0, y=Ly, z=0, z=Lz, respectively.
 !
-! TODO Add support for reconstructions in x and y dimensions. This
-!      probably requires an interface to subroutines that operate on
-!      real and complex arrays. (Continuation in x should be real)
+! TODO Add support for reconstructions in x direction. This would
+!      require interfaces to subroutines that operate on real arrays.
+!      (Continuation in x should result in real array)
 !
 ! 2020 Mauro Fontana. DF-UBA.
 !======================================================================
@@ -23,7 +23,7 @@ MODULE fcgram
          ! Tables used for Dirichlet periodic extension and for
          ! reconstructions using Neumann or second normal derivative
          ! at the boundaries
-         DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:, :) :: dir
+         DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:) :: dir
          DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:)    :: neu,neu2
          ! Grid spacing
          REAL(KIND=GP)  :: dx
@@ -89,8 +89,14 @@ MODULE fcgram
       this%y%d  = o(2)
       this%z%d  = o(3)
 
-      CALL fftp3d_create_plan_rc(this%planrc,N,fftflags) 
-      CALL fftp3d_create_plan_cr(this%plancr,N,fftflags)
+      IF (this%y%C .le. 0) THEN
+         CALL fftp3d_create_plan(this%planrc,N,-1,fftflags,0)
+         CALL fftp3d_create_plan(this%plancr,N,1,fftflags,0)
+      ELSE
+         CALL fftp3d_create_plan(this%planrc,N,-1,fftflags,1)
+         CALL fftp3d_create_plan(this%plancr,N,1,fftflags,1)
+      ENDIF
+
 
       this%tdir = tdir
 
@@ -171,7 +177,7 @@ MODULE fcgram
 
 
 !*****************************************************************
-      SUBROUTINE load_dirichlet_tables(coord, tdir)
+      SUBROUTINE load_dirichlet_tables(coord,tdir)
 !-----------------------------------------------------------------
 ! Helper function to populate Dirichlet tables in a coord
 ! member of a given fcplan datatype.
@@ -252,17 +258,14 @@ MODULE fcgram
 
 
 !*****************************************************************
-      SUBROUTINE load_neumann_tables(coord, tdir, ord)
+      SUBROUTINE load_neumann_tables(coord,tdir,ord)
 !-----------------------------------------------------------------
 ! Helper function to populate the Neumann reconstructors for a
-! coord member of a given fcplan datatype. Note that if d matching
-! points are used for Dirichlet conditions, d+1 and d+2 must be 
-! used to keep the same order of accuracy in Neumann and second
-! normal derivative, respectively.
+! coord member of a given fcplan datatype.
 ! ARGUMENTS:
 !     coord : A coord type variable. At the output contains
 !             the tables required to compute a periodic extension
-!             with Dirichlet boundary conditions. [INOUT]
+!             with normal derivative boundary conditions. [INOUT]
 !     tdir  : directory containing the FC-Gram tables. [IN]
 !     ord   : Order. 1 for Neumann reconstructor, 2 for second
 !             normal derivative reconstructor. [IN]
@@ -350,8 +353,8 @@ MODULE fcgram
       ! of the inverse. dx/dxp accounts for different grid spacings
       ! between current grid and the grid used to generate the tables
       IF ( ord .eq. 1 ) THEN
-         coord%neu          = MATMUL(Q(coord%d,:), TRANSPOSE(Qn))
-         coord%neu(coord%d) = coord%neu(coord%d) * coord%dx/dxp
+         coord%neu           = MATMUL(Q(coord%d,:), TRANSPOSE(Qn))
+         coord%neu(coord%d)  = coord%neu(coord%d) * coord%dx/dxp
       ELSEIF ( ord .eq. 2 ) THEN
          coord%neu2          = MATMUL(Q(coord%d,:), TRANSPOSE(Qn))
          coord%neu2(coord%d) = coord%neu2(coord%d) * (coord%dx/dxp)**2
@@ -362,7 +365,7 @@ MODULE fcgram
       END SUBROUTINE load_neumann_tables
 
 !***********************************************************************
-      SUBROUTINE neumann_reconstruct(plan, f, boun, ord)
+      SUBROUTINE neumann_reconstruct(plan,f,boun,ord)
 !-----------------------------------------------------------------------
 ! Reconstructs function values at the boundary from given its
 ! ordth-normal derivative at the endpoint d^(ord)_n f = g. The
@@ -508,7 +511,7 @@ MODULE fcgram
       END SUBROUTINE neumann_reconstruct
 
 !**********************************************************************
-      SUBROUTINE robin_reconstruct(plan, f, boun, a)
+      SUBROUTINE robin_reconstruct(plan,f,boun,a)
 !----------------------------------------------------------------------
 ! Reconstructs function values at the boundary from the Robin
 ! boundary condition f' + a*f = g. The array f must contain the

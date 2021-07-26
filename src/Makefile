@@ -134,7 +134,7 @@ clean:
         done
 
 dist:
-	rm -f $(BIN)/{*MHD*,*CHANNEL*,*ROT*,*RAY*,boots,README*,*TESTS*} \
+	rm -f $(BIN)/{*MHD*,*HD*,*BOUSS*,boots,README*,*TESTS*} \
               *HD* *MHD* *ROT* *BOUSS* *CHANNEL* boots* *TESTS*
 	rm -f $(BIN)/README_output.info
 	$(MAKE) clean
@@ -210,8 +210,7 @@ $(OBJS):
 	$(COMPILE) $(OBJSDIR)/$(@:.o=.f90)
 
 tests:  edit $(CONTRIBOBJS) $(GTIMER) $(FFTPDIR)/fftp.o \
-	   $(GUTILS) $(IOLIB)/binary_io.o $(OBJS)
-	cd $(BOUNDIR) && $(MAKE) clean && $(MAKE) COMPILE='$(COMPILE)'
+	   $(GUTILS) $(IOLIB)/binary_io.o $(OBJS) $(BOUNDIR)/boundary_mod.o
 	$(PREPROCESS) -DTESTS_ specter.fpp -o TESTS.f90
 	$(COMPILE) TESTS.f90
 	$(FC) $(FFLAGS) $(TARGET_ARCH) $(DO_HYBRID$(P_HYBRID)) \

@@ -814,6 +814,7 @@
          CALL GTStop(ihwtm2)
       ENDIF
 
+#ifndef TESTS_  /* If building tests jump to after Runge-Kutta*/
 ! Set up boundary conditions
       CALL setup_bc(vplanbc,planfc, &
           (/ vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend /),'v')
@@ -983,7 +984,6 @@
 
       ENDIF
 
-#ifndef TESTS_
  RK : DO t = ini,step
 ! Every 'tstep' steps, stores the fields 
 ! in binary files
@@ -1151,11 +1151,13 @@
 ! End of Runge-Kutta
 #else
 !      INCLUDE 'tests/playground.f90'
-      INCLUDE 'tests/fft.f90'
+!      INCLUDE 'tests/fft.f90'
       INCLUDE 'tests/fc_dirichlet.f90'
       INCLUDE 'tests/fc_neumann.f90'
       INCLUDE 'tests/fc_neumann2.f90'
+#ifdef MAGFIELD_
       INCLUDE 'tests/fc_robin.f90'
+#endif
       INCLUDE 'tests/energy.f90'
       INCLUDE 'tests/poisson.f90'
 #endif /*End of if TESTS_*/

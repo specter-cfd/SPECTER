@@ -96,7 +96,7 @@ ELSE
    R3 = R3/nx/ny
 ENDIF
 IF ( myrank .eq. 0 ) THEN
-   rm1 = MAXVAL(ABS(R2(:,1:ny-Cy,1)-R1(:,1:ny-Cy,1)))
+   rm1 = MAXVAL(ABS(R3(:,1:ny-Cy,1)-R1(:,1:ny-Cy,1)))
    PRINT*, "Maximum reconstruction error at z=0 : ", rm1
 ENDIF
 CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
