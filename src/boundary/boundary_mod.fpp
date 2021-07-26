@@ -51,12 +51,18 @@ MODULE boundary
 
       IF ( field .eq. 'v' ) THEN
          CALL v_setup(this,planfc,bckind)
+#ifdef SCALAR_
+      ELSEIF ( field .eq. 's' ) THEN
+         CALL s_setup(this,planfc,bckind)
+#endif
+#ifdef MAGFIELD_
       ELSEIF ( field .eq. 'b' ) THEN
          IF (PRESENT(vplan)) THEN
             CALL b_setup(this,planfc,bckind,vplan=vplan)
          ELSE
             CALL b_setup(this,planfc,bckind)
          ENDIF
+#endif
       ENDIF
 
       RETURN

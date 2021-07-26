@@ -107,10 +107,10 @@
       CALL goto_domain_w_boundaries(planbc,planfc,th)
 
       ! Z=0
-      IF (planbc%bczsta .eq. 0) CALL constant_z(planfc,th,0)
+      IF (planbc%bczsta .eq. 0) CALL s_constant_z(planfc,th,0)
 
       ! Z=Lz
-      IF (planbc%bczend .eq. 0) CALL constant_z(planfc,th,1)
+      IF (planbc%bczend .eq. 0) CALL s_constant_z(planfc,th,1)
 
       ! Back to 3D Fourier
       CALL goto_3d_fourier(planbc,planfc,th)
@@ -119,7 +119,7 @@
       END SUBROUTINE s_imposebc
       
 !***********************************************************************
-      SUBROUTINE constant_z(planfc,th,pos)
+      SUBROUTINE s_constant_z(planfc,th,pos)
 !-----------------------------------------------------------------------
 !  Subroutine to apply non-slip boundary conditions in top and bottom
 !  boundaries.
@@ -162,7 +162,7 @@
          ENDDO
       ENDDO
 
-      END SUBROUTINE constant_z
+      END SUBROUTINE s_constant_z
 
 !*****************************************************************
       SUBROUTINE sdiagnostic(planbc,planfc,a,t,dt)

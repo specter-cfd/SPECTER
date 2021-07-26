@@ -500,14 +500,14 @@
 !     skdn : minimum wave number in concentration/source
 !     skup : maximum wave number in concentration/source
 !     kappa: diffusivity
-!     thtop : value of the scalar at z=Lz
-!     thbot : value of the scalar at z=0 
+!     szsta: value of the scalar at z=Lz
+!     szend: value of the scalar at z=0 
 !     sparam0-9 : ten real numbers to control properties of 
 !            the source
 !     cparam0-9 : ten real numbers to control properties of
 !            the initial concentration
-      thtop = 0.0_GP
-      thbot = 0.0_GP
+      szsta = 0.0_GP
+      szend = 0.0_GP
       IF (myrank.eq.0) THEN
          OPEN(1,file='parameter.inp',status='unknown',form="formatted")
          READ(1,NML=scalar)
@@ -518,8 +518,8 @@
       CALL MPI_BCAST(skdn,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(skup,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(kappa,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(thtop,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(thbot,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(szsta,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(szend,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sparam0,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sparam1,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sparam2,1,GC_REAL,0,MPI_COMM_WORLD,ierr)

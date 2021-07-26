@@ -51,6 +51,6 @@
          ENDDO
 
          ! Apply boundary conditions and project onto solenoidal space
-         CALL v_imposebc_and_project(vplanbc,planfc,vx,vy,vz,pr,rki=o,
-                 v_zsta=(/ vxzsta, vysta/), vz_end=(/ vxzend, vyzend/))
+         CALL v_imposebc_and_project(vplanbc,planfc,vx,vy,vz,pr,rki=o,&
+                 v_zsta=(/ vxzsta, vyzsta/), v_zend=(/ vxzend, vyzend/))
          CALL s_imposebc(splanbc,planfc,th)
