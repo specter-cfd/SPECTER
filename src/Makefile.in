@@ -193,4 +193,3 @@ NSTREAMS        = 1
 #                 Can be overridden at runtime by setting MPI_PPN env.
 #                 variable. This variable is only used when P_CUDA=yes.
 PPN             = 4
-BOUSS**************************************************************************
