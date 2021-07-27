@@ -3,9 +3,9 @@
 #****************************************************************************
 
 # Spatial resolution (grid points in X,Y,Z)
-NX       = 256
+NX       = 128
 NY       = 128
-NZ       = 512
+NZ       = 128
 
 # Points used for periodic continuation in each direction.
 # Note that the number of points used in each direction for the
@@ -24,7 +24,7 @@ OZ       = 5
 ORD      = 2
 
 # SOLVER:  (read the file SOLVERS for a list of options)
-SOLVER   = BOUSS
+SOLVER   = MHD
 
 # PRECISION: (SINGLE or DOUBLE)
 PRECISION= DOUBLE
@@ -41,7 +41,7 @@ P_HYBRID = no
 # Parallelization model for accelerators:
 # P_CUDA=yes    # CUDA-MPI (or CUDA-OpenMP-MPI) hybridization
 # P_CUDA=no     # MPI- or hybrid- parallelization only
-P_CUDA   = no
+P_CUDA   = yes
 
 # IKIND    4 in 32 bits machines, 8 in 64 bits machines
 # CSIZE    8 if L1 cache is <= 64 kb, 16 if L1 cache is 128 kb
@@ -178,8 +178,8 @@ MPILD_MAC     = -lpmpich -lmpich -lSystemStubs
 #
 # NVCC NVIDIA CUDA compiler:
 CUCC_NVIDIA     = nvcc
-CUINC_NVIDIA    = -I/usr/local/cuda/6.5/include
-CULIBDIR_NVIDIA = -L/usr/local/cuda/6.5/lib64
+CUINC_NVIDIA    = -I/opt/ohpc/pub/apps/software/cuda-6.5/include
+CULIBDIR_NVIDIA = -L/opt/ohpc/pub/apps/software/cuda-6.5/lib64
 CULIB_NVIDIA    = -lcudart -lcufft
 CUCFLAGS_NVIDIA = -O3
 CUBIND_NVIDIA   = -DCUDA_BIND_DEVICE_
@@ -192,4 +192,4 @@ NSTREAMS        = 1
 # PPN = <number># number of GPUs per node; required for device affinity.
 #                 Can be overridden at runtime by setting MPI_PPN env.
 #                 variable. This variable is only used when P_CUDA=yes.
-PPN             = 4
+PPN             = 1

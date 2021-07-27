@@ -5,6 +5,8 @@
 ! 2011 Duane L. Rosenberg and Pablo D. Mininni.
 !      National Center for Atmospheric Research.
 !      e-mail: mininni@ucar.uba.ar 
+!
+! 2021 FC-Gram support (M. Fontana)
 !=================================================================
 
 !=================================================================
@@ -20,6 +22,8 @@
 !
       USE fprecision
       USE iso_c_binding
+
+      IMPLICIT NONE
  
       INTEGER, PARAMETER  :: ikind = IKIND_
       INTEGER, PARAMETER  :: csize = CSIZE_
@@ -36,29 +40,34 @@
       TYPE  (C_PTR)       :: pstream_(nstreams)
       INTEGER, DIMENSION (nstreams) :: issta,issnd
       INTEGER, DIMENSION (nstreams) :: kssta,kssnd
-      INTEGER             :: hcom,hfft,hmem,htra,htot
-      DOUBLE PRECISION    :: comtime = 0.0
-      DOUBLE PRECISION    :: ffttime = 0.0
-      DOUBLE PRECISION    :: memtime = 0.0
-      DOUBLE PRECISION    :: tratime = 0.0
-      DOUBLE PRECISION    :: tottime = 0.0
+      INTEGER             :: hcom,hfft,hmem,htra,hcont,htot
+      DOUBLE PRECISION    :: comtime  = 0.0
+      DOUBLE PRECISION    :: ffttime  = 0.0
+      DOUBLE PRECISION    :: memtime  = 0.0
+      DOUBLE PRECISION    :: tratime  = 0.0
+      DOUBLE PRECISION    :: conttime = 0.0
+      DOUBLE PRECISION    :: tottime  = 0.0
       TYPE FFTPLAN
-         COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:)  :: ccarr
+         COMPLEX(KIND=GP), DIMENSION (:,:,:), POINTER  :: ccarr
+         COMPLEX(KIND=GP), DIMENSION (:,:,:), POINTER  :: carr
+         REAL(KIND=GP),    DIMENSION (:,:,:), POINTER  :: rarr
+         INTEGER, DIMENSION (:), POINTER               :: itype1, itype2
+         INTEGER(kind=ikind)                           :: planrxy,plancz
+         INTEGER(kind=ikind)                           :: planrx,plancyz
+         INTEGER                                       :: nx,ny,nz
+
+         !Cuda specific bits
          COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:)  :: ccarrt
-         COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:)  :: carr
-         REAL   (KIND=GP), POINTER, DIMENSION (:,:,:)  :: rarr
          TYPE     (C_PTR)                              :: cu_ccd_,cu_ccd1_
          TYPE     (C_PTR)                              :: cu_cd_,cu_rd_
          TYPE     (C_PTR)                              :: pccarr_,pcarr_
          TYPE     (C_PTR)                              :: prarr_
          INTEGER  (C_INT),        DIMENSION (nstreams) :: icuplanr_
          INTEGER  (C_INT),        DIMENSION (nstreams) :: icuplanc_
-         INTEGER                                       :: nx,ny,nz
          INTEGER(C_SIZE_T)                             :: szccd_,szcd_,szrd_
          INTEGER(C_SIZE_T),       DIMENSION (nstreams) :: str_szccd_
          INTEGER(C_SIZE_T),       DIMENSION (nstreams) :: str_szcd_
          INTEGER(C_SIZE_T),       DIMENSION (nstreams) :: str_szrd_
-         INTEGER, DIMENSION (:), POINTER               :: itype1,itype2
       END TYPE FFTPLAN
       SAVE
 
@@ -170,19 +179,17 @@
       SAVE
 
   END MODULE threads
-
 !=================================================================
 
   MODULE mpivars
-!     INCLUDE 'mpif.h'
+      ! pkend is last k-index corresponding to the
+      ! actual physical (non-continuated) domain.
       INTEGER, SAVE :: ista,iend
       INTEGER, SAVE :: jsta,jend
-      INTEGER, SAVE :: ksta,kend
+      INTEGER, SAVE :: ksta,kend,pkend
       INTEGER, SAVE :: nprocs,myrank
       INTEGER, SAVE :: provided
       INTEGER, SAVE :: ierr
 
   END MODULE mpivars
-
 !=================================================================
-

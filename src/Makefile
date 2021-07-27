@@ -42,7 +42,7 @@ BOUNDIR      = $(GHOME)/boundary
 # FFTW library variables:
 FFTWSINGLE  = f
 FFTWDOUBLE  =
-FFTWHYByes  = -lfftw3$(FFTW3$(PRECISION))_threads
+FFTWHYByes  = -lfftw3$(FFTW$(PRECISION))_threads
 FFTWHYBno   =
 FFTWFLAGS   = $(FFTWHYB$(P_HYBRID)) -lfftw3$(FFTW$(PRECISION)) -lm 
 FFTWLDFLAGS = $(FFTWFLAGS) $(DO_HYBRID$(P_HYBRID))
