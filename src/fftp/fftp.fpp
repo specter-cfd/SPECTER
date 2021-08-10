@@ -58,6 +58,110 @@
       END SUBROUTINE fftp3d_init_threads
 
 !*****************************************************************
+      SUBROUTINE fftp3d_create_plan(plan,n,fftdir,flags,transp)
+!-----------------------------------------------------------------
+! Creates plans for the FFTW in each node.
+!
+! Parameters
+!     plan   : contains the parallel 3D plan [OUT]
+!     n      : the size of the dimensions of the input array [IN]
+!     fftdir : the direction of the Fourier transform [IN]
+!              FFTW_FORWARD or FFTW_REAL_TO_COMPLEX (-1)
+!              FFTW_BACKWARD or FFTW_COMPLEX_TO_REAL (+1)
+!     flags  : flags for the CUFFT [IN]
+!              Curently unused.
+!     transp : number of axes transformed before transposing
+!              0 = 2D FFT -> 1D FFT & 1D IFFT -> 2D FFT
+!              1 = 1D FFT -> 2D FFT & 2D IFFT -> 1D FFT
+!-----------------------------------------------------------------
+
+      USE mpivars
+      USE fftplans
+!$    USE threads
+      USE gtimer
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: n(3)
+      INTEGER, INTENT(IN) :: fftdir
+      INTEGER, INTENT(IN) :: flags
+      INTEGER, INTENT(IN) :: transp
+      TYPE(FFTPLAN), INTENT(OUT) :: plan
+
+      ALLOCATE ( plan%ccarr(n(3),n(2),ista:iend)    )
+      ALLOCATE ( plan%carr(n(1)/2+1,n(2),ksta:kend) )
+      ALLOCATE ( plan%rarr(n(1),n(2),ksta:kend)     )
+!$    CALL GPMANGLE(plan_with_nthreads)(nth)
+
+      ! Create XY -> Z plan
+      IF (transp .eq. 0) THEN
+
+      IF (fftdir .eq. -1) THEN
+      CALL GPMANGLE(plan_many_dft_r2c)(plan%planrxy,2,(/n(1),n(2)/),          &
+                         kend-ksta+1,plan%rarr,                               &
+                         (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),             &
+                         plan%carr,(/n(1)/2+1,n(2)*(kend-ksta+1)/),1,         &
+                         (n(1)/2+1)*n(2),flags)
+      CALL GPMANGLE(plan_many_dft)(plan%plancz,1,n(3),n(2)*(iend-ista+1),     &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
+                         -1,flags)
+
+      ELSEIF (fftdir .eq. 1) THEN
+      CALL GPMANGLE(plan_many_dft_c2r)(plan%planrxy,2,(/n(1),n(2)/),          &
+                         kend-ksta+1,plan%carr,                               &
+                         (/n(1)/2+1,n(2)*(kend-ksta+1)/),1,                   &
+                         (n(1)/2+1)*n(2),plan%rarr,                           &
+                         (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),flags)
+
+      CALL GPMANGLE(plan_many_dft)(plan%plancz,1,n(3),n(2)*(iend-ista+1),     &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
+                         1,flags)
+      ENDIF  ! End transp = 0
+
+      ELSEIF (transp .eq. 1) THEN
+
+      IF (fftdir .eq. -1) THEN
+      ! Create X -> YZ plan
+      CALL GPMANGLE(plan_many_dft_r2c)(plan%planrx,1,n(1),                    &
+                         n(2)*(kend-ksta+1),plan%rarr,n(1)*n(2)*(kend-ksta+1),&
+                         1,n(1),plan%carr,(n(1)/2+1)*n(2)*(kend-ksta+1),1,    &
+                         (n(1)/2+1),flags)
+      CALL GPMANGLE(plan_many_dft)(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),&
+                         plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
+                         plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
+                         -1,flags)
+      ELSEIF (fftdir .eq. 0) THEN
+      CALL GPMANGLE(plan_many_dft_c2r)(plan%planrx,1,n(1),n(2)*(kend-ksta+1), &
+                         plan%carr,(n(1)/2+1)*n(2)*(kend-ksta+1),1,n(1)/2+1,  &
+                         plan%rarr,n(1)*n(2)*(kend-ksta+1),1,n(1),flags)
+
+      CALL GPMANGLE(plan_many_dft)(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),&
+                         plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
+                         plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
+                         1,flags)
+      ENDIF  !End transp = 1
+      ENDIF
+
+      plan%nx = n(1)
+      plan%ny = n(2)
+      plan%nz = n(3)
+      ALLOCATE( plan%itype1(0:nprocs-1) )
+      ALLOCATE( plan%itype2(0:nprocs-1) )
+      CALL fftp3d_create_block(n,nprocs,myrank,plan%itype1, &
+                              plan%itype2)
+
+      CALL GTStart(hcom,GT_WTIME)
+      CALL GTStart(hfft,GT_WTIME)
+      CALL GTStart(htra,GT_WTIME)
+      CALL GTStart(hcont,GT_WTIME)
+      CALL GTStart(htot,GT_WTIME)
+
+
+      RETURN
+      END SUBROUTINE fftp3d_create_plan
+
+!*****************************************************************
       SUBROUTINE fftp3d_create_plan_rc(plan,n,flags)
 !-----------------------------------------------------------------
 ! Creates plans for the FFTW in each node.
@@ -199,7 +303,6 @@
 
       RETURN
       END SUBROUTINE fftp3d_create_plan_cr
-
 
 !*****************************************************************
       SUBROUTINE fftp3d_destroy_plan(plan)
@@ -665,14 +768,6 @@
                                    plan%z%dir(C-ii+1,jj)*inout(d-jj+1,j,i)
             ENDDO
          ENDDO
-
-! Old approach
-!            ! Continuation using last o points
-!            inout(n-C+1:n,j,i) = MATMUL(planfc%z%dir, inout(n-C-d+1:n-C,j,i))
-!
-!            ! Continuation using first o points
-!            inout(n-C+1:n,j,i) = inout(n-C+1:n,j, i) + &
-!                MATMUL(planfc%z%dir(C:1:-1,:), inout(d:1:-1,j,i))
       ENDDO
       ENDDO
       ENDIF
