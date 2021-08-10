@@ -103,28 +103,28 @@ CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
 IF (myrank .eq. 0) PRINT*, "Mean squared electrostatic potential at borders:",&
         char(10), tmr/3, tms/3, "(after Laplace)"
 CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
-IF (myrank .eq. 0) PRINT*, "--------------------------"
-IF (myrank .eq. 0) PRINT*, "Checking insulator solver:"
-IF (myrank .eq. 0) PRINT*, "--------------------------"
-CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
-
-C1=C4; C2=C5; C3=C6   ! Restore the field
-CALL sol_project(C1,C2,C3,pr,0,2,2)
-
-CALL divergence(C1,C2,C3,tmq)
-CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
-IF (myrank .eq. 0) PRINT*, "Mean squared divergence ", &
-  "after Poisson:", char(10), tmq
-CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
-CALL fftp1d_real_to_complex_z(planfc,pr,MPI_COMM_WORLD)
-
-CALL robcheck(planfc,pr,pr,pr,tmp,tmq,tmr,tms)
-CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
-IF (myrank .eq. 0) PRINT*, "Mean squared error in Robin boundary for the ", &
-        "electrostatic potential:", char(10), tmr/3, tms/3, "(after Laplace)"
-    PRINT*, "(This error is higher than the others cases because it involves ",&
-        "estimating a derivative with FC..."
-    PRINT*, "should be of the FC order for this resolution)"
+!IF (myrank .eq. 0) PRINT*, "--------------------------"
+!IF (myrank .eq. 0) PRINT*, "Checking insulator solver:"
+!IF (myrank .eq. 0) PRINT*, "--------------------------"
+!CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+!
+!C1=C4; C2=C5; C3=C6   ! Restore the field
+!CALL sol_project(C1,C2,C3,pr,0,2,2)
+!
+!CALL divergence(C1,C2,C3,tmq)
+!CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+!IF (myrank .eq. 0) PRINT*, "Mean squared divergence ", &
+!  "after Poisson:", char(10), tmq
+!CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+!CALL fftp1d_real_to_complex_z(planfc,pr,MPI_COMM_WORLD)
+!
+!CALL robcheck(planfc,pr,pr,pr,tmp,tmq,tmr,tms)
+!CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+!IF (myrank .eq. 0) PRINT*, "Mean squared error in Robin boundary for the ", &
+!        "electrostatic potential:", char(10), tmr/3, tms/3, "(after Laplace)"
+!    PRINT*, "(This error is higher than the others cases because it involves ",&
+!        "estimating a derivative with FC..."
+!    PRINT*, "should be of the FC order for this resolution)"
 IF (myrank .eq. 0) &
 PRINT*, "-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*"
 CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)

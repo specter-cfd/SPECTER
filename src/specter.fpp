@@ -687,6 +687,10 @@
          Dkx = 1.0_GP/Lx
          vbcxsta = "periodic"
          vbcxend = "periodic"
+#ifdef SCALAR_
+         sbcxsta = "periodic"
+         sbcxend = "periodic"
+#endif
 #ifdef MAGFIELD_
          bbcxsta = "periodic"
          bbcxend = "periodic"
@@ -706,6 +710,10 @@
          Dky = 1.0_GP/Ly
          vbcysta = "periodic"
          vbcyend = "periodic"
+#ifdef SCALAR_
+         sbcysta = "periodic"
+         sbcyend = "periodic"
+#endif
 #ifdef MAGFIELD_
          bbcysta = "periodic"
          bbcyend = "periodic"
@@ -724,6 +732,10 @@
          Dkz = 1.0_GP/Lz
          vbczsta = "periodic"
          vbczend = "periodic"
+#ifdef SCALAR_
+         sbczsta = "periodic"
+         sbczend = "periodic"
+#endif
 #ifdef MAGFIELD_
          bbczsta = "periodic"
          bbczend = "periocic"

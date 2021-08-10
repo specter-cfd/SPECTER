@@ -1,11 +1,11 @@
 !======================================================================
-! SPECTER boundary conditions for the velocity field.
+! SPECTER boundary conditions for the scalar field.
 !
 !  -1 : Periodic boundary conditions.
-!   0 : Non-slip boundary conditions.
+!   0 : Constant concentration (or temperature) boundary conditions.
 !
 !  References:
-!  - No-Slip: https://doi.org/10.1016/j.cpc.2020.107482 
+!  - Constant: https://doi.org/10.1016/j.cpc.2020.107482 
 !
 ! 2020 Mauro Fontana. DF-UBA.
 !======================================================================
