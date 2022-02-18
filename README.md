@@ -58,7 +58,7 @@ To get the best out of **SPECTER** we recommend reading the information provided
 References
 ----------
 - Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. Comp. Phys. Comm. 256, 107482 (2020).DOI: [10.1016/j.cpc.2020.107482](https://doi.org/10.1016/j.cpc.2020.107482).
-- Fontana M, Mininni PD, Bruno OP & Dmitruk P; *Vector potential-based MHD solver for non-periodic flows using Fourier continuation expansions*. (2021). arXiv: [2107.07077](https://arxiv.org/abs/2107.07077).
+- Fontana M, Mininni PD, Bruno OP & Dmitruk P; *Vector potential-based MHD solver for non-periodic flows using Fourier continuation expansions*. Comp. Phys. Comm. 275, 108304 (2022). DOI: [10.1016/j.cpc.2022.108304](https://doi.org/10.1016/j.cpc.2022.108304).
 - Bruno, O. P. & Lyon, M: *High-order unconditionally stable FC-AD solvers for general smooth domains I. Basic elements*. Jour. Comp. Phys.  229, (2010). DOI: [10.1016/j.jcp.2009.11.020](https://doi.org/10.1016/j.jcp.2009.11.020).
 - Mininni P. D., Rosenberg D. L., Reddy R. & Pouquet A.; *A hybrid MPI–OpenMP scheme for scalable parallel pseudospectral computations for fluid turbulence*. P. Comp. 37, 123 (2011). DOI: [10.1016/j.parco.2011.05.004](https://doi.org/10.1016/j.parco.2011.05.004).
 - Rosenberg D. L., Mininni P. D., Reddy R. & Pouquet A.; *GPU parallelization of a hybrid pseudospectral fluid turbulence framework using CUDA*.  Atmosphere 11, 178 (2020). DOI: [10.3390/atmos11020178](https://doi.org/10.3390/atmos11020178).
@@ -68,7 +68,7 @@ Citation
 If you use **SPECTER** for a publication, we kindly ask you to cite the following article: **Fontana, M., Bruno, O. P., Mininni P. D. & Dmitruk P.; *Fourier continuation method for incompressible fluids with boundaries*. Comp. Phys. Comm. 256, 107482 (2020).DOI: [10.1016/j.cpc.2020.107482](https://doi.org/10.1016/j.cpc.2020.107482)**.
 
 Depending on the solver, we also ask you to consider citing:
-- `MHD`: **Fontana M, Mininni PD, Bruno OP & Dmitruk P; *Vector potential-based MHD solver for non-periodic flows using Fourier continuation expansions*. (2021). arXiv: [2107.07077](https://arxiv.org/abs/2107.07077)**.
+- `MHD`: **Fontana M, Mininni PD, Bruno OP & Dmitruk P; *Vector potential-based MHD solver for non-periodic flows using Fourier continuation expansions*. Comp. Phys. Comm. 275, 108304 (2022). DOI: [10.1016/j.cpc.2022.108304](https://doi.org/10.1016/j.cpc.2022.108304)**.
 
 ---
 ### Authors
