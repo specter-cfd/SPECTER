@@ -42,6 +42,14 @@
 #define INCLUDEFNAME_ 'mhd/mhd_
 #endif
 
+#ifdef MHDBOUSS_SOL
+#define BOUSSINESQ_
+#define SCALAR_
+#define MAGFIELD_
+#define INCLUDEFNAME_ 'mhdbouss/mhdbouss_
+#endif
+
+
 ! Do not edit below this line!
 ! Builds the names of all files to include for each solver
 #define STRINGIFY(a) a

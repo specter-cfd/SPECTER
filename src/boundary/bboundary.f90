@@ -245,7 +245,6 @@
 !    ai     : Array containing the ith component of the vector potential
 !              (kz,ky,kx) domain. [INOUT]
 !    pos    : 0 for bottom boundary, 1 for top boundary.
-!    inter  : 0 for final BC, 1 for intermediate BC
 !-----------------------------------------------------------------------
       USE fprecision
       USE mpivars
@@ -398,7 +397,6 @@
       CALL divergence(a,b,c,tm1)
       CALL divergence(c1,c2,c3,tm2)
 
-
 10    FORMAT( 1P 7E13.6 )
       IF ( (planbc%bcxsta .eq. 0) .OR. (planbc%bcxend .eq. 0) .OR. &
            (planbc%bcysta .eq. 0) .OR. (planbc%bcyend .eq. 0) .OR. &
@@ -415,8 +413,9 @@
                WRITE(1,10) (t-1)*dt,tm1,tm2,tmp,tmq,tmr,tms
             CLOSE(1)
          ENDIF
+      ENDIF
 
-      ELSEIF ( (planbc%bcxsta .eq. 1) .OR. (planbc%bcxend .eq. 1) .OR. &
+      IF ( (planbc%bcxsta .eq. 1) .OR. (planbc%bcxend .eq. 1) .OR. &
                (planbc%bcysta .eq. 1) .OR. (planbc%bcyend .eq. 1) .OR. &
                (planbc%bczsta .eq. 1) .OR. (planbc%bczend .eq. 1) ) THEN
          CALL robcheck(planfc,a,b,c,tmp,tmq,tmr,tms)

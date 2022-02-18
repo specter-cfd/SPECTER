@@ -51,3 +51,9 @@
          CALL v_imposebc_and_project(vplanbc,planfc,vx,vy,vz,pr,rki=o,&
                  v_zsta=(/ vxzsta, vyzsta/), v_zend=(/ vxzend, vyzend/))
          CALL s_imposebc(splanbc,planfc,th)
+         CALL fc_filter(th)
+
+         ! Hack to prevent weird accumulation in complex domain for th
+         CALL fftp3d_complex_to_real(planfc,th,R1,MPI_COMM_WORLD)
+         R1 = R1/nx/ny/nz
+         CALL fftp3d_real_to_complex(planfc,R1,th,MPI_COMM_WORLD)

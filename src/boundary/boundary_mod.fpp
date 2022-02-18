@@ -478,6 +478,7 @@ MODULE boundary
       USE grid
       USE fft
       USE mpivars
+      USE commtypes
 !$    USE threads
 
 
@@ -491,9 +492,10 @@ MODULE boundary
 
       INTEGER                      :: i,j,k
 
+
       ! Get coefficients
       ! ----------------
-      ! Dirichlet
+      ! Pure Dirichlet
       IF ( bczsta .eq. bczend .AND. bczsta .eq. 0 ) THEN
       IF (ista.eq.1) THEN
             coef(1,1,1) = (bc(2,1,1)-bc(1,1,1))/Lz
@@ -525,7 +527,7 @@ MODULE boundary
          END DO
       ENDIF  !End Dirichlet
 
-      ! Neumann
+      ! Pure Neumann
       ELSEIF ( bczsta .eq. bczend .AND. bczsta .eq. 1 ) THEN
       IF (ista.eq.1) THEN
          coef(1,1,1) = bc(1,1,1)
@@ -557,7 +559,7 @@ MODULE boundary
          END DO
       ENDIF  ! End Neumann
 
-      ! Robin
+      ! Pure Robin
       ELSEIF ( bczsta .eq. bczend .AND. bczsta .eq. 2 ) THEN
       IF (ista.eq.1) THEN
          coef(1,1,1) = bc(1,1,1)
@@ -588,7 +590,44 @@ MODULE boundary
            END DO
          END DO
       ENDIF  !End Robin
-      
+
+      ! Dirichlet bottom - Robin top
+      ELSEIF ( bczsta .eq. 0 .AND. bczend .eq. 2 ) THEN
+      IF (ista.eq.1) THEN
+         coef(1,1,1) = bc(2,1,1)
+         coef(2,1,1) = bc(1,1,1)
+!$omp parallel do private (k,tmp)
+         DO j = 2,ny
+            tmp   = 1.0_GP/(2*khom(j,1))
+            coef(1,j,1) = bc(2,j,1)*tmp
+            coef(2,j,1) = (bc(1,j,1)*2*khom(j,1) - bc(2,j,1)*exp(-khom(j,1)*Lz))*tmp
+         END DO
+!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+         DO i = 2,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+            DO j = 1,ny
+               tmp   = 1.0_GP/(2*khom(j,i))
+               coef(1,j,i) = bc(2,j,i)*tmp
+               coef(2,j,i) = (bc(1,j,i)*2*khom(j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
+            END DO
+         END DO
+      ELSE
+!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+         DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+            DO j = 1,ny
+               tmp   = 1.0_GP/(2*khom(j,i))
+               coef(1,j,i) = bc(2,j,i)*tmp
+               coef(2,j,i) = (bc(1,j,i)*2*khom(j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
+           END DO
+         END DO
+      ENDIF  !End Dirichlet bottom - Robin top
+
+      ELSE  ! Unsupported combination of BC
+         IF ( myrank .eq. 0) PRINT*, "[ERROR] Unsupported BC combination in call "&
+              "to laplace_z. Aborting..."
+         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         STOP
       ENDIF  !End coefficients
 
       ! Construct solution and normal derivative

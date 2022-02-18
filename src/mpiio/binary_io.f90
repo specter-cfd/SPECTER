@@ -226,7 +226,7 @@ if (myrank.eq.0) write(*,*)' io_read: read time:',GTGetTime(ihread)
       END SUBROUTINE io_write
 
 !*****************************************************************
-      SUBROUTINE io_initc(myrank,n,ksta,kend,plan)
+      SUBROUTINE io_initc(myrank,n,ista,iend,plan)
 !-----------------------------------------------------------------
 !
 ! Initializes variables for MPI I/O. Creates plans and MPI 
@@ -249,22 +249,22 @@ if (myrank.eq.0) write(*,*)' io_read: read time:',GTGetTime(ihread)
       IMPLICIT NONE
 
       INTEGER, INTENT(IN)   :: myrank,n(3)
-      INTEGER, INTENT(IN)   :: ksta,kend
+      INTEGER, INTENT(IN)   :: ista,iend
       INTEGER, DIMENSION(3) :: subsizes,starts
       TYPE(IOPLAN), INTENT(OUT) :: plan
 
-      plan%nx = n(1)
+      plan%nz = n(1)
       plan%ny = n(2)
-      plan%nz = n(3)
-      plan%ksta = ksta
-      plan%kend = kend
+      plan%nx = n(3)
+      plan%ksta = ista    ! To use the same plan structure as the real plan
+      plan%kend = iend    ! To use the same plan structure as the real plan
 
       subsizes(1) = n(1)
       subsizes(2) = n(2)
-      subsizes(3) = kend-ksta+1
+      subsizes(3) = iend-ista+1
       starts(1) = 0
       starts(2) = 0
-      starts(3) = ksta-1
+      starts(3) = ista-1
       CALL MPI_TYPE_CREATE_SUBARRAY(3,n,subsizes,starts, &
            MPI_ORDER_FORTRAN,GC_COMPLEX,plan%iotype,ioerr)
       CALL MPI_TYPE_COMMIT(plan%iotype,ioerr)
@@ -296,7 +296,7 @@ if (myrank.eq.0) write(*,*)' io_read: read time:',GTGetTime(ihread)
       IMPLICIT NONE
       
       TYPE(IOPLAN), INTENT(IN)       :: plan
-      COMPLEX(KIND=GP), INTENT(OUT) :: var(plan%nx,plan%ny,plan%ksta:plan%kend)
+      COMPLEX(KIND=GP), INTENT(OUT) :: var(plan%nz,plan%ny,plan%ksta:plan%kend)
       INTEGER, INTENT(IN)            :: unit
       INTEGER                        :: fh
       CHARACTER(len=100), INTENT(IN) :: dir
@@ -314,7 +314,7 @@ if (myrank.eq.0) write(*,*)' io_read: read time:',GTGetTime(ihread)
       CALL MPI_FILE_SET_VIEW(fh,disp,GC_COMPLEX,plan%iotype,'native', &
           MPI_INFO_NULL,ioerr)
       CALL MPI_FILE_READ_ALL(fh,var,                           &
-          plan%nx*plan%ny*(plan%kend-plan%ksta+1),GC_COMPLEX,  &
+          plan%nz*plan%ny*(plan%kend-plan%ksta+1),GC_COMPLEX,  &
           MPI_STATUS_IGNORE,ioerr)
       CALL MPI_FILE_CLOSE(fh,ioerr)
 
@@ -322,7 +322,7 @@ if (myrank.eq.0) write(*,*)' io_read: read time:',GTGetTime(ihread)
       END SUBROUTINE io_readc
 
 !*****************************************************************
-      SUBROUTINE io_writec(unit,dir,plan,var)
+      SUBROUTINE io_writec(unit,dir,fname,nmb,plan,var)
 !-----------------------------------------------------------------
 !
 ! Writes field components into MPI native complex binary files, 
@@ -345,24 +345,26 @@ if (myrank.eq.0) write(*,*)' io_read: read time:',GTGetTime(ihread)
       IMPLICIT NONE
 
       TYPE(IOPLAN), INTENT(IN)       :: plan
-      COMPLEX(KIND=GP), INTENT(IN) :: var(plan%nz,plan%ny,ista:iend)
+      REAL(KIND=GP), INTENT(INOUT)   :: var(plan%nz,plan%ny,plan%ksta:plan%kend)
       INTEGER, INTENT(IN)            :: unit
       INTEGER                        :: fh
-      CHARACTER(len=*), INTENT(IN) :: dir
+      CHARACTER(len=*), INTENT(IN)   :: dir
+      CHARACTER(len=*), INTENT(IN)   :: nmb
+      CHARACTER(len=*), INTENT(IN)   :: fname
 
       IF ( bmangle.EQ.1 ) THEN
-      CALL MPI_FILE_OPEN(MPI_COMM_WORLD,trim(dir),MPI_MODE_CREATE+MPI_MODE_WRONLY,       &
+      CALL MPI_FILE_OPEN(MPI_COMM_WORLD,trim(dir) // '/' // fname // &
+          '.' // nmb // '.out',MPI_MODE_CREATE+MPI_MODE_WRONLY,      &
           MPI_INFO_NULL,fh,ioerr)
       ELSE
-      CALL MPI_FILE_OPEN(MPI_COMM_WORLD,trim(dir)    &
+      CALL MPI_FILE_OPEN(MPI_COMM_WORLD,fname    &
                         ,MPI_MODE_CREATE+MPI_MODE_WRONLY &
                         ,MPI_INFO_NULL,fh,ioerr)
       ENDIF
       CALL MPI_FILE_SET_VIEW(fh,disp,GC_COMPLEX,plan%iotype,'native', &
           MPI_INFO_NULL,ioerr)
-      CALL MPI_FILE_WRITE_ALL(fh,var,                         &
-          plan%nx*plan%ny*(iend-ista+1),GC_COMPLEX, &
-          MPI_STATUS_IGNORE,ioerr)
+      CALL MPI_FILE_WRITE_ALL(fh,var, plan%nz*plan%ny*(plan%kend-plan%ksta+1),&
+          GC_COMPLEX, MPI_STATUS_IGNORE,ioerr)
       CALL MPI_FILE_CLOSE(fh,ioerr)
 
       RETURN

@@ -290,7 +290,6 @@
  ! Initialize array IO
       CALL io_init(myrank,(/nx-Cx,ny-Cy,nz-Cz/),ksta,kend,planio)
 
-
 !
 ! Allocates memory for distributed blocks
       ALLOCATE( vx(nz,ny,ista:iend), vy(nz,ny,ista:iend), vz(nz,ny,ista:iend) )
@@ -996,6 +995,7 @@
 
       ENDIF
 
+
  RK : DO t = ini,step
 ! Every 'tstep' steps, stores the fields 
 ! in binary files
@@ -1063,6 +1063,7 @@
             END DO
             CALL fftp3d_complex_to_real(planfc,C1,R1,MPI_COMM_WORLD)
             CALL io_write(1,odir,'th',ext,planio,R1)
+
 #endif
 #ifdef MAGFIELD_
             rmp = 1.0_GP/(real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
