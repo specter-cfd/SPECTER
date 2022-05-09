@@ -134,10 +134,10 @@
 
       ! Z=Lz
       IF (planbc%bczend .eq. 0) THEN
-          IF( .NOT. PRESENT(v_zsta) ) THEN
+          IF( .NOT. PRESENT(v_zend) ) THEN
              CALL noslip_z(planfc,rki,vx,vy,vz,pr,(/.0_GP,.0_GP/),1)
           ELSE
-             CALL noslip_z(planfc,rki,vx,vy,vz,pr,v_zsta,1)
+             CALL noslip_z(planfc,rki,vx,vy,vz,pr,v_zend,1)
           ENDIF
       ENDIF
 
