@@ -6,4 +6,4 @@
 
          ! Print diagnostic quantities
          CALL vdiagnostic(vplanbc,planfc,vx,vy,vz,t,dt)
-         CALL vdiagnostic(splanbc,planfc,th,t,dt)
+         CALL sdiagnostic(splanbc,planfc,th,t,dt)
