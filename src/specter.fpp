@@ -773,6 +773,9 @@
          kx(i) = real(i-1,kind=GP)
          kx(i+nx/2) = real(i-nx/2-1,kind=GP)
       END DO
+      IF (ny.eq.1) THEN
+        ky(1) = 0.0_GP
+      ENDIF
       DO j = 1,ny/2
          ky(j) = real(j-1,kind=GP)
          ky(j+ny/2) = real(j-ny/2-1,kind=GP)
