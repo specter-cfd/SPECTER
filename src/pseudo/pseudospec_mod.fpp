@@ -72,6 +72,12 @@
   END MODULE fft
 !=================================================================
 
+!  MODULE pseudo_boundaries
+!      USE boundary
+
+!  END MODULE pseudo_boundaries
+!=================================================================
+
   MODULE var
       USE fprecision
       REAL(KIND=GP), PARAMETER    :: pi = 3.14159265358979323846_GP
@@ -91,6 +97,17 @@
   END MODULE kes
 !=================================================================
 
+  MODULE newtmod
+      USE fprecision
+      INTEGER :: n_dim_1d 
+      INTEGER :: step_evol
+      INTEGER :: t_rk
+      REAL(KIND=GP) :: epsilon = 0.0001_GP, d_sx = 0.0001_GP, d_sy = 0.0001_GP
+      SAVE
+
+  END MODULE newtmod
+
+!=================================================================
   MODULE random
       USE var
       USE fprecision

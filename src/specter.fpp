@@ -60,6 +60,7 @@
       USE random
       USE threads
       USE gtimer
+      USE newtmod
 
 #if defined(DEF_GHOST_CUDA_)
       USE, INTRINSIC :: iso_c_binding
@@ -74,6 +75,7 @@
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: pr
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: th,fs
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: X0,X_evol,Y0,Y_shift,f_Y,X_pert,dX0,X_partial_dif,X_pert_evol
 #endif
 #ifdef MAGFIELD_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: ax,ay,az
@@ -132,6 +134,8 @@
       REAL(KIND=GP)    :: sparam5,sparam6,sparam7,sparam8,sparam9
       REAL(KIND=GP)    :: cparam0,cparam1,cparam2,cparam3,cparam4
       REAL(KIND=GP)    :: cparam5,cparam6,cparam7,cparam8,cparam9
+      REAL(KIND=GP)    :: T_guess, sx, sy
+
 #endif
 #ifdef MAGFIELD_
       REAL(KIND=GP)    :: mkup,mkdn
@@ -219,9 +223,10 @@
       NAMELIST / scalar   / sparam5,sparam6,sparam7,sparam8,sparam9
       NAMELIST / scalar   / cparam0,cparam1,cparam2,cparam3,cparam4
       NAMELIST / scalar   / cparam5,cparam6,cparam7,sparam8,sparam9
-
       NAMELIST / scabound / sbcxsta,sbcxend,sbcysta,sbcyend,sbczsta,sbczend
       NAMELIST / scabound / szsta,szend
+      NAMELIST / sca_newt / T_guess,sx, sy
+
 #endif
 #ifdef MAGFIELD_
       NAMELIST / magfield / m0,a0,mkdn,mkup,mu
@@ -246,7 +251,7 @@
 ! NOTE: On systems with a single GPU per node (e.g., Titan)
 !       we remove the following block. But on systems with
 !       multiple devices per node, this will have to be
-!       considered carefully, and possibly re-def'd:
+!       considered carefully, and possibly re-def'd':
 #if defined(DEF_GHOST_CUDA_)
 #if defined(CUDA_BIND_LINUX_)
 ! Initializes CUDA for Linux-based systems. This is a call to an
@@ -308,6 +313,9 @@
 #ifdef SCALAR_
       ALLOCATE( th(nz,ny,ista:iend), fs(nz,ny,ista:iend) )
       ALLOCATE( C7(nz,ny,ista:iend), C8(nz,ny,ista:iend) )
+      n_dim_1d = 4*(iend-ista+1)*ny*nz
+      ALLOCATE(X0(1:n_dim_1d),  X_evol(1:n_dim_1d),  Y0(1:n_dim_1d),  Y_shift(1:n_dim_1d), &
+       f_Y(1:n_dim_1d), dX0(1:n_dim_1d),X_pert(1:n_dim_1d),X_partial_dif(1:n_dim_1d), X_pert_evol(1:n_dim_1d))
 #endif
 
 #ifdef MAGFIELD_
@@ -561,6 +569,21 @@
       CALL MPI_BCAST(sbcyend,15,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sbczsta,15,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sbczend,15,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+
+! Reads parameters for the scalar field newton solver
+! namelist 'sca_newt' on the external file 'parameter.inp' 
+!     T_guess : Initial guess of the UPO period in time units. 
+!     sx : Initial guess of the UPO shift in x direction 
+!     sy : Initial guess of the UPO shift in y direction 
+
+      IF (myrank.eq.0) THEN
+         OPEN(1,file='parameter.inp',status='unknown',form="formatted")
+         READ(1,NML=sca_newt)
+         CLOSE(1)
+      ENDIF
+      CALL MPI_BCAST(T_guess,1,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(sx,1,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(sy,1,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
 #endif
 
 #ifdef MAGFIELD_
@@ -754,6 +777,7 @@
          OPEN(1,file='x.txt',action='write')
          OPEN(2,file='y.txt',action='write')
          OPEN(3,file='z.txt',action='write')
+         OPEN(4,file='test_newt_params', action='write')
          DO i = 1,nx-Cx
             WRITE(1,FMT='(1P E23.15)') x(i)
          ENDDO
@@ -763,9 +787,11 @@
          DO i = 1,nz-Cz
             WRITE(3,FMT='(1P E23.15)') z(i)
          ENDDO
+         WRITE(4) T_guess, sx, sy
          CLOSE(1)
          CLOSE(2)
          CLOSE(3)
+         CLOSE(4)
       ENDIF
 
 ! Construct grids for wavenumber domain
@@ -904,7 +930,7 @@
 !$omp parallel do if (iend-ista.lt.nth) private (k)
          DO j = 1,ny
             DO k = 1,nz-Cz
-               pr(k,j,i) = pr(k,j,i)*dt   ! Convert to p'
+               pr(k,j,i) = pr(k,j,i)*dt   ! Convert to p''
              END DO
           END DO
       END DO
@@ -953,7 +979,7 @@
 !$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  ph(k,j,i) = ph(k,j,i)*dt   ! Convert to p'
+                  ph(k,j,i) = ph(k,j,i)*dt   ! Convert to p'prime'
                 END DO
              END DO
          END DO
@@ -1037,7 +1063,7 @@
             CALL io_write(1,odir,'vy',ext,planio,R2)
             CALL io_write(1,odir,'vz',ext,planio,R3)
 
-            ! Pressure. Transform from p' to p to save
+            ! Pressure. Transform from p'' to p to save
             rmp = 1.0_GP/ &
 	          (real(nx,kind=GP)*real(ny,kind=GP)*dt)
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
@@ -1110,7 +1136,7 @@
             CALL io_write(1,odir,'ay',ext,planio,R2)
             CALL io_write(1,odir,'az',ext,planio,R3)
 
-            ! Electric potential. Transform from phi' to phi to save
+            ! Electric potential. Transform from phi'' to phi to save
             rmp = 1.0_GP/ &
 	          (real(nx,kind=GP)*real(ny,kind=GP)*dt)
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
@@ -1154,11 +1180,12 @@
 ! Runge-Kutta step 2
 ! Evolves the system in time
 
-         DO o = ord,1,-1
+!         DO o = ord,1,-1
 
-         INCLUDE RKSTEP2_
       
-         END DO
+         INCLUDE BOUSS_NEWT_
+      
+!        END DO
 
          timet = timet+1
          timec = timec+1

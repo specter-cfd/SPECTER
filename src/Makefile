@@ -95,7 +95,7 @@ BIN         = ../bin
 
 # Objects
 HD_OBJS       = pseudospec_mod.o module_dns.o pseudospec_hd.o
-BOUSS_OBJS    = $(HD_OBJS) pseudospec_phd.o
+BOUSS_OBJS    = $(HD_OBJS) pseudospec_phd.o pseudospec_newt.o
 ROTBOUSS_OBJS = $(BOUSS_OBJS)
 MHD_OBJS      = $(HD_OBJS) pseudospec_mhd.o
 OBJS          = $($(SOLVER)_OBJS)

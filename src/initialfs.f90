@@ -13,6 +13,8 @@
          DO j = 1,ny
             DO k = 1,nz
                fs(k,j,i) = 0.
+               fs(k,j,i) = 0.
+               fs(k,j,i) = 0.
             END DO
          END DO
       END DO
