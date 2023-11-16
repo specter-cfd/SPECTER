@@ -59,8 +59,8 @@
 ! the spectra. The format fmtext should be consistent with the
 ! length of the string, e.g. for a 5 character extent
 ! len=7 and fmtext = '(i5.5)'.
-      CHARACTER(len=4)      :: ext
-      CHARACTER(len=6),SAVE :: fmtext = '(i4.4)'
+      CHARACTER(len=5)      :: ext
+      CHARACTER(len=7),SAVE :: fmtext = '(i5.5)'
 
   END MODULE filefmt
 !=================================================================

@@ -4,9 +4,14 @@
 
 step_evol = ini + NINT(T_guess/dt)
 
+IF (myrank.eq.0) THEN
+   WRITE(*,*) 'Ini:', ini, 'step_evol', step_evol
+ENDIF
+
 DO t_rk = ini,step_evol
    ! Runge-Kutta step 1
    ! Copies the fields into auxiliary arrays
+   ! WRITE(*,*) 'tk = ', t_rk
 
    !$omp parallel do if (iend-ista.ge.nth) private (j,k)
    DO i = ista,iend

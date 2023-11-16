@@ -777,7 +777,7 @@
          OPEN(1,file='x.txt',action='write')
          OPEN(2,file='y.txt',action='write')
          OPEN(3,file='z.txt',action='write')
-         OPEN(4,file='test_newt_params', action='write')
+         OPEN(4,file='test_newt_params.txt', action='write')
          DO i = 1,nx-Cx
             WRITE(1,FMT='(1P E23.15)') x(i)
          ENDDO
@@ -787,7 +787,7 @@
          DO i = 1,nz-Cz
             WRITE(3,FMT='(1P E23.15)') z(i)
          ENDDO
-         WRITE(4) T_guess, sx, sy
+         WRITE(4,*) T_guess, sx, sy
          CLOSE(1)
          CLOSE(2)
          CLOSE(3)
@@ -1281,6 +1281,7 @@
 #ifdef SCALAR_
       DEALLOCATE( th,fs )
       DEALLOCATE( C7,C8 )
+      DEALLOCATE( X0,X_evol,Y0,Y_shift,f_Y,X_pert,dX0,X_partial_dif,X_pert_evol)
 #endif
 #ifdef MAGFIELD_
       DEALLOCATE(  ax,  ay, az  )
