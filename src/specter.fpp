@@ -581,9 +581,9 @@
          READ(1,NML=sca_newt)
          CLOSE(1)
       ENDIF
-      CALL MPI_BCAST(T_guess,1,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(sx,1,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(sy,1,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(T_guess,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(sx,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(sy,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
 #endif
 
 #ifdef MAGFIELD_
@@ -777,7 +777,6 @@
          OPEN(1,file='x.txt',action='write')
          OPEN(2,file='y.txt',action='write')
          OPEN(3,file='z.txt',action='write')
-         OPEN(4,file='test_newt_params.txt', action='write')
          DO i = 1,nx-Cx
             WRITE(1,FMT='(1P E23.15)') x(i)
          ENDDO
@@ -787,11 +786,9 @@
          DO i = 1,nz-Cz
             WRITE(3,FMT='(1P E23.15)') z(i)
          ENDDO
-         WRITE(4,*) T_guess, sx, sy
          CLOSE(1)
          CLOSE(2)
          CLOSE(3)
-         CLOSE(4)
       ENDIF
 
 ! Construct grids for wavenumber domain
@@ -1058,7 +1055,7 @@
             ENDIF
             CALL fftp3d_complex_to_real(planfc,C1,R1,MPI_COMM_WORLD)
             CALL fftp3d_complex_to_real(planfc,C2,R2,MPI_COMM_WORLD)
-            CALL fftp3d_complex_to_real(planfc,C3,R3,MPI_COMM_WORLD)
+            CALL fftp3d_complex_to_real(planfc,C3,R3,MPI_COMM_WORLD) 
             CALL io_write(1,odir,'vx',ext,planio,R1)
             CALL io_write(1,odir,'vy',ext,planio,R2)
             CALL io_write(1,odir,'vz',ext,planio,R3)
@@ -1180,12 +1177,14 @@
 ! Runge-Kutta step 2
 ! Evolves the system in time
 
-!         DO o = ord,1,-1
+      !    DO o = ord,1,-1
 
       
-         INCLUDE BOUSS_NEWT_
-      
-!        END DO
+            INCLUDE BOUSS_NEWT_
+            !INCLUDE RKSTEP2_
+
+
+      !  END DO
 
          timet = timet+1
          timec = timec+1

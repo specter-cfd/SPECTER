@@ -2,16 +2,12 @@
 !!!!!!!!!!!!!Evolve system in T time!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-step_evol = ini + NINT(T_guess/dt)
+step_evol = ini + INT(T_guess/dt)
 
-IF (myrank.eq.0) THEN
-   WRITE(*,*) 'Ini:', ini, 'step_evol', step_evol
-ENDIF
 
 DO t_rk = ini,step_evol
    ! Runge-Kutta step 1
    ! Copies the fields into auxiliary arrays
-   ! WRITE(*,*) 'tk = ', t_rk
 
    !$omp parallel do if (iend-ista.ge.nth) private (j,k)
    DO i = ista,iend
@@ -29,7 +25,7 @@ DO t_rk = ini,step_evol
    ! Evolves the system in time
 
    DO o = ord,1,-1
-      INCLUDE 'include/bouss/bouss_rkstep1.f90'
+      INCLUDE 'include/bouss/bouss_rkstep2.f90'
 
    END DO
 END DO 
