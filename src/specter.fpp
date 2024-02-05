@@ -135,6 +135,7 @@
       REAL(KIND=GP)    :: cparam0,cparam1,cparam2,cparam3,cparam4
       REAL(KIND=GP)    :: cparam5,cparam6,cparam7,cparam8,cparam9
       REAL(KIND=GP)    :: T_guess, sx, sy
+      REAL(KIND=GP)    :: proj_f, proj_x, proj_y
 
 #endif
 #ifdef MAGFIELD_

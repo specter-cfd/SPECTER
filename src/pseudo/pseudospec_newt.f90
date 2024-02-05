@@ -403,7 +403,7 @@
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: Xtras_x
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: Xtras_y
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: f_X0
-      DOUBLE PRECISION, INTENT(OUT) :: proj_f, proj_x, proj_y
+      REAL(KIND=GP), INTENT(OUT) :: proj_f, proj_x, proj_y
       INTEGER :: i, j, k
       INTEGER :: offset1,offset2
 

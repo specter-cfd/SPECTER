@@ -43,8 +43,8 @@ do arnoldi_step
     !Transforms to a 1d variable X_evol
     CALL ThreeTo1D(vx, vy, vz, th, X_pert_evol) 
 
-    !Calculates the directional derivative term
-    CALL X_fin_diff(X_partial_dif, X_pert_evol, Y0, sx, sy)
+    !Calculates the directional derivative term    CALL X_fin_diff(X_partial_dif, X_pert_evol, Y0, sx, sy)
+
 
     ! Can now form A*dX0
 
@@ -57,3 +57,7 @@ do arnoldi_step
 end do
 
 CALL backpropagation()
+
+
+!Calculates the projection along the shifted directions and along the direction of flow
+CALL CalculateProjection(dX0, X0, proj_f, proj_x, proj_y)

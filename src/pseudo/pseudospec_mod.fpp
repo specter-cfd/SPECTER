@@ -103,6 +103,7 @@
       INTEGER :: step_evol
       INTEGER :: t_rk
       REAL(KIND=GP) :: epsilon = 0.0001_GP, d_sx = 0.0001_GP, d_sy = 0.0001_GP
+!      REAL(KIND=GP) :: proj_f, proj_x, proj_y
       SAVE
 
   END MODULE newtmod
