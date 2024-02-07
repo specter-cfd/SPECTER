@@ -100,10 +100,12 @@
   MODULE newtmod
       USE fprecision
       INTEGER :: n_dim_1d 
+      INTEGER :: n, n_max 
       INTEGER :: step_evol
       INTEGER :: t_rk
-      REAL(KIND=GP) :: epsilon = 0.0001_GP, d_sx = 0.0001_GP, d_sy = 0.0001_GP
-!      REAL(KIND=GP) :: proj_f, proj_x, proj_y
+      REAL(KIND=GP) :: epsilon = 0.0001_GP, d_sx = 0.0001_GP, d_sy = 0.0000_GP, dT = 0.0001_GP !TODO: Wont assigning values here overwrite the updated values in iteration on every call of newtmod?
+      REAL(KIND=GP) :: proj_f, proj_x, proj_y
+      REAL(KIND=GP) :: tol
       SAVE
 
   END MODULE newtmod

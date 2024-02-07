@@ -179,10 +179,10 @@
 
 
 !*****************************************************************
-     SUBROUTINE f_Y_RB(Y0, f_Y0)
+     SUBROUTINE f_Y_RB(Y0, f_Y0, dT)
 !-----------------------------------------------------------------
 !
-! Computes the matrix element f(Y0) in Rayleigh Benard flow.
+! Computes f(Y0)*dT in Rayleigh Benard flow.
 ! Where f(Y0) = Y0_dot is the time derivative of the state Y0
 ! given by the flow governing equations.
 ! Parameters
@@ -198,6 +198,7 @@
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: Y0 
+      REAL(KIND=GP), INTENT(IN) :: dT 
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: f_Y0
       COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: vx, vy, vz, th
       COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: fx, fy, fz, fs
@@ -242,10 +243,10 @@
             DO j = 1,ny
                   offset2 = offset1 + 4*(j-1)*nz
                   DO k = 1,nz
-                  f_Y0(1+4*(k-1)+offset2) = nu*vx(k,j,i)-C4(k,j,i)+fx(k,j,i)
-                  f_Y0(2+4*(k-1)+offset2) = nu*vy(k,j,i)-C5(k,j,i)+fy(k,j,i)
-                  f_Y0(3+4*(k-1)+offset2) = nu*vz(k,j,i)-C6(k,j,i)+fz(k,j,i)
-                  f_Y0(4+4*(k-1)+offset2) = kappa*th(k,j,i)-C8(k,j,i)+fs(k,j,i)
+                  f_Y0(1+4*(k-1)+offset2) = (nu*vx(k,j,i)-C4(k,j,i)+fx(k,j,i))*dT
+                  f_Y0(2+4*(k-1)+offset2) = (nu*vy(k,j,i)-C5(k,j,i)+fy(k,j,i))*dT
+                  f_Y0(3+4*(k-1)+offset2) = (nu*vz(k,j,i)-C6(k,j,i)+fz(k,j,i))*dT
+                  f_Y0(4+4*(k-1)+offset2) = (kappa*th(k,j,i)-C8(k,j,i)+fs(k,j,i))*dT
                   END DO
             END DO
       END DO
@@ -380,11 +381,53 @@
       END SUBROUTINE scal
 
 !*****************************************************************
+      SUBROUTINE Norm(X, norm_X)
+!-----------------------------------------------------------------
+!
+! Routine to compute the reduced scalar product of two 1D
+! vectors in double precision (even if GP=SINGLE).
+!
+! Parameters
+!     u1      : First 1D vector
+!     u2      : Second 1D vector
+!     s       : at the output contais the reduced scalar product
+!     n_dim_1d: size of the 1D vectors
+!
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+!$    USE threads
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: X
+      REAL(KIND=GP), INTENT(OUT) :: norm_X
+      INTEGER :: i
+
+      !TODO: compute norm
+
+!       stemp = 0.0D0
+!       tmp = 1.0_GP/  &
+!             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
+! !$omp parallel do reduction(+:stemp)
+!       DO i = 1,n_dim_1d
+!          stemp = stemp+CONJG(u1(i))*u2(i)*tmp !no me acuerdo cual va conjugado
+!       ENDDO
+!       CALL MPI_ALLREDUCE(stemp,s,1,MPI_DOUBLE_PRECISION,MPI_SUM, &
+!                          MPI_COMM_WORLD,ierr)
+
+      RETURN
+      END SUBROUTINE Norm
+
+
+
+!*****************************************************************
      SUBROUTINE CalculateProjection(c, X0, proj_f, proj_x, proj_y)
 !-----------------------------------------------------------------
 !
-! Removes the projection of c = dX0 in the directions with traslational
-! symmetries such as x and y. It also removes the components of dX0 
+! Calculates the projection of c = dX in the directions with traslational
+! symmetries such as x and y. It also calculates the components of dX 
 ! along the direction of f(X0) such that the correction doesnt follow
 ! the original orbit.
 
@@ -468,6 +511,285 @@
 
       RETURN 
       END SUBROUTINE CalculateProjection
+
+!*****************************************************************
+     SUBROUTINE Form_Res(Res, dX, X_partial_diff, proj_f, proj_x, proj_y, f_Y, Y_shift)
+!-----------------------------------------------------------------
+!
+! Forms first Residual vector for the GMRES algorithm.
+!
+
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(:) :: Res
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX, X_partial_diff, f_Y, Y_shift
+      REAL(KIND=GP), INTENT(IN) :: proj_f, proj_x, proj_y
+      INTEGER :: i
+
+      IF (myrank.eq.0) THEN
+            DIMENSION Res(n_dim_1d+3)
+      ELSE
+            DIMENSION Res(n_dim_1d)
+      ENDIF
+
+      !$omp parallel do
+            DO i = 1,n_dim_1d
+            Res(i) = X_partial_diff(i) - 2*dX + f_Y + Y_shift 
+            ENDDO
+
+      IF (myrank.eq.0) THEN
+            Res(n_dim_1d + 1) = proj_x
+            Res(n_dim_1d + 2) = proj_y
+            Res(n_dim_1d + 3) = proj_f
+      ENDIF
+   
+      RETURN 
+      END SUBROUTINE Form_Res
+
+
+
+!*****************************************************************
+     SUBROUTINE Arnoldi_step(Res, Q, H, n)
+!-----------------------------------------------------------------
+!
+! Performs n_th iteration of Arnoldi algorithm, i.e. calculates the new column vector for Q
+! using Modified Graham-Schmidt.
+!
+
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:) :: Res
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:,:) :: Q, H
+      REAL(KIND=GP) :: norm_res
+      INTEGER, INTENT(IN) :: n
+      INTEGER :: i
+
+      IF (myrank.eq.0) THEN
+            DIMENSION Res(n_dim_1d+3)
+      ELSE
+            DIMENSION Res(n_dim_1d)
+      ENDIF
+
+      IF (n.eq.1) THEN
+            CALL Norm(Res, norm_res) ! TODO: Set up norm
+            Res = Res / norm_res
+            Q(:,1) = Res ! TODO: Check if valid to divide vector by real number
+            RETURN
+      ENDIF
+
+      DO i = 1, n
+            H(i,n) = scal(Q(:,i), Res)
+            Res = Res - H(i,n) * Q(:,i)
+      END DO
+
+      CALL Norm(Res, norm_res)
+      H(n+1, n) = norm_res
+      Res = Res/norm_res
+      Q(:,n) = Res
+      RETURN
+      END SUBROUTINE Arnoldi_step
+
+
+!*****************************************************************
+     SUBROUTINE Update_values(Res, dX, d_sx, d_sy, dT)
+!-----------------------------------------------------------------
+!
+! Performs n_th iteration of Arnoldi algorithm, i.e. calculates the new column vector for Q
+! using Modified Graham-Schmidt.
+!
+
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: Res
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: dX
+      REAL(KIND=GP), INTENT(OUT) :: d_sx, d_sy, dT
+      INTEGER :: i
+
+      IF (myrank.eq.0) THEN
+            DIMENSION Res(n_dim_1d+3)
+      ELSE
+            DIMENSION Res(n_dim_1d)
+      ENDIF
+
+      !$omp parallel do
+            DO i = 1,n_dim_1d
+            dX(i) = Res(i)
+            ENDDO
+
+      IF (myrank.eq.0) THEN
+            d_sx = Res(n_dim_1d+1)
+            d_sy = Res(n_dim_1d+2)
+            dT = Res(n_dim_1d+3)
+      ENDIF
+
+      RETURN
+      END SUBROUTINE Update_values
+
+!*****************************************************************
+     SUBROUTINE Givens_rotation(H, cs, sn, n)
+!-----------------------------------------------------------------
+!
+! Performs Givens rotation
+!
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:,:) :: H
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:) :: cs, sn
+      REAL(KIND=GP) :: temp, hip
+      INTEGER, INTENT(IN) :: n
+      INTEGER :: i
+
+      !TODO: allocate size of variables (is it necessary?)
+
+      !TODO: check if i must impose condition n.neq.1 or if it skips it directly (s/GPT: skips it)
+      !Premultiply the last H column by the previous k-1 Givens matrices
+      DO i = 1, n-1
+            temp = cs(i)*H(i,n) + sn(i)*H(i+1,n)
+            H(i+1,n) = -sn(i)*H(i,n) + cs(i)*H(i+1,n)
+            H(i,n) = temp
+      END DO
+
+      !Find the values of the new cs and sn of the k_th Given matrix
+      hip = SQRT(H(n,n)**2+H(n+1,n)**2)
+      cs(n) = H(n,n)/hip
+      sn(n) = H(n+1,n)/hip
+
+      !Update the last H entries and eliminate H[k,k-1] to obtain a triangular matrix R
+      H(n,n) = cs(n)*H(n,n) + sn(n)*H(n+1,n)
+      H(n+1,n) = 0
+
+      RETURN
+      END SUBROUTINE Givens_rotation
+
+!*****************************************************************
+     SUBROUTINE Update_error(beta, cs, sn, e, b_norm, n)
+!-----------------------------------------------------------------
+!
+! Performs Givens rotation
+!
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      !TODO: check if complex and real are in right place
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:) :: beta
+      REAL(KIND=GP), INTENT(INOUT), DIMENSION(:) :: e
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: cs, sn
+      REAL(KIND=GP), INTENT(IN) :: b_norm
+      REAL(KIND=GP) :: error
+      INTEGER, INTENT(IN) :: n
+      INTEGER :: i
+
+      beta(n+1) =  -sn(n) * beta(n)
+      beta(n) = cs(n) * beta(n)
+        
+      error = ABS(beta(n+1))/b_norm
+      e(n) = error
+
+      RETURN
+      END SUBROUTINE Update_error
+
+!*****************************************************************
+     SUBROUTINE Backpropagation(Y, H, beta, n)
+!-----------------------------------------------------------------
+!
+! Performs Givens rotation
+!
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      !TODO: check if complex and real are in right place
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(:) :: Y
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:,:) :: H
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: beta
+      INTEGER, INTENT(IN) :: n
+      INTEGER :: i
+
+      !TODO: whole thing
+      beta(n+1) =  -sn(n) * beta(n)
+      beta(n) = cs(n) * beta(n)
+        
+      error = ABS(beta(n+1))/b_norm
+      e(n) = error
+
+      RETURN
+      END SUBROUTINE Backpropagation
+
+!*****************************************************************
+     SUBROUTINE Update_X(X0, Q, Y)
+!-----------------------------------------------------------------
+!
+!  x = x0 + Q[:,:k]@y
+!
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      !TODO: whole thing
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:) :: X0
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:,:) :: Q
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: Y
+      INTEGER :: i
+
+      beta(n+1) =  -sn(n) * beta(n)
+      beta(n) = cs(n) * beta(n)
+        
+      error = ABS(beta(n+1))/b_norm
+      e(n) = error
+
+      RETURN
+      END SUBROUTINE Update_X
 
 
 
@@ -616,7 +938,7 @@
 !      SUBROUTINE Comp_direc_deriv(X, Y, Y_out)
 !-----------------------------------------------------------------
 !
-! Computes the matrix element e^(-s_x T1) d/dX0 (X(T,X0))
+! Computes the matrix element e^(-s_x T1) d/dX (X(T,X0))
 ! To do so, one approximates using finite differences like so:
 ! (exp(-s_x T1) X(T, X0+e c) - Y0)/e
 ! where e is an epsilon, and c is the direction in which to take the derivative,

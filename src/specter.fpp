@@ -76,6 +76,8 @@
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: th,fs
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: X0,X_evol,Y0,Y_shift,f_Y,X_pert,dX0,X_partial_dif,X_pert_evol
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: Res, cs, sn, e, beta
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:) :: Q, H
 #endif
 #ifdef MAGFIELD_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: ax,ay,az
@@ -317,6 +319,16 @@
       n_dim_1d = 4*(iend-ista+1)*ny*nz
       ALLOCATE(X0(1:n_dim_1d),  X_evol(1:n_dim_1d),  Y0(1:n_dim_1d),  Y_shift(1:n_dim_1d), &
        f_Y(1:n_dim_1d), dX0(1:n_dim_1d),X_pert(1:n_dim_1d),X_partial_dif(1:n_dim_1d), X_pert_evol(1:n_dim_1d))
+      ALLOCATE(H(n_max+1, n_max))
+      IF (myrank.eq.0) THEN
+            ALLOCATE(Res(1:n_dim_1d+3), cs(1:n_dim_1d+3), sn(1:n_dim_1d+3), e(1:n_dim_1d+3), beta(1:n_dim_1d+3))
+            ALLOCATE(Q(1:n_dim_1d+3,n_max))
+      ELSE
+            ALLOCATE(Res(1:n_dim_1d), cs(1:n_dim_1d), sn(1:n_dim_1d), e(1:n_dim_1d), beta(1:n_dim_1d))
+            ALLOCATE(Q(1:n_dim_1d,n_max))
+      ENDIF
+
+
 #endif
 
 #ifdef MAGFIELD_
@@ -1282,6 +1294,8 @@
       DEALLOCATE( th,fs )
       DEALLOCATE( C7,C8 )
       DEALLOCATE( X0,X_evol,Y0,Y_shift,f_Y,X_pert,dX0,X_partial_dif,X_pert_evol)
+      DEALLOCATE(Res, cs, sn, e, beta)
+      DEALLOCATE(Q, H)
 #endif
 #ifdef MAGFIELD_
       DEALLOCATE(  ax,  ay, az  )
