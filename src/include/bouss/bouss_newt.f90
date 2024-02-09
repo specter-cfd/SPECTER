@@ -51,7 +51,7 @@ GMRES: DO n = 1,n_max
    !!! We then compute the LHS of (1) term by term:
 
    !Calculate the directional derivative
-   CALL Perturb(X0, X_pert, dX)
+   CALL Perturb(X0, X_pert, dX, epsilon)
    CALL OneTo3D(X_pert, vx, vy, vz, th)
    !CALL Evol_T(X_pert, X_evol, T_guess)
 
@@ -61,11 +61,11 @@ GMRES: DO n = 1,n_max
    CALL ThreeTo1D(vx, vy, vz, th, X_pert_evol) 
 
    !Calculates the directional derivative term    
-   CALL X_fin_diff(X_partial_dif, X_pert_evol, Y0, sx, sy)
+   CALL X_fin_diff(X_partial_dif, X_pert_evol, Y0, sx, sy, epsilon)
 
-   !Perform small shifts:
-   CALL Traslation(Y0, Y_shift, 1, d_sx) 
-   CALL Traslation(Y_shift, Y_shift, 2, d_sy) 
+   !Computes infinitesi:
+   CALL Shift_term(Y0, Y_shift_x, 1, d_sx) 
+   CALL Shift_term(Y0, Y_shift_y, 2, d_sy) 
    !TODO: Check if extra computation needed for the traslation terms
 
    !Calculate f(Y)
@@ -78,7 +78,7 @@ GMRES: DO n = 1,n_max
 
    ! Can now form r_n = b - A*X_n
 
-   CALL Form_Res(Res, dX, X_partial_diff, proj_f, proj_x, proj_y, f_Y, Y_shift, n)
+   CALL Form_Res(Res, dX, X_partial_diff, proj_f, proj_x, proj_y, f_Y, Y_shift_x, Y_shift_y, n)
 
    CALL Arnoldi_step(Res, Q, H, n)
 
@@ -88,14 +88,32 @@ GMRES: DO n = 1,n_max
 
    CALL Update_error(beta, cs, sn, e, b_norm, n)
 
-   IF e(n)<tol EXIT GMRES!THEN
-      ! CYCLE GMRES
-   ! END IF
+   IF e(n)<tol THEN
+      n_max = n
+      EXIT GMRES
+   !Check if it will lead to syntax error
 
 END DO GMRES
 
-CALL Backpropagation(Y, H, beta, n)
+mu = 0.0_GP
 
-CALL Update_X(X0, Q, Y)
+DO n_hook = 1, n_hook_max
+
+   CALL Hookstep_transform(H, mu, n)
+   !TODO: Check if n=n
+   CALL Backpropagation(H, beta, n_max, y)
+
+   CALL Norm(y, norm_y)
+
+   IF (norm_y.gt.Delta) THEN
+      mu = mu + 0.01_GP
+   ELSE
+      EXIT
+   END IF
+
+END DO
+
+!TODO: calculate m and check again if n=n
+CALL Update_X(X0, Q, y, vx, vy, vz, th, n, m)
 
 

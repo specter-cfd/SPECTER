@@ -179,6 +179,216 @@
 
 
 !*****************************************************************
+      SUBROUTINE scal(u1,u2,s)
+!-----------------------------------------------------------------
+!
+! Routine to compute the reduced scalar product of two 1D
+! vectors in double precision (even if GP=SINGLE).
+!
+! Parameters
+!     u1      : First 1D vector
+!     u2      : Second 1D vector
+!     s       : at the output contais the reduced scalar product
+!     n_dim_1d: size of the 1D vectors
+!
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+!$    USE threads
+      IMPLICIT NONE
+
+      DOUBLE PRECISION, INTENT(OUT) :: s
+      DOUBLE PRECISION              :: stemp,tmp
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: u1,u2
+      INTEGER :: i
+
+      stemp = 0.0D0
+      tmp = 1.0_GP/  &
+            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
+!$omp parallel do reduction(+:stemp)
+      DO i = 1,n_dim_1d
+         stemp = stemp+CONJG(u1(i))*u2(i)*tmp !no me acuerdo cual va conjugado
+      ENDDO
+      CALL MPI_ALLREDUCE(stemp,s,1,MPI_DOUBLE_PRECISION,MPI_SUM, &
+                         MPI_COMM_WORLD,ierr)
+
+      RETURN
+      END SUBROUTINE scal
+
+!*****************************************************************
+      SUBROUTINE Norm(X, norm_X)
+!-----------------------------------------------------------------
+!
+! Routine to compute the Frobenius norm of 1D complex
+! vectors in double precision (even if GP=SINGLE).
+!
+! Parameters
+!     X      : 1D complex vector
+!     norm_X      : Norm
+!
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+!$    USE threads
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: X
+      REAL(KIND=GP), INTENT(OUT) :: norm_X
+
+      norm_X =  SQRT(SUM(ABS(X)**2))
+
+
+      RETURN
+      END SUBROUTINE Norm
+
+!*****************************************************************
+     SUBROUTINE Perturb(X0, X_pert, dX, epsilon)
+!-----------------------------------------------------------------
+!
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+   !$    USE threads
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: X0
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: X_pert
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX
+      REAL(KIND=GP), INTENT(OUT) :: epsilon
+      REAL(KIND=GP) :: norm_X0, norm_dX    
+      INTEGER :: i
+
+      CALL Norm(X0, norm_X0)
+      CALL Norm(dX, norm_dX)
+
+      epsilon = 10.0**(-7.0) * norm_X0 / norm_dX
+
+      !$omp parallel do
+            DO i = 1,n_dim_1d
+            X_pert(i) = X0(i) + epsilon * dX(i)
+            ENDDO
+
+      RETURN 
+      END SUBROUTINE Perturb
+
+
+!*****************************************************************
+     SUBROUTINE X_fin_diff(X_partial_dif, X_evol, Y_1d, sx, sy, epsilon)
+!-----------------------------------------------------------------
+
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: X_partial_dif
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: X_evol
+      COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: X_evol_shift
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: Y_1d
+      REAL(KIND=GP), INTENT(IN)    :: sx, sy
+      REAL(KIND=GP), INTENT(IN)    :: epsilon
+      INTEGER :: i, j, k
+      INTEGER :: offset1,offset2
+
+      CALL Traslation(X_evol, X_evol_shift, 1, sx) !traslado en sx, sy dados por el guess inicial
+      CALL Traslation(X_evol_shift, X_evol_shift, 2, sy) !COMENTARIO: faltaría definir sx, sy en algún lado
+
+
+      !$omp parallel do if ((iend-ista).ge.nth) private(j,k,offset1,offset2)
+      DO i = ista,iend
+      offset1 = 4*(i-ista)*ny*nz
+            !$omp parallel do if ((iend-ista).lt.nth) private(k,offset2)
+            DO j = 1,ny
+                  offset2 = offset1 + 4*(j-1)*nz
+                  DO k = 1,nz
+                  X_partial_dif(1+4*(k-1)+offset2) = (X_evol_shift(1+4*(k-1)+offset2) - Y_1d(1+4*(k-1)+offset2))/epsilon
+                  X_partial_dif(2+4*(k-1)+offset2) = (X_evol_shift(2+4*(k-1)+offset2) - Y_1d(2+4*(k-1)+offset2))/epsilon
+                  X_partial_dif(3+4*(k-1)+offset2) = (X_evol_shift(3+4*(k-1)+offset2) - Y_1d(3+4*(k-1)+offset2))/epsilon
+                  X_partial_dif(4+4*(k-1)+offset2) = (X_evol_shift(4+4*(k-1)+offset2) - Y_1d(4+4*(k-1)+offset2))/epsilon
+                  END DO
+            END DO
+      END DO
+
+      RETURN 
+      END SUBROUTINE X_fin_diff
+
+
+!*****************************************************************
+     SUBROUTINE Shift_term(Y0, Y_shift, dir, d_s)
+!-----------------------------------------------------------------
+!
+! Calculates the projection of c = dX in the directions with traslational
+! symmetries such as x and y. It also calculates the components of dX 
+! along the direction of f(X0) such that the correction doesnt follow
+! the original orbit.
+
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: Y0
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: Y_shift
+      INTEGER, INTENT(IN) :: dir
+      REAL(KIND=GP), INTENT(IN) :: d_s
+      INTEGER :: i, j, k
+      INTEGER :: offset1,offset2
+           
+
+      IF (dir.eq.1) THEN 
+            !$omp parallel do if ((iend-ista).ge.nth) private(j,k,offset1,offset2)
+            DO i = ista,iend
+            offset1 = 4*(i-ista)*ny*nz
+                  !$omp parallel do if ((iend-ista).lt.nth) private(k,offset2)
+                  DO j = 1,ny
+                        offset2 = offset1 + 4*(j-1)*nz
+                        DO k = 1,nz
+                        Y_shift(1+4*(k-1)+offset2) = Y0(1+4*(k-1)+offset2) * im * kx(i) * d_s/ Lx 
+                        Y_shift(2+4*(k-1)+offset2) = Y0(2+4*(k-1)+offset2) * im * kx(i) * d_s/ Lx
+                        Y_shift(3+4*(k-1)+offset2) = Y0(3+4*(k-1)+offset2) * im * kx(i) * d_s/ Lx
+                        Y_shift(4+4*(k-1)+offset2) = Y0(4+4*(k-1)+offset2) * im * kx(i) * d_s/ Lx
+                        END DO
+                  END DO
+            END DO
+      
+      ELSE IF (dir.eq.2) THEN
+            !$omp parallel do if ((iend-ista).ge.nth) private(j,k,offset1,offset2)
+            DO i = ista,iend
+            offset1 = 4*(i-ista)*ny*nz
+                  !$omp parallel do if ((iend-ista).lt.nth) private(k,offset2)
+                  DO j = 1,ny
+                        offset2 = offset1 + 4*(j-1)*nz
+                        DO k = 1,nz
+                        Y_shift(1+4*(k-1)+offset2) = Y0(1+4*(k-1)+offset2) * im * ky(j) * d_s / Ly 
+                        Y_shift(2+4*(k-1)+offset2) = Y0(2+4*(k-1)+offset2) * im * ky(j) * d_s / Ly
+                        Y_shift(3+4*(k-1)+offset2) = Y0(3+4*(k-1)+offset2) * im * ky(j) * d_s / Ly
+                        Y_shift(4+4*(k-1)+offset2) = Y0(4+4*(k-1)+offset2) * im * ky(j) * d_s / Ly
+                        END DO
+                  END DO
+            END DO
+      END IF
+
+      RETURN 
+      END SUBROUTINE Shift_term
+
+
+!*****************************************************************
      SUBROUTINE f_Y_RB(Y0, f_Y0, dT)
 !-----------------------------------------------------------------
 !
@@ -253,180 +463,14 @@
       RETURN 
       END SUBROUTINE f_Y_RB
 
-!*****************************************************************
-     SUBROUTINE Perturb(X0, X_pert, c)
-!-----------------------------------------------------------------
-!
-      USE fprecision
-      USE commtypes
-      USE newtmod
-      USE mpivars
-      USE grid
-   !$    USE threads
-      IMPLICIT NONE
-
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: X0
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: X_pert
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: c
-      INTEGER :: i
-
-!$omp parallel do
-      DO i = 1,n_dim_1d
-         X_pert(i) = X0(i) + epsilon * c(i)
-      ENDDO
-
-      ! !$omp parallel do if ((iend-ista).ge.nth) private(j,k,offset1,offset2)
-      ! DO i = ista,iend
-      ! offset1 = 4*(i-ista)*ny*nz
-      !       !$omp parallel do if ((iend-ista).lt.nth) private(k,offset2)
-      !       DO j = 1,ny
-      !             offset2 = offset1 + 4*(j-1)*nz
-      !             DO k = 1,nz
-      !             X_pert(1+4*(k-1)+offset2) = X0(1+4*(k-1)+offset2) + epsilon * c(1+4*(k-1)+offset2)
-      !             X_pert(2+4*(k-1)+offset2) = X0(2+4*(k-1)+offset2) + epsilon * c(2+4*(k-1)+offset2)
-      !             X_pert(3+4*(k-1)+offset2) = X0(3+4*(k-1)+offset2) + epsilon * c(3+4*(k-1)+offset2)
-      !             X_pert(4+4*(k-1)+offset2) = X0(4+4*(k-1)+offset2) + epsilon * c(4+4*(k-1)+offset2)
-      !             END DO
-      !       END DO
-      ! END DO
-
-      RETURN 
-      END SUBROUTINE Perturb
-
-
-!*****************************************************************
-     SUBROUTINE X_fin_diff(X_partial_dif, X_evol, Y_1d, sx, sy)
-!-----------------------------------------------------------------
-
-      USE fprecision
-      USE commtypes
-      USE newtmod
-      USE mpivars
-      USE grid
-      USE kes
-      USE var
-   !$    USE threads
-      IMPLICIT NONE
-
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: X_partial_dif
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: X_evol
-      COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: X_evol_shift
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: Y_1d
-      REAL(KIND=GP), INTENT(IN)    :: sx, sy
-      INTEGER :: i, j, k
-      INTEGER :: offset1,offset2
-
-      CALL Traslation(X_evol, X_evol_shift, 1, sx) !traslado en sx, sy dados por el guess inicial
-      CALL Traslation(X_evol_shift, X_evol_shift, 2, sy) !COMENTARIO: faltaría definir sx, sy en algún lado
-
-
-      !$omp parallel do if ((iend-ista).ge.nth) private(j,k,offset1,offset2)
-      DO i = ista,iend
-      offset1 = 4*(i-ista)*ny*nz
-            !$omp parallel do if ((iend-ista).lt.nth) private(k,offset2)
-            DO j = 1,ny
-                  offset2 = offset1 + 4*(j-1)*nz
-                  DO k = 1,nz
-                  X_partial_dif(1+4*(k-1)+offset2) = (X_evol_shift(1+4*(k-1)+offset2) - Y_1d(1+4*(k-1)+offset2))/epsilon
-                  X_partial_dif(2+4*(k-1)+offset2) = (X_evol_shift(2+4*(k-1)+offset2) - Y_1d(2+4*(k-1)+offset2))/epsilon
-                  X_partial_dif(3+4*(k-1)+offset2) = (X_evol_shift(3+4*(k-1)+offset2) - Y_1d(3+4*(k-1)+offset2))/epsilon
-                  X_partial_dif(4+4*(k-1)+offset2) = (X_evol_shift(4+4*(k-1)+offset2) - Y_1d(4+4*(k-1)+offset2))/epsilon
-                  END DO
-            END DO
-      END DO
-
-      RETURN 
-      END SUBROUTINE X_fin_diff
-
 
 
 
 !*****************************************************************
-      SUBROUTINE scal(u1,u2,s)
+     SUBROUTINE CalculateProjection(dX, X0, proj_f, proj_x, proj_y)
 !-----------------------------------------------------------------
 !
-! Routine to compute the reduced scalar product of two 1D
-! vectors in double precision (even if GP=SINGLE).
-!
-! Parameters
-!     u1      : First 1D vector
-!     u2      : Second 1D vector
-!     s       : at the output contais the reduced scalar product
-!     n_dim_1d: size of the 1D vectors
-!
-      USE fprecision
-      USE commtypes
-      USE newtmod
-      USE mpivars
-      USE grid
-!$    USE threads
-      IMPLICIT NONE
-
-      DOUBLE PRECISION, INTENT(OUT) :: s
-      DOUBLE PRECISION              :: stemp,tmp
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: u1,u2
-      INTEGER :: i
-
-      stemp = 0.0D0
-      tmp = 1.0_GP/  &
-            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
-!$omp parallel do reduction(+:stemp)
-      DO i = 1,n_dim_1d
-         stemp = stemp+CONJG(u1(i))*u2(i)*tmp !no me acuerdo cual va conjugado
-      ENDDO
-      CALL MPI_ALLREDUCE(stemp,s,1,MPI_DOUBLE_PRECISION,MPI_SUM, &
-                         MPI_COMM_WORLD,ierr)
-
-      RETURN
-      END SUBROUTINE scal
-
-!*****************************************************************
-      SUBROUTINE Norm(X, norm_X)
-!-----------------------------------------------------------------
-!
-! Routine to compute the reduced scalar product of two 1D
-! vectors in double precision (even if GP=SINGLE).
-!
-! Parameters
-!     u1      : First 1D vector
-!     u2      : Second 1D vector
-!     s       : at the output contais the reduced scalar product
-!     n_dim_1d: size of the 1D vectors
-!
-      USE fprecision
-      USE commtypes
-      USE newtmod
-      USE mpivars
-      USE grid
-!$    USE threads
-      IMPLICIT NONE
-
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: X
-      REAL(KIND=GP), INTENT(OUT) :: norm_X
-      INTEGER :: i
-
-      !TODO: compute norm
-
-!       stemp = 0.0D0
-!       tmp = 1.0_GP/  &
-!             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
-! !$omp parallel do reduction(+:stemp)
-!       DO i = 1,n_dim_1d
-!          stemp = stemp+CONJG(u1(i))*u2(i)*tmp !no me acuerdo cual va conjugado
-!       ENDDO
-!       CALL MPI_ALLREDUCE(stemp,s,1,MPI_DOUBLE_PRECISION,MPI_SUM, &
-!                          MPI_COMM_WORLD,ierr)
-
-      RETURN
-      END SUBROUTINE Norm
-
-
-
-!*****************************************************************
-     SUBROUTINE CalculateProjection(c, X0, proj_f, proj_x, proj_y)
-!-----------------------------------------------------------------
-!
-! Calculates the projection of c = dX in the directions with traslational
+! Calculates the projection of dX in the directions with traslational
 ! symmetries such as x and y. It also calculates the components of dX 
 ! along the direction of f(X0) such that the correction doesnt follow
 ! the original orbit.
@@ -441,7 +485,7 @@
    !$    USE threads
       IMPLICIT NONE
 
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: c
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: X0
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: Xtras_x
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: Xtras_y
@@ -451,7 +495,7 @@
       INTEGER :: offset1,offset2
 
       CALL f_Y_RB(X0, f_X0)
-      CALL scal(c, f_X0, proj_f)
+      CALL scal(dX, f_X0, proj_f)
             
       !$omp parallel do if ((iend-ista).ge.nth) private(j,k,offset1,offset2)
       DO i = ista,iend
@@ -483,31 +527,8 @@
             END DO
       END DO
 
-      CALL scal(c, Xtras_x, proj_x)
-      CALL scal(c, Xtras_y, proj_y)
-
-
-      !COMENTARIO: lo siguiente incluye sacar la proyección, pero puede no ser necesario
-      ! CALL f_Y_RB(X0, f_X0)
-      ! CALL scal(f_X0, f_X0, norm_f_X0)!COMENTARIO: chequear si scal funciona como está o hay que modificarla
-      ! CALL scal(c, f_X0, s)
-
-      ! !$omp parallel do if ((iend-ista).ge.nth) private(j,k,offset1,offset2)
-      ! DO i = ista,iend
-      ! offset1 = 4*(i-ista)*ny*nz
-      !       !$omp parallel do if ((iend-ista).lt.nth) private(k,offset2)
-      !       DO j = 1,ny
-      !             offset2 = offset1 + 4*(j-1)*nz
-      !             DO k = 1,nz
-      !             c(1+4*(k-1)+offset2) = c(1+4*(k-1)+offset2) - s * f_X0(1+4*(k-1)+offset2)/norm_fX0
-      !             c(2+4*(k-1)+offset2) = c(2+4*(k-1)+offset2) - s * f_X0(2+4*(k-1)+offset2)/norm_fX0
-      !             c(3+4*(k-1)+offset2) = c(3+4*(k-1)+offset2) - s * f_X0(3+4*(k-1)+offset2)/norm_fX0
-      !             c(4+4*(k-1)+offset2) = c(4+4*(k-1)+offset2) - s * f_X0(4+4*(k-1)+offset2)/norm_fX0
-      !             END DO
-      !       END DO
-      ! END DO
-
-      ! !Me faltaría sacar los comp. en x e y.
+      CALL scal(dX, Xtras_x, proj_x)
+      CALL scal(dX, Xtras_y, proj_y)
 
       RETURN 
       END SUBROUTINE CalculateProjection
@@ -728,10 +749,10 @@
       END SUBROUTINE Update_error
 
 !*****************************************************************
-     SUBROUTINE Backpropagation(Y, H, beta, n)
+     SUBROUTINE Backpropagation(R, b, n, y)
 !-----------------------------------------------------------------
 !
-! Performs Givens rotation
+! 
 !
       USE fprecision
       USE commtypes
@@ -744,24 +765,56 @@
       IMPLICIT NONE
 
       !TODO: check if complex and real are in right place
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(:) :: Y
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:,:) :: H
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: beta
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(:) :: y
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:,:) :: R
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: b
       INTEGER, INTENT(IN) :: n
-      INTEGER :: i
+      INTEGER :: i, j
+      REAL(KIND=GP) :: aux
 
-      !TODO: whole thing
-      beta(n+1) =  -sn(n) * beta(n)
-      beta(n) = cs(n) * beta(n)
-        
-      error = ABS(beta(n+1))/b_norm
-      e(n) = error
+      DO i = n, 1, -1
+            aux = 0
+            DO j = i+1,n
+                  aux = aux + y(j) * R(i,j)
+            END DO
+            y(i) = (b(i) - aux)/R(i,i)
+      END DO
+
 
       RETURN
       END SUBROUTINE Backpropagation
 
 !*****************************************************************
-     SUBROUTINE Update_X(X0, Q, Y)
+     SUBROUTINE Hookstep_transform(R, mu, n)
+!-----------------------------------------------------------------
+!
+!
+      USE fprecision
+      USE commtypes
+      USE newtmod
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+   !$    USE threads
+      IMPLICIT NONE
+
+      !TODO: whole thing
+ 
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:,:) :: R
+      INTEGER, INTENT(IN) :: n
+      REAL(KIND=GP) :: mu
+      INTEGER :: i
+
+      DO i = 1,n
+            R(i,i) = R(i,i) + mu/R(i,i)
+      END DO
+      
+      RETURN
+      END SUBROUTINE Hookstep_transform
+
+!*****************************************************************
+     SUBROUTINE Update_X(X0, Q, y, vx, vy, vz, th, n, m)
 !-----------------------------------------------------------------
 !
 !  x = x0 + Q[:,:k]@y
@@ -777,16 +830,20 @@
       IMPLICIT NONE
 
       !TODO: whole thing
+ 
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend) :: vx, vy, vz, th
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:) :: X0
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:,:) :: Q
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: Y
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: y
+      INTEGER, INTENT(IN) :: n,m
+      COMPLEX(KIND=GP), DIMENSION(:,:) :: Q_slice
       INTEGER :: i
 
-      beta(n+1) =  -sn(n) * beta(n)
-      beta(n) = cs(n) * beta(n)
-        
-      error = ABS(beta(n+1))/b_norm
-      e(n) = error
+      Q_slice = Q(1:m, 1:n)
+
+      X0 = X0 + MATMUL(Q_slice, y)
+
+      CALL OneTo3D(X0, vx, vy, vz, th)
 
       RETURN
       END SUBROUTINE Update_X
