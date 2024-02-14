@@ -75,9 +75,11 @@
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: pr
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: th,fs
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: X0,X_evol,Y0,Y_shift,f_Y,X_pert,dX0,X_partial_dif,X_pert_evol
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: Res, cs, sn, e, beta
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:) :: Q, H
+      !Bouss_newt:
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: X0,X_evol,Y0,Y_shift_x,Y_shift_y,f_Y,X_pert
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: dX,X_partial_dif,X_pert_evol, y_sol
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: Res, Res_aux, cs, sn, e, beta
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:) :: Q, Q_aux, H
 #endif
 #ifdef MAGFIELD_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: ax,ay,az
@@ -85,7 +87,6 @@
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: ph
 #endif
 
-!
 ! Temporal data storage arrays
 
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C1,C2,C3
@@ -136,8 +137,9 @@
       REAL(KIND=GP)    :: sparam5,sparam6,sparam7,sparam8,sparam9
       REAL(KIND=GP)    :: cparam0,cparam1,cparam2,cparam3,cparam4
       REAL(KIND=GP)    :: cparam5,cparam6,cparam7,cparam8,cparam9
-      REAL(KIND=GP)    :: T_guess, sx, sy
-      REAL(KIND=GP)    :: proj_f, proj_x, proj_y
+      !Bouss_newt:
+      REAL(KIND=GP)    :: T_guess,sx,sy
+      !REAL(KIND=GP)    :: proj_f, proj_x, proj_y
 
 #endif
 #ifdef MAGFIELD_
@@ -228,7 +230,7 @@
       NAMELIST / scalar   / cparam5,cparam6,cparam7,sparam8,sparam9
       NAMELIST / scabound / sbcxsta,sbcxend,sbcysta,sbcyend,sbczsta,sbczend
       NAMELIST / scabound / szsta,szend
-      NAMELIST / sca_newt / T_guess,sx, sy
+      NAMELIST / sca_newt / T_guess,sx,sy
 
 #endif
 #ifdef MAGFIELD_
@@ -317,18 +319,10 @@
       ALLOCATE( th(nz,ny,ista:iend), fs(nz,ny,ista:iend) )
       ALLOCATE( C7(nz,ny,ista:iend), C8(nz,ny,ista:iend) )
       n_dim_1d = 4*(iend-ista+1)*ny*nz
-      ALLOCATE(X0(1:n_dim_1d),  X_evol(1:n_dim_1d),  Y0(1:n_dim_1d),  Y_shift(1:n_dim_1d), &
-       f_Y(1:n_dim_1d), dX0(1:n_dim_1d),X_pert(1:n_dim_1d),X_partial_dif(1:n_dim_1d), X_pert_evol(1:n_dim_1d))
-      ALLOCATE(H(n_max+1, n_max))
-      IF (myrank.eq.0) THEN
-            ALLOCATE(Res(1:n_dim_1d+3), cs(1:n_dim_1d+3), sn(1:n_dim_1d+3), e(1:n_dim_1d+3), beta(1:n_dim_1d+3))
-            ALLOCATE(Q(1:n_dim_1d+3,n_max))
-      ELSE
-            ALLOCATE(Res(1:n_dim_1d), cs(1:n_dim_1d), sn(1:n_dim_1d), e(1:n_dim_1d), beta(1:n_dim_1d))
-            ALLOCATE(Q(1:n_dim_1d,n_max))
-      ENDIF
-
-
+      ALLOCATE(X0(n_dim_1d),  X_evol(n_dim_1d),  Y0(n_dim_1d),  Y_shift_x(n_dim_1d), &
+        Y_shift_y(n_dim_1d),f_Y(n_dim_1d), dX(n_dim_1d),X_pert(n_dim_1d),X_partial_dif(n_dim_1d), X_pert_evol(n_dim_1d))
+      ALLOCATE(Q(n_dim_1d,n_max), Q_aux(3,n_max),H(n_max+1, n_max))
+      ALLOCATE(Res(n_dim_1d), Res_aux(3), cs(n_max), sn(n_max), e(n_max), beta(n_max), y_sol(n_max))
 #endif
 
 #ifdef MAGFIELD_
@@ -1293,9 +1287,9 @@
 #ifdef SCALAR_
       DEALLOCATE( th,fs )
       DEALLOCATE( C7,C8 )
-      DEALLOCATE( X0,X_evol,Y0,Y_shift,f_Y,X_pert,dX0,X_partial_dif,X_pert_evol)
-      DEALLOCATE(Res, cs, sn, e, beta)
-      DEALLOCATE(Q, H)
+      DEALLOCATE( X0,X_evol,Y0,Y_shift_x, Y_shift_y,f_Y,X_pert,dX,X_partial_dif,X_pert_evol  )
+      DEALLOCATE( Res,Res_aux, cs, sn, e, beta  )
+      DEALLOCATE(  Q, Q_aux, H  )
 #endif
 #ifdef MAGFIELD_
       DEALLOCATE(  ax,  ay, az  )

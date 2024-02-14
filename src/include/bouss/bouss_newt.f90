@@ -26,18 +26,18 @@ GMRES: DO n = 1,n_max
 ! On the first iteration we save X0 from the guessed fields
    IF (n.eq.1) THEN    ! In later iterations dX is updated by the Arnoldi algorithm.
       !Save initial field in 1d variable X0
-      CALL ThreeTo1D(vx, vy, vz, th, X0) 
+      CALL ThreeTo1D(X0, vx, vy, vz, th) 
 
 
       !performs evolution of vx, vy, vz, th in time T
       INCLUDE 'include/bouss/bouss_evol_T.f90' 
 
       !Transforms to a 1d variable X_evol
-      CALL ThreeTo1D(vx, vy, vz, th, X_evol)
+      CALL ThreeTo1D(X_evol, vx, vy, vz, th)
 
       !Traslate in the guessed shifts:
-      CALL Traslation(X_evol, Y0, 1, sx) 
-      CALL Traslation(Y0, Y0, 2, sy) 
+      CALL Translation(X_evol, Y0, 1, sx) 
+      CALL Translation(Y0, Y0, 2, sy) 
 
       !Calculate initial direction for directional derivative
       !$omp parallel do
@@ -45,75 +45,79 @@ GMRES: DO n = 1,n_max
             dX(i) = X0(i) - Y0(i)
          ENDDO
       
-      CALL Norm(dX, b_norm)
+      CALL Norm(b_norm,dX)
    ENDIF
    
    !!! We then compute the LHS of (1) term by term:
 
    !Calculate the directional derivative
-   CALL Perturb(X0, X_pert, dX, epsilon)
-   CALL OneTo3D(X_pert, vx, vy, vz, th)
-   !CALL Evol_T(X_pert, X_evol, T_guess)
+   CALL Perturb(X_pert,epsilon,X0,dX )
+   CALL OneTo3D(vx, vy, vz, th, X_pert)
 
    INCLUDE 'include/bouss/bouss_evol_T.f90' 
 
    !Transforms to a 1d variable X_evol
-   CALL ThreeTo1D(vx, vy, vz, th, X_pert_evol) 
+   CALL ThreeTo1D(X_pert_evol, vx, vy, vz, th) 
 
    !Calculates the directional derivative term    
    CALL X_fin_diff(X_partial_dif, X_pert_evol, Y0, sx, sy, epsilon)
 
-   !Computes infinitesi:
-   CALL Shift_term(Y0, Y_shift_x, 1, d_sx) 
-   CALL Shift_term(Y0, Y_shift_y, 2, d_sy) 
+   !Computes terms of translation generator:
+   CALL Shift_term(Y_shift_x, Y0, 1, d_sx) 
+   CALL Shift_term(Y_shift_y, Y0, 2, d_sy) 
    !TODO: Check if extra computation needed for the traslation terms
 
    !Calculate f(Y)
-   CALL f_Y_RB(Y0, f_Y, dT)
+   CALL f_Y_RB(f_Y, Y0, dT)
 
    !!! Now for the rest of the first column of A:
 
    !Calculates the projection along the shifted directions and along the direction of flow
-   CALL CalculateProjection(dX, X0, proj_f, proj_x, proj_y)
+   CALL CalculateProjection(proj_f, proj_x, proj_y, dX, X0)
 
    ! Can now form r_n = b - A*X_n
 
-   CALL Form_Res(Res, dX, X_partial_diff, proj_f, proj_x, proj_y, f_Y, Y_shift_x, Y_shift_y, n)
+   CALL Form_Res(Res, Res_aux, dX, X_partial_dif, f_Y, Y_shift_x, Y_shift_y, proj_f, proj_x, proj_y, n)
 
-   CALL Arnoldi_step(Res, Q, H, n)
+   CALL Arnoldi_step(Res, Res_aux, Q, H, res_norm, n)
 
-   CALL Update_values(Res, dX, d_sx, d_sy, dT)
+   CALL Update_values(dX, d_sx, d_sy, dT_guess, Res, Res_aux)
 
    CALL Givens_rotation(H, cs, sn, n)
 
-   CALL Update_error(beta, cs, sn, e, b_norm, n)
+   CALL Update_error(beta, cs, sn, e, b_norm, res_norm, n)
 
-   IF e(n)<tol THEN
+   IF (e(n)<tol) THEN
       n_max = n
       EXIT GMRES
    !Check if it will lead to syntax error
+   ENDIF
 
 END DO GMRES
 
-mu = 0.0_GP
+! mu = 0.0_GP
 
-DO n_hook = 1, n_hook_max
+! DO n_hook = 1, n_hook_max
 
-   CALL Hookstep_transform(H, mu, n)
-   !TODO: Check if n=n
-   CALL Backpropagation(H, beta, n_max, y)
+!    CALL Hookstep_transform(H, mu, n)
+!    !TODO: Check if n=n
+!    CALL Backpropagation(y, H, beta, n_max)
 
-   CALL Norm(y, norm_y)
+!    CALL Norm(y, norm_y)
 
-   IF (norm_y.gt.Delta) THEN
-      mu = mu + 0.01_GP
-   ELSE
-      EXIT
-   END IF
+!    IF (norm_y.gt.Delta) THEN
+!       mu = mu + 0.01_GP
+!    ELSE
+!       EXIT
+!    END IF
 
-END DO
+! END DO
+
+CALL Backpropagation(y_sol, H, beta, n_max)
 
 !TODO: calculate m and check again if n=n
-CALL Update_X(X0, Q, y, vx, vy, vz, th, n, m)
+CALL Update_X(vx, vy, vz, th, X0, Q, y_sol, n)
 
-
+T_guess = T_guess + dT_guess
+sx = sx + d_sx
+sy = sy + d_sy
