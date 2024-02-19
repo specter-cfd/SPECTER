@@ -60,5 +60,6 @@
 
 #ifdef BOUSS_SOL
 #define BOUSS_NEWT_ STRINGIFY(INCLUDEFNAME_)newt.f90'
+#define NEWT_ 
 !#define BOUSS_EVOL_T_ STRINGIFY(INCLUDEFNAME_)evol_T.f90'
 #endif

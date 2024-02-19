@@ -20,6 +20,9 @@
 
 
 GMRES: DO n = 1,n_max
+IF (myrank.eq.0) THEN
+print *, 'Iteration:',n
+ENDIF
 
 !!!First we obtain the RHS of (1)
 
@@ -27,6 +30,7 @@ GMRES: DO n = 1,n_max
    IF (n.eq.1) THEN    ! In later iterations dX is updated by the Arnoldi algorithm.
       !Save initial field in 1d variable X0
       CALL ThreeTo1D(X0, vx, vy, vz, th) 
+
 
 
       !performs evolution of vx, vy, vz, th in time T
@@ -44,8 +48,9 @@ GMRES: DO n = 1,n_max
          DO i = 1,n_dim_1d
             dX(i) = X0(i) - Y0(i)
          ENDDO
-      
+
       CALL Norm(b_norm,dX)
+
    ENDIF
    
    !!! We then compute the LHS of (1) term by term:
@@ -56,6 +61,7 @@ GMRES: DO n = 1,n_max
 
    INCLUDE 'include/bouss/bouss_evol_T.f90' 
 
+
    !Transforms to a 1d variable X_evol
    CALL ThreeTo1D(X_pert_evol, vx, vy, vz, th) 
 
@@ -65,6 +71,7 @@ GMRES: DO n = 1,n_max
    !Computes terms of translation generator:
    CALL Shift_term(Y_shift_x, Y0, 1, d_sx) 
    CALL Shift_term(Y_shift_y, Y0, 2, d_sy) 
+
    !TODO: Check if extra computation needed for the traslation terms
 
    !Calculate f(Y)
@@ -79,13 +86,25 @@ GMRES: DO n = 1,n_max
 
    CALL Form_Res(Res, Res_aux, dX, X_partial_dif, f_Y, Y_shift_x, Y_shift_y, proj_f, proj_x, proj_y, n)
 
-   CALL Arnoldi_step(Res, Res_aux, Q, H, res_norm, n)
+   CALL Arnoldi_step(Res, Res_aux, Q, Q_aux, H, res_norm, n)
+   IF (myrank.eq.0) THEN
+   print *, 'Performed Arnoldi_step'
+   ENDIF
 
-   CALL Update_values(dX, d_sx, d_sy, dT_guess, Res, Res_aux)
+   CALL Update_values(dX, d_sx, d_sy, dT_guess, Res, Res_aux,n)
+   IF (myrank.eq.0) THEN
+   print *, 'Updated values'
+   ENDIF
 
    CALL Givens_rotation(H, cs, sn, n)
+   IF (myrank.eq.0) THEN
+   print *, 'Performed Givens rotation'
+   ENDIF
 
    CALL Update_error(beta, cs, sn, e, b_norm, res_norm, n)
+   IF (myrank.eq.0) THEN
+   print *, 'Updated error. e(n)=',e(n)
+   ENDIF
 
    IF (e(n)<tol) THEN
       n_max = n
@@ -94,6 +113,10 @@ GMRES: DO n = 1,n_max
    ENDIF
 
 END DO GMRES
+
+IF (myrank.eq.0) THEN
+print *, 'Exited GMRES'
+ENDIF
 
 ! mu = 0.0_GP
 
@@ -114,9 +137,15 @@ END DO GMRES
 ! END DO
 
 CALL Backpropagation(y_sol, H, beta, n_max)
+IF (myrank.eq.0) THEN
+print *, 'Did Backpropagation',e(n)
+ENDIF
 
 !TODO: calculate m and check again if n=n
 CALL Update_X(vx, vy, vz, th, X0, Q, y_sol, n)
+IF (myrank.eq.0) THEN
+print *, 'Updated X'
+ENDIF
 
 T_guess = T_guess + dT_guess
 sx = sx + d_sx

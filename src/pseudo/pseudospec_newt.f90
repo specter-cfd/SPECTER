@@ -247,7 +247,7 @@
       END SUBROUTINE Norm
 
 !*****************************************************************
-     SUBROUTINE Perturb(X_pert,eps,X0,dX)
+     SUBROUTINE Perturb(X_pert,epsilon,X0,dX)
 !-----------------------------------------------------------------
 !
 ! Computes the 1D vector X_pert by adding a perturbance in the direction
@@ -256,7 +256,7 @@
 !
 ! Parameters
 !     X_pert      : 1D perturbed vector
-!     eps      : Perturbance magnitude correction
+!     epsilon      : Perturbance magnitude correction
 !     X0      : 1D initial complex vector
 !     dX      : Perturbance vector
 !
@@ -268,7 +268,7 @@
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: X_pert
-      REAL(KIND=GP), INTENT(OUT) :: eps
+      REAL(KIND=GP), INTENT(OUT) :: epsilon
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: X0
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX
       REAL(KIND=GP) :: norm_X0, norm_dX    
@@ -277,11 +277,11 @@
       CALL Norm(norm_X0,X0)
       CALL Norm(norm_dX,dX)
 
-      eps = 10.0**(-7.0) * norm_X0 / norm_dX
+      epsilon = 10.0**(-7.0) * norm_X0 / norm_dX
 
       !$omp parallel do
             DO i = 1,n_dim_1d
-            X_pert(i) = X0(i) + eps * dX(i)
+            X_pert(i) = X0(i) + epsilon * dX(i)
             ENDDO
 
       RETURN 
@@ -289,7 +289,7 @@
 
 
 !*****************************************************************
-     SUBROUTINE X_fin_diff(X_partial_dif, X_evol, Y_1d, sx, sy, eps)
+     SUBROUTINE X_fin_diff(X_partial_dif, X_evol, Y_1d, sx, sy, epsilon)
 !-----------------------------------------------------------------
 !
 ! Computes the partial derivative of the translated evolved vector with
@@ -301,7 +301,7 @@
 !     X_evol      : 1D perturbed vector evolved in T_guess time
 !     Y_1d      : 1D unperturbed vector evolved in T_guess time
 !     sx, sy      : guessed shifts in x and y
-!     eps      : Perturbance magnitude correction calculated with Perturb subroutine
+!     epsilon      : Perturbance magnitude correction calculated with Perturb subroutine
 
 !TODO: check unused modules
       USE fprecision
@@ -319,7 +319,7 @@
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: X_evol_shift
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: Y_1d
       REAL(KIND=GP), INTENT(IN)    :: sx, sy
-      REAL(KIND=GP), INTENT(IN)    :: eps
+      REAL(KIND=GP), INTENT(IN)    :: epsilon
       INTEGER :: i, j, k
       INTEGER :: offset1,offset2
 
@@ -334,10 +334,10 @@
             DO j = 1,ny
                   offset2 = offset1 + 4*(j-1)*nz
                   DO k = 1,nz
-                  X_partial_dif(1+4*(k-1)+offset2) = (X_evol_shift(1+4*(k-1)+offset2) - Y_1d(1+4*(k-1)+offset2))/eps
-                  X_partial_dif(2+4*(k-1)+offset2) = (X_evol_shift(2+4*(k-1)+offset2) - Y_1d(2+4*(k-1)+offset2))/eps
-                  X_partial_dif(3+4*(k-1)+offset2) = (X_evol_shift(3+4*(k-1)+offset2) - Y_1d(3+4*(k-1)+offset2))/eps
-                  X_partial_dif(4+4*(k-1)+offset2) = (X_evol_shift(4+4*(k-1)+offset2) - Y_1d(4+4*(k-1)+offset2))/eps
+                  X_partial_dif(1+4*(k-1)+offset2) = (X_evol_shift(1+4*(k-1)+offset2) - Y_1d(1+4*(k-1)+offset2))/epsilon
+                  X_partial_dif(2+4*(k-1)+offset2) = (X_evol_shift(2+4*(k-1)+offset2) - Y_1d(2+4*(k-1)+offset2))/epsilon
+                  X_partial_dif(3+4*(k-1)+offset2) = (X_evol_shift(3+4*(k-1)+offset2) - Y_1d(3+4*(k-1)+offset2))/epsilon
+                  X_partial_dif(4+4*(k-1)+offset2) = (X_evol_shift(4+4*(k-1)+offset2) - Y_1d(4+4*(k-1)+offset2))/epsilon
                   END DO
             END DO
       END DO
@@ -416,7 +416,7 @@
 
 
 !*****************************************************************
-     SUBROUTINE f_Y_RB(f_Y0, Y0, dT_guess_)
+     SUBROUTINE f_Y_RB(f_Y0, Y0, dT_guess)
 !-----------------------------------------------------------------
 !
 ! Computes f(Y0)*dT_guess in Rayleigh Benard flow.
@@ -437,7 +437,7 @@
 
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: f_Y0
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: Y0 
-      REAL(KIND=GP), INTENT(IN) :: dT_guess_ 
+      REAL(KIND=GP), INTENT(IN) :: dT_guess 
       COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: vx, vy, vz, th
       COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: fx, fy, fz, fs
       COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: C4, C5, C6, C8
@@ -481,10 +481,10 @@
             DO j = 1,ny
                   offset2 = offset1 + 4*(j-1)*nz
                   DO k = 1,nz
-                  f_Y0(1+4*(k-1)+offset2) = (nu*vx(k,j,i)-C4(k,j,i)+fx(k,j,i))*dT_guess_
-                  f_Y0(2+4*(k-1)+offset2) = (nu*vy(k,j,i)-C5(k,j,i)+fy(k,j,i))*dT_guess_
-                  f_Y0(3+4*(k-1)+offset2) = (nu*vz(k,j,i)-C6(k,j,i)+fz(k,j,i))*dT_guess_
-                  f_Y0(4+4*(k-1)+offset2) = (kappa*th(k,j,i)-C8(k,j,i)+fs(k,j,i))*dT_guess_
+                  f_Y0(1+4*(k-1)+offset2) = (nu*vx(k,j,i)-C4(k,j,i)+fx(k,j,i))*dT_guess
+                  f_Y0(2+4*(k-1)+offset2) = (nu*vy(k,j,i)-C5(k,j,i)+fy(k,j,i))*dT_guess
+                  f_Y0(3+4*(k-1)+offset2) = (nu*vz(k,j,i)-C6(k,j,i)+fz(k,j,i))*dT_guess
+                  f_Y0(4+4*(k-1)+offset2) = (kappa*th(k,j,i)-C8(k,j,i)+fs(k,j,i))*dT_guess
                   END DO
             END DO
       END DO
@@ -495,7 +495,7 @@
 
 
 !*****************************************************************
-     SUBROUTINE CalculateProjection(pj_f, pj_x, pj_y, dX, X0)
+     SUBROUTINE CalculateProjection(proj_f, proj_x, proj_y, dX, X0)
 !-----------------------------------------------------------------
 !
 ! Calculates the projection of dX in the directions with traslational
@@ -504,7 +504,7 @@
 ! the original orbit.
 !
 ! Parameters
-!     pj_f, pj_x, pj_y  : scalar product between dX and (respectively) time derivative of X0, and x-y translation generator applied to X0
+!     proj_f, proj_x, proj_y  : scalar product between dX and (respectively) time derivative of X0, and x-y translation generator applied to X0
 !     dX  : 1D perturbance vector
 !     X0  : initial vector
 !TODO: only calculate once time derivative of X0, as it does not change with the gmres iteration (it does change with newton iteration)
@@ -519,7 +519,7 @@
    !$    USE threads
       IMPLICIT NONE
 
-      COMPLEX(KIND=GP), INTENT(OUT) :: pj_f, pj_x, pj_y
+      COMPLEX(KIND=GP), INTENT(OUT) :: proj_f, proj_x, proj_y
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: X0
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: Xtras_x
@@ -530,10 +530,10 @@
 
       !Calculates time derivative at initial time f_X0.
       !Third parameter dT=1.0 because time derivative is of interest with no other factor. 
-      CALL f_Y_RB(f_X0,X0,1.0)!_KIND=GP) it prompted: Error: Missing kind-parameter at (1)
+      CALL f_Y_RB(f_X0,X0,1.0_GP)
 
       !Projects time derivative with dX (proposed variation to initial field)
-      CALL scal(pj_f, dX, f_X0)
+      CALL scal(proj_f, dX, f_X0)
             
       !Computes the initial vector field with the translation generator applied in x and y:
 
@@ -568,58 +568,15 @@
       END DO
 
       !Projects with dX (proposed variation of initial field)
-      CALL scal(pj_x, dX, Xtras_x)
-      CALL scal(pj_y, dX, Xtras_y)
+      CALL scal(proj_x, dX, Xtras_x)
+      CALL scal(proj_y, dX, Xtras_y)
 
       RETURN 
       END SUBROUTINE CalculateProjection
 
-!Original version of Form_Res used the same vector for all Res. It was incompatible with scal, which demands n_dim_1d size.
-
-! !*****************************************************************
-!      SUBROUTINE Form_Res(Res, dX, X_partial_diff, proj_f, proj_x, proj_y, f_Y, Y_shift)
-! !-----------------------------------------------------------------
-! !
-! ! Forms first Residual vector for the GMRES algorithm.
-! !
-
-!       USE fprecision
-!       USE commtypes
-!       USE newtmod
-!       USE mpivars
-!       USE grid
-!       USE kes
-!       USE var
-!    !$    USE threads
-!       IMPLICIT NONE
-
-!       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(:) :: Res
-!       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX, X_partial_diff, f_Y, Y_shift
-!       REAL(KIND=GP), INTENT(IN) :: proj_f, proj_x, proj_y
-!       INTEGER :: i
-
-!       IF (myrank.eq.0) THEN
-!             DIMENSION Res(n_dim_1d+3)
-!       ELSE
-!             DIMENSION Res(n_dim_1d)
-!       ENDIF
-
-!       !$omp parallel do
-!             DO i = 1,n_dim_1d
-!             Res(i) = X_partial_diff(i) - 2*dX + f_Y + Y_shift 
-!             ENDDO
-
-!       IF (myrank.eq.0) THEN
-!             Res(n_dim_1d + 1) = proj_x
-!             Res(n_dim_1d + 2) = proj_y
-!             Res(n_dim_1d + 3) = proj_f
-!       ENDIF
-   
-!       RETURN 
-!       END SUBROUTINE Form_Res
 
 !*****************************************************************
-     SUBROUTINE Form_Res(Res, Res_aux, dX, X_partial_diff, f_Y, Y_shift_x, Y_shift_y, pj_f, pj_x, pj_y, k)
+     SUBROUTINE Form_Res(Res, Res_aux, dX, X_partial_diff, f_Y, Y_shift_x, Y_shift_y, proj_f, proj_x, proj_y, n)
 !-----------------------------------------------------------------
 !
 ! Forms the Residual vector as stated in the GMRES algorithm. In each 
@@ -633,8 +590,8 @@
 !     f_Y  : Time derivative term
 !     Y_shift_x  : x shift term
 !     Y_shift_y  : y shift term
-!     pj_f, pj_x, pj_y  : scalar product between dX and (respectively) time derivative of X0, and x-y translation generator applied to X0
-!     k  : iteration number of GMRES
+!     proj_f, proj_x, proj_y  : scalar product between dX and (respectively) time derivative of X0, and x-y translation generator applied to X0
+!     n  : iteration number of GMRES
 
       USE fprecision
       USE commtypes
@@ -646,35 +603,35 @@
    !$    USE threads
       IMPLICIT NONE
 
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: Res
-      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(3) :: Res_aux
-      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX, X_partial_diff, f_Y, Y_shift_x, Y_shift_y
-      REAL(KIND=GP), INTENT(IN) :: pj_f, pj_x, pj_y
-      INTEGER, INTENT(IN) :: k
+      INTEGER(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: Res
+      INTEGER(KIND=GP), INTENT(OUT), DIMENSION(3) :: Res_aux
+      INTEGER(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX, X_partial_diff, f_Y, Y_shift_x, Y_shift_y
+      REAL(KIND=GP), INTENT(IN) :: proj_f, proj_x, proj_y
+      INTEGER, INTENT(IN) :: n
       INTEGER :: i
 
       ! In first iteration r = b - A@X, where X the initial (dX, d_sx, d_sy, dT)^T, but in the rest of the iterations:
-      ! r_n = A@Q_(k-1) where Q_(k-1) is the previous Arnoldi vector which contains the updated (dX, d_sx, d_sy, dT)^T.
+      ! r_n = A@Q_(n-1) where Q_(n-1) is the previous Arnoldi vector which contains the updated (dX, d_sx, d_sy, dT)^T.
       ! So the first time the matrix vector product must be negative (and the 2dX comes from adding b=dX in the first iteration), 
       ! but in the rest it is positive.
 
       !TODO: Check if necessary to use do loop instead of just adding.
-      IF (k.eq.1) THEN 
+      IF (n.eq.1) THEN 
       !$omp parallel do
             DO i = 1,n_dim_1d
             Res(i) = 2*dX(i) - X_partial_diff(i) - Y_shift_x(i) - Y_shift_y(i) - f_Y(i)
             ENDDO
-            Res_aux(1) = -pj_x
-            Res_aux(2) = -pj_y
-            Res_aux(3) = -pj_f
+            Res_aux(1) = -proj_x
+            Res_aux(2) = -proj_y
+            Res_aux(3) = -proj_f
       ELSE 
       !$omp parallel do
             DO i = 1,n_dim_1d
             Res(i) = -dX(i) + X_partial_diff(i) + Y_shift_x(i) + Y_shift_y(i) + f_Y(i) 
             ENDDO
-            Res_aux(1) = pj_x
-            Res_aux(2) = pj_y
-            Res_aux(3) = pj_f
+            Res_aux(1) = proj_x
+            Res_aux(2) = proj_y
+            Res_aux(3) = proj_f
       END IF
 
       RETURN 
@@ -682,57 +639,9 @@
 
 
 
-! !*****************************************************************
-!      SUBROUTINE Arnoldi_step(Res, Q, H, n)
-! !-----------------------------------------------------------------
-! !
-! ! Performs n_th iteration of Arnoldi algorithm, i.e. calculates the new column vector for Q
-! ! using Modified Graham-Schmidt.
-! !
-
-!       USE fprecision
-!       USE commtypes
-!       USE newtmod
-!       USE mpivars
-!       USE grid
-!       USE kes
-!       USE var
-!    !$    USE threads
-!       IMPLICIT NONE
-
-!       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:) :: Res
-!       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:,:) :: Q, H
-!       REAL(KIND=GP) :: norm_res
-!       INTEGER, INTENT(IN) :: n
-!       INTEGER :: i
-
-!       IF (myrank.eq.0) THEN
-!             DIMENSION Res(n_dim_1d+3)
-!       ELSE
-!             DIMENSION Res(n_dim_1d)
-!       ENDIF
-
-!       IF (n.eq.1) THEN
-!             CALL Norm(Res, norm_res) ! TODO: Set up norm
-!             Res = Res / norm_res
-!             Q(:,1) = Res ! TODO: Check if valid to divide vector by real number
-!             RETURN
-!       ENDIF
-
-!       DO i = 1, n
-!             H(i,n) = scal(Q(:,i), Res)
-!             Res = Res - H(i,n) * Q(:,i)
-!       END DO
-
-!       CALL Norm(Res, norm_res)
-!       H(n+1, n) = norm_res
-!       Res = Res/norm_res
-!       Q(:,n) = Res
-!       RETURN
-!       END SUBROUTINE Arnoldi_step
 
 !*****************************************************************
-     SUBROUTINE Arnoldi_step(Res, Res_aux, Q, Q_aux, H, norm_res, k)
+     SUBROUTINE Arnoldi_step(Res, Res_aux, Q, Q_aux, H, norm_res, n)
 !-----------------------------------------------------------------
 !
 ! Performs n_th iteration of Arnoldi algorithm, i.e. calculates the new column vector for Q
@@ -742,10 +651,10 @@
 !
 !     Res  : 1D residual vector of dim: n_dim_1d
 !     Res_aux  : rest of residual vector, dim: 3
-!     Q  : Arnoldi orthonomal matrix of dim: (n_dim_1d, k)
-!     Q_aux  : rest of orthonomal matrix, dim: (3, k)
-!     H  : upper hessenberg arnoldi matrix, dim: (k+1,k)
-!     k  : iteration number of GMRES
+!     Q  : Arnoldi orthonomal matrix of dim: (n_dim_1d, n)
+!     Q_aux  : rest of orthonomal matrix, dim: (3, n)
+!     H  : upper hessenberg arnoldi matrix, dim: (n+1,n)
+!     n  : iteration number of GMRES
 
       USE fprecision
       USE commtypes
@@ -762,42 +671,66 @@
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:,:) :: Q, Q_aux, H
       REAL(KIND=GP), INTENT(OUT) :: norm_res
       REAL(KIND=GP) :: aux
-      INTEGER, INTENT(IN) :: k
+      INTEGER, INTENT(IN) :: n
       INTEGER :: i
 
-      IF (k.eq.1) THEN
+      IF (n.eq.1) THEN
             !TODO: change for norm, if parallelized scal is included
+            IF (myrank.eq.0) THEN
+            print *, 'Entered Arnoldi step'
+            ENDIF
+
             CALL Norm(norm_res, Res)
-            norm_res = SQRT(norm_res**2 + SUM(ABS(Res_aux)**2))
+            IF (myrank.eq.0) THEN
+            print *, 'Computed Norm subroutine'
+            ENDIF
+            
+            aux = SUM(ABS(Res_aux)**2)
+            norm_res = SQRT(norm_res**2 + aux)
+            IF (myrank.eq.0) THEN
+            print *, 'Calculated norm_res'
+            ENDIF
+
             Res = Res / norm_res
             Res_aux = Res_aux / norm_res
+            IF (myrank.eq.0) THEN
+            print *, 'Computed Res and Res_aux'
+            ENDIF
+
             Q(:,1) = Res ! TODO: Check if valid to divide vector by real number
+            IF (myrank.eq.0) THEN
+            print *, 'Filled column of Q'
+            ENDIF
             Q_aux(:,1) = Res_aux
+            IF (myrank.eq.0) THEN
+            print *, 'Filled column of Q_aux'
+            ENDIF
+
             RETURN
       ENDIF
 
-      DO i = 1, k-1 !TODO: Revision: scal is parallelized but only works if dim = n_dim_1d
-            CALL scal(H(i,k-1),Q(:,i), Res) !Compute the inner product with the n_dim_1d part
-            H(i,k-1) = H(i,k-1) + DOT_PRODUCT(Q_aux(:,i), Res_aux)
-            Res = Res - H(i,k-1) * Q(:,i)
-            Res_aux = Res_aux - H(i,k-1) * Q_aux(:,i)
+      DO i = 1, n-1 !TODO: Revision: scal is parallelized but only works if dim = n_dim_1d
+            CALL scal(H(i,n-1),Q(:,i), Res) !Compute the inner product with the n_dim_1d part
+            H(i,n-1) = H(i,n-1) + DOT_PRODUCT(Q_aux(:,i), Res_aux)
+            Res = Res - H(i,n-1) * Q(:,i)
+            Res_aux = Res_aux - H(i,n-1) * Q_aux(:,i)
       END DO
 
       !TODO: change for scal for computing norm
       CALL Norm(norm_res, Res)
       norm_res = SQRT(norm_res**2 + SUM(ABS(Res_aux)**2))
-      H(k, k-1) = norm_res
+      H(n, n-1) = norm_res
       Res = Res/norm_res
       Res_aux = Res_aux/norm_res
-      Q(:,k) = Res
-      Q_aux(:,k) = Res_aux
+      Q(:,n) = Res
+      Q_aux(:,n) = Res_aux
 
       RETURN
       END SUBROUTINE Arnoldi_step
 
 
 !*****************************************************************
-     SUBROUTINE Update_values(dX, d_sx_, d_sy_, dT_guess_, Res, Res_aux)
+     SUBROUTINE Update_values(dX, d_sx, d_sy, dT_guess, Res, Res_aux,n)
 !-----------------------------------------------------------------
 !
 ! Updates the values according to the last arnoldi iteration.
@@ -822,8 +755,9 @@
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: dX
-      REAL(KIND=GP), INTENT(OUT) :: d_sx_, d_sy_, dT_guess_
+      REAL(KIND=GP), INTENT(OUT) :: d_sx, d_sy, dT_guess
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: Res, Res_aux
+      INTEGER, INTENT(IN) :: n
       INTEGER :: i
 
       !In first iteration no change has been done
@@ -837,16 +771,16 @@
             dX(i) = Res(i)
             ENDDO
 
-      d_sx_ = Res_aux(1)
-      d_sy_ = Res_aux(2)
-      dT_guess_ = Res_aux(3)
+      d_sx = Res_aux(1)
+      d_sy = Res_aux(2)
+      dT_guess = Res_aux(3)
 
       RETURN
       END SUBROUTINE Update_values
 
 
 !*****************************************************************
-     SUBROUTINE Givens_rotation(H, cs, sn, k)
+     SUBROUTINE Givens_rotation(H, cs, sn, n)
 !-----------------------------------------------------------------
 !
 ! Performs Givens rotation
@@ -864,38 +798,38 @@
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:,:) :: H
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:) :: cs, sn
       REAL(KIND=GP) :: temp, hip
-      INTEGER, INTENT(IN) :: k
+      INTEGER, INTENT(IN) :: n
       INTEGER :: i
 
       !TODO: check if this works or if the condition must be imposed on bouss_newt
       !In first iteration the hessenberg matrix is empty
-      IF (k.eq.1) THEN
+      IF (n.eq.1) THEN
             RETURN
       ENDIF
 
 
-      !TODO: check if i must impose condition k.neq.1 or if it skips it directly (s/GPT: skips it)
-      !Premultiply the last H column (k-1) by the previous k-1 Givens matrices
-      DO i = 1, k-2
-            temp = cs(i)*H(i,k-1) + sn(i)*H(i+1,k-1)
-            H(i+1,k-1) = -sn(i)*H(i,k-1) + cs(i)*H(i+1,k-1)
-            H(i,k-1) = temp
+      !TODO: check if i must impose condition n.neq.1 or if it skips it directly (s/GPT: skips it)
+      !Premultiply the last H column (n-1) by the previous n-1 Givens matrices
+      DO i = 1, n-2
+            temp = cs(i)*H(i,n-1) + sn(i)*H(i+1,n-1)
+            H(i+1,n-1) = -sn(i)*H(i,n-1) + cs(i)*H(i+1,n-1)
+            H(i,n-1) = temp
       END DO
 
       !Find the values of the new cs and sn of the k_th Given matrix
-      hip = SQRT(H(k-1,k-1)**2+H(k,k-1)**2)
-      cs(k-1) = H(k-1,k-1)/hip
-      sn(k-1) = H(k,k-1)/hip
+      hip = SQRT(H(n-1,n-1)**2+H(n,n-1)**2)
+      cs(n-1) = H(n-1,n-1)/hip
+      sn(n-1) = H(n,n-1)/hip
 
-      !Update the last H entries and eliminate H(k,k-1) to obtain a triangular matrix R
-      H(k-1,k-1) = cs(k-1)*H(k-1,k-1) + sn(k-1)*H(k,k-1)
-      H(k,k-1) = 0
+      !Update the last H entries and eliminate H(n,n-1) to obtain a triangular matrix R
+      H(n-1,n-1) = cs(n-1)*H(n-1,n-1) + sn(n-1)*H(n,n-1)
+      H(n,n-1) = 0
 
       RETURN
       END SUBROUTINE Givens_rotation
 
 !*****************************************************************
-     SUBROUTINE Update_error(beta, cs, sn, e, b_norm_, res_norm_, k)
+     SUBROUTINE Update_error(beta, cs, sn, e, b_norm, res_norm, n)
 !-----------------------------------------------------------------
 !
 ! Performs Givens rotation
@@ -914,33 +848,33 @@
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:) :: beta
       REAL(KIND=GP), INTENT(INOUT), DIMENSION(:) :: e
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: cs, sn
-      REAL(KIND=GP), INTENT(IN) :: b_norm_, res_norm_
+      REAL(KIND=GP), INTENT(IN) :: b_norm, res_norm
       REAL(KIND=GP) :: error
-      INTEGER, INTENT(IN) :: k
+      INTEGER, INTENT(IN) :: n
       INTEGER :: i
 
-      IF (k.eq.1) THEN
-            error = res_norm_/b_norm_
+      IF (n.eq.1) THEN
+            error = res_norm/b_norm
             e(1) = error
-            beta(1) = res_norm_
+            beta(1) = res_norm
             RETURN
       ENDIF
 
-      beta(k) =  -sn(k-1) * beta(k-1)
-      beta(k-1) = cs(k-1) * beta(k-1)
+      beta(n) =  -sn(n-1) * beta(n-1)
+      beta(n-1) = cs(n-1) * beta(n-1)
         
-      error = ABS(beta(k))/b_norm_
-      e(k) = error
+      error = ABS(beta(n))/b_norm
+      e(n) = error
 
       RETURN
       END SUBROUTINE Update_error
 
 !*****************************************************************
-     SUBROUTINE Backpropagation(y_sol, R, b, k)
+     SUBROUTINE Backpropagation(y_sol, R, b, n)
 !-----------------------------------------------------------------
 !
 ! Performs backpropagation algorithm to solve an upper triangular system of equations R@y=b
-! where R is of size (k,k) and b and y of size (k)
+! where R is of size (n,n) and b and y of size (n)
 !
       USE fprecision
       USE commtypes
@@ -956,13 +890,13 @@
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(:) :: y_sol
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:,:) :: R
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: b
-      INTEGER, INTENT(IN) :: k
+      INTEGER, INTENT(IN) :: n
       INTEGER :: i, j
       REAL(KIND=GP) :: aux
 
-      DO i = k, 1, -1
+      DO i = n, 1, -1
             aux = 0
-            DO j = i+1,k
+            DO j = i+1,n
                   aux = aux + y_sol(j) * R(i,j)
             END DO
             y_sol(i) = (b(i) - aux)/R(i,i)
@@ -973,7 +907,7 @@
       END SUBROUTINE Backpropagation
 
 !*****************************************************************
-     SUBROUTINE Hookstep_transform(R, mu, k)
+     SUBROUTINE Hookstep_transform(R, mu, n)
 !-----------------------------------------------------------------
 !
 !
@@ -990,11 +924,11 @@
       !TODO: whole thing
  
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:,:) :: R
-      INTEGER, INTENT(IN) :: k
+      INTEGER, INTENT(IN) :: n
       REAL(KIND=GP) :: mu
       INTEGER :: i
 
-      DO i = 1,k
+      DO i = 1,n
             R(i,i) = R(i,i) + mu/R(i,i)
       END DO
       
@@ -1002,10 +936,10 @@
       END SUBROUTINE Hookstep_transform
 
 !*****************************************************************
-     SUBROUTINE Update_X(vx, vy, vz, th, X0, Q, y_sol, k)
+     SUBROUTINE Update_X(vx, vy, vz, th, X0, Q, y_sol, n)
 !-----------------------------------------------------------------
 !
-!  x = x0 + Q[:,:k]@y
+!  x = x0 + Q[:,:n]@y
 !
 !TODO: Adjust value of T_guess
 !
@@ -1026,11 +960,11 @@
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:) :: X0
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:,:) :: Q
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(:) :: y_sol
-      INTEGER, INTENT(IN) :: k
-      COMPLEX(KIND=GP), DIMENSION(n_dim_1d,k) :: Q_slice
+      INTEGER, INTENT(IN) :: n
+      COMPLEX(KIND=GP), DIMENSION(n_dim_1d,n) :: Q_slice
       INTEGER :: i
 
-      Q_slice = Q(:, 1:k)
+      Q_slice = Q(:, 1:n)
 
       !TODO: think how to parallelize
       X0 = X0 + MATMUL(Q_slice, y_sol)

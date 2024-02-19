@@ -75,11 +75,13 @@
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: pr
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: th,fs
-      !Bouss_newt:
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: X0,X_evol,Y0,Y_shift_x,Y_shift_y,f_Y,X_pert
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: dX,X_partial_dif,X_pert_evol, y_sol
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:) :: Res, Res_aux, cs, sn, e, beta
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:) :: Q, Q_aux, H
+#endif
+#ifdef NEWT_
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:)   :: Q, Q_aux, H
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:)     :: X0,X_evol,Y0,Y_shift_x,Y_shift_y,f_Y,X_pert
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:)     :: dX,X_partial_dif,X_pert_evol, y_sol
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:)     :: Res, Res_aux, cs, sn, beta
+      REAL(KIND=GP), ALLOCATABLE, DIMENSION (:)        :: e
 #endif
 #ifdef MAGFIELD_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: ax,ay,az
@@ -137,9 +139,13 @@
       REAL(KIND=GP)    :: sparam5,sparam6,sparam7,sparam8,sparam9
       REAL(KIND=GP)    :: cparam0,cparam1,cparam2,cparam3,cparam4
       REAL(KIND=GP)    :: cparam5,cparam6,cparam7,cparam8,cparam9
-      !Bouss_newt:
-      REAL(KIND=GP)    :: T_guess,sx,sy
-      !REAL(KIND=GP)    :: proj_f, proj_x, proj_y
+#endif
+#ifdef NEWT_
+      REAL(KIND=GP)    :: T_guess,sx,sy,epsilon
+      REAL(KIND=GP)    :: proj_f, proj_x, proj_y
+      REAL(KIND=GP)    :: tol,b_norm,res_norm
+      REAL(KIND=GP)    :: d_sx,d_sy,dT_guess
+      INTEGER          :: n,n_max,step_evol,t_rk 
 
 #endif
 #ifdef MAGFIELD_
@@ -230,8 +236,9 @@
       NAMELIST / scalar   / cparam5,cparam6,cparam7,sparam8,sparam9
       NAMELIST / scabound / sbcxsta,sbcxend,sbcysta,sbcyend,sbczsta,sbczend
       NAMELIST / scabound / szsta,szend
-      NAMELIST / sca_newt / T_guess,sx,sy
-
+#endif
+#ifdef NEWT_
+      NAMELIST / sca_newt / T_guess,sx,sy,n_max,tol
 #endif
 #ifdef MAGFIELD_
       NAMELIST / magfield / m0,a0,mkdn,mkup,mu
@@ -318,6 +325,8 @@
 #ifdef SCALAR_
       ALLOCATE( th(nz,ny,ista:iend), fs(nz,ny,ista:iend) )
       ALLOCATE( C7(nz,ny,ista:iend), C8(nz,ny,ista:iend) )
+#endif
+#ifdef NEWT_
       n_dim_1d = 4*(iend-ista+1)*ny*nz
       ALLOCATE(X0(n_dim_1d),  X_evol(n_dim_1d),  Y0(n_dim_1d),  Y_shift_x(n_dim_1d), &
         Y_shift_y(n_dim_1d),f_Y(n_dim_1d), dX(n_dim_1d),X_pert(n_dim_1d),X_partial_dif(n_dim_1d), X_pert_evol(n_dim_1d))
@@ -582,6 +591,8 @@
 !     T_guess : Initial guess of the UPO period in time units. 
 !     sx : Initial guess of the UPO shift in x direction 
 !     sy : Initial guess of the UPO shift in y direction 
+!     n_max : Maximum number of iterations for GMRES algorithm 
+!     tol : Maximum value allowed for GMRES
 
       IF (myrank.eq.0) THEN
          OPEN(1,file='parameter.inp',status='unknown',form="formatted")
@@ -591,6 +602,8 @@
       CALL MPI_BCAST(T_guess,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sx,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(sy,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(n_max,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(tol,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
 #endif
 
 #ifdef MAGFIELD_
@@ -1186,7 +1199,11 @@
 
       !    DO o = ord,1,-1
 
-      
+            IF (myrank.eq.0) THEN
+            print *, 'About to enter Bouss_newt. t = ', t
+            ENDIF
+
+
             INCLUDE BOUSS_NEWT_
             !INCLUDE RKSTEP2_
 
