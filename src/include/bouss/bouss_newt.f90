@@ -81,10 +81,18 @@ ENDIF
 
    !Calculates the projection along the shifted directions and along the direction of flow
    CALL CalculateProjection(proj_f, proj_x, proj_y, dX, X0)
+   IF (myrank.eq.0) THEN
+   print *, 'Calculated Projection'
+   ENDIF
 
    ! Can now form r_n = b - A*X_n
 
    CALL Form_Res(Res, Res_aux, dX, X_partial_dif, f_Y, Y_shift_x, Y_shift_y, proj_f, proj_x, proj_y, n)
+
+   IF (myrank.eq.0) THEN
+   print *, 'Formed Res'
+   ENDIF
+
 
    CALL Arnoldi_step(Res, Res_aux, Q, Q_aux, H, res_norm, n)
    IF (myrank.eq.0) THEN

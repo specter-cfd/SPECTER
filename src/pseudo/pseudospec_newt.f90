@@ -603,10 +603,10 @@
    !$    USE threads
       IMPLICIT NONE
 
-      INTEGER(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: Res
-      INTEGER(KIND=GP), INTENT(OUT), DIMENSION(3) :: Res_aux
-      INTEGER(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX, X_partial_diff, f_Y, Y_shift_x, Y_shift_y
-      REAL(KIND=GP), INTENT(IN) :: proj_f, proj_x, proj_y
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: Res
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(3) :: Res_aux
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX, X_partial_diff, f_Y, Y_shift_x, Y_shift_y
+      COMPLEX(KIND=GP), INTENT(IN) :: proj_f, proj_x, proj_y
       INTEGER, INTENT(IN) :: n
       INTEGER :: i
 
@@ -641,7 +641,7 @@
 
 
 !*****************************************************************
-     SUBROUTINE Arnoldi_step(Res, Res_aux, Q, Q_aux, H, norm_res, n)
+     SUBROUTINE Arnoldi_step(Res, Res_aux, Q, Q_aux, H, res_norm, n)
 !-----------------------------------------------------------------
 !
 ! Performs n_th iteration of Arnoldi algorithm, i.e. calculates the new column vector for Q
@@ -669,35 +669,41 @@
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(n_dim_1d) :: Res
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(3) :: Res_aux
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(:,:) :: Q, Q_aux, H
-      REAL(KIND=GP), INTENT(OUT) :: norm_res
+      REAL(KIND=GP), INTENT(OUT) :: res_norm
       REAL(KIND=GP) :: aux
       INTEGER, INTENT(IN) :: n
       INTEGER :: i
 
       IF (n.eq.1) THEN
-            !TODO: change for norm, if parallelized scal is included
             IF (myrank.eq.0) THEN
-            print *, 'Entered Arnoldi step'
+            print *, 'Entered Arnoldi_step'
+            ENDIF
+            CALL Norm(res_norm, Res) !Produces SISGEV invalid memory reference
+            IF (myrank.eq.0) THEN
+            print *, 'Called norm on Res'
             ENDIF
 
-            CALL Norm(norm_res, Res)
-            IF (myrank.eq.0) THEN
-            print *, 'Computed Norm subroutine'
-            ENDIF
-            
             aux = SUM(ABS(Res_aux)**2)
-            norm_res = SQRT(norm_res**2 + aux)
+            res_norm = SQRT(res_norm**2 + aux)
+            res_norm = SQRT(SUM(ABS(Res_aux)**2)+ SUM(ABS(Res)**2))
+
+            Res = Res / res_norm
+            Res_aux = Res_aux / res_norm
+
             IF (myrank.eq.0) THEN
-            print *, 'Calculated norm_res'
+            print *, 'Normalized Res and Res_aux'
             ENDIF
 
-            Res = Res / norm_res
-            Res_aux = Res_aux / norm_res
-            IF (myrank.eq.0) THEN
-            print *, 'Computed Res and Res_aux'
-            ENDIF
 
-            Q(:,1) = Res ! TODO: Check if valid to divide vector by real number
+            Q(:,1) = Res 
+
+            !Instead try:
+
+            ! !$omp parallel do
+            !       DO i = 1,n_dim_1d
+            !       Q(i,1) = Res(i)
+            !       ENDDO
+
             IF (myrank.eq.0) THEN
             print *, 'Filled column of Q'
             ENDIF
@@ -717,11 +723,11 @@
       END DO
 
       !TODO: change for scal for computing norm
-      CALL Norm(norm_res, Res)
-      norm_res = SQRT(norm_res**2 + SUM(ABS(Res_aux)**2))
-      H(n, n-1) = norm_res
-      Res = Res/norm_res
-      Res_aux = Res_aux/norm_res
+      CALL Norm(res_norm, Res)
+      res_norm = SQRT(res_norm**2 + SUM(ABS(Res_aux)**2))
+      H(n, n-1) = res_norm
+      Res = Res/res_norm
+      Res_aux = Res_aux/res_norm
       Q(:,n) = Res
       Q_aux(:,n) = Res_aux
 
