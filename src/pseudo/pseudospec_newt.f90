@@ -272,7 +272,7 @@
       REAL(KIND=GP), INTENT(OUT) :: epsilon
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: X0
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX
-      REAL(KIND=GP) :: norm_X0, norm_dX    
+      REAL(KIND=GP) :: norm_X0, norm_dX, norm_pert 
       INTEGER :: i
 
       CALL Norm(norm_X0,X0)
@@ -280,14 +280,15 @@
 
 
       epsilon = 10.0**(-7.0) * norm_X0 / norm_dX
-      ! IF (myrank.eq.0) THEN
-      ! print *, 'norm_X0=', norm_X0, 'norm_dX=',norm_dX, 'epsilon=',epsilon
-      ! ENDIF
 
       !$omp parallel do
             DO i = 1,n_dim_1d
             X_pert(i) = X0(i) + epsilon * dX(i)
             ENDDO
+      CALL Norm(norm_pert, X_pert)
+      IF (myrank.eq.0) THEN
+      print *, 'norm_X0=', norm_X0, 'norm_dX=',norm_dX, 'epsilon=',epsilon,'X_pert_norm=',norm_pert
+      ENDIF
 
       RETURN 
       END SUBROUTINE Perturb
@@ -719,6 +720,10 @@
             print *, 'Normalized Res and Res_aux'
             ENDIF
 
+            Q_aux(:,1) = Res_aux
+            IF (myrank.eq.0) THEN
+            print *, 'Filled column of Q_aux'
+            ENDIF
 
             ! Q(:,1) = Res 
 
@@ -731,10 +736,6 @@
 
             IF (myrank.eq.0) THEN
             print *, 'Filled column of Q'
-            ENDIF
-            Q_aux(:,1) = Res_aux
-            IF (myrank.eq.0) THEN
-            print *, 'Filled column of Q_aux'
             ENDIF
 
             RETURN
