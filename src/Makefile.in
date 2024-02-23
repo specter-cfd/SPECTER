@@ -3,9 +3,9 @@
 #****************************************************************************
 
 # Spatial resolution (grid points in X,Y,Z)
-NX       = 256
+NX       = 64
 NY       = 1 
-NZ       = 128
+NZ       = 64
 
 # Points used for periodic continuation in each direction.
 # Note that the number of points used in each direction for the
@@ -13,7 +13,7 @@ NZ       = 128
 # C=0 implies periodic boundary conditions in that direction
 CX       = 0
 CY       = 0
-CZ       = 25
+CZ       = 15
 
 # Order at each boundary (=0 for periodic directions)
 OX       = 0
@@ -109,7 +109,7 @@ TARGET_INTEL  =
 CPP_GNU       = cpp -traditional-cpp
 FC_GNU        = gfortran
 CC_GNU        = gcc
-FFLAGS_GNU    = -O3 -funroll-loops
+FFLAGS_GNU    = -O3 -funroll-loops -g
 FPSPEC_GNU    = -O3 -funroll-loops
 # GCC 10 specific options, uncomment if using GCC > v10.0
 #FFLAGS_GNU   += -w -fallow-argument-mismatch

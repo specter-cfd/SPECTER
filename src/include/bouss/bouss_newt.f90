@@ -31,17 +31,24 @@ ENDIF
       !Save initial field in 1d variable X0
       CALL ThreeTo1D(X0, vx, vy, vz, th) 
 
-
-
       !performs evolution of vx, vy, vz, th in time T
       INCLUDE 'include/bouss/bouss_evol_T.f90' 
 
       !Transforms to a 1d variable X_evol
       CALL ThreeTo1D(X_evol, vx, vy, vz, th)
-
+      CALL Norm(aux_norm,X_evol)
+      ! IF (myrank.eq.0) THEN
+      ! print *, 'norm_X_evol=', aux_norm
+      ! ENDIF
+      
       !Traslate in the guessed shifts:
-      CALL Translation(X_evol, Y0, 1, sx) 
+      CALL Translation(Y0, X_evol, 1, sx) 
       CALL Translation(Y0, Y0, 2, sy) 
+
+      CALL Norm(aux_norm,Y0)
+      ! IF (myrank.eq.0) THEN
+      ! print *, 'norm_Y0=', aux_norm
+      ! ENDIF
 
       !Calculate initial direction for directional derivative
       !$omp parallel do
@@ -50,6 +57,10 @@ ENDIF
          ENDDO
 
       CALL Norm(b_norm,dX)
+      CALL Norm(aux_norm,X0)
+      ! IF (myrank.eq.0) THEN
+      ! print *, 'norm_b=', b_norm,'norm_X0=', aux_norm
+      ! ENDIF
 
    ENDIF
    

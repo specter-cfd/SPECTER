@@ -174,7 +174,7 @@
 
 
 !*****************************************************************
-      SUBROUTINE scal(s,u1,u2)
+      SUBROUTINE Scal(s,u1,u2)
 !-----------------------------------------------------------------
 !
 ! Routine to compute the reduced scalar product of two 1D
@@ -198,7 +198,8 @@
       ! DOUBLE PRECISION, INTENT(OUT) :: s
       ! DOUBLE PRECISION              :: stemp,tmp
       COMPLEX(KIND=GP), INTENT(OUT) :: s
-      COMPLEX(KIND=GP)              :: stemp,tmp
+      COMPLEX(KIND=GP)              :: stemp
+      REAL(KIND=GP)              :: tmp
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: u1,u2
       INTEGER :: i
 
@@ -207,13 +208,13 @@
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
 !$omp parallel do reduction(+:stemp)
       DO i = 1,n_dim_1d
-         stemp = stemp+CONJG(u1(i))*u2(i)*tmp !no me acuerdo cual va conjugado
+         stemp = stemp+CONJG(u1(i))*u2(i)*tmp
       ENDDO
       CALL MPI_ALLREDUCE(stemp,s,1,MPI_DOUBLE_PRECISION,MPI_SUM, &
                          MPI_COMM_WORLD,ierr)
 
       RETURN
-      END SUBROUTINE scal
+      END SUBROUTINE Scal
 
 !*****************************************************************
       SUBROUTINE Norm(norm_a,a)
@@ -226,7 +227,7 @@
 !     norm_a      : Norm
 !     a      : 1D complex vector
 !
-! TODO: Check if necessary to use this subroutine instead of only scal. Delete unused modules
+! TODO: Check if necessary to use this subroutine instead of only Scal. Delete unused modules
       USE fprecision
       USE commtypes
       USE newtmod
@@ -239,8 +240,8 @@
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: a
       COMPLEX(KIND=GP) :: aux
 
-      CALL scal(aux, a, a)
-      norm_a =  SQRT(aux)
+      CALL Scal(aux, a, a)
+      norm_a =  SQRT(REAL(aux))
 
 
       RETURN
@@ -277,7 +278,11 @@
       CALL Norm(norm_X0,X0)
       CALL Norm(norm_dX,dX)
 
+
       epsilon = 10.0**(-7.0) * norm_X0 / norm_dX
+      ! IF (myrank.eq.0) THEN
+      ! print *, 'norm_X0=', norm_X0, 'norm_dX=',norm_dX, 'epsilon=',epsilon
+      ! ENDIF
 
       !$omp parallel do
             DO i = 1,n_dim_1d
@@ -519,12 +524,13 @@
    !$    USE threads
       IMPLICIT NONE
 
-      COMPLEX(KIND=GP), INTENT(OUT) :: proj_f, proj_x, proj_y
+      REAL(KIND=GP), INTENT(OUT) :: proj_f, proj_x, proj_y
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: X0
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: Xtras_x
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: Xtras_y
       COMPLEX(KIND=GP), DIMENSION(n_dim_1d) :: f_X0
+      COMPLEX(KIND=GP) :: aux1,aux2
       INTEGER :: i, j, k
       INTEGER :: offset1,offset2
 
@@ -533,7 +539,8 @@
       CALL f_Y_RB(f_X0,X0,1.0_GP)
 
       !Projects time derivative with dX (proposed variation to initial field)
-      CALL scal(proj_f, dX, f_X0)
+      CALL Scal(aux1, dX, f_X0)
+      proj_f = REAL(aux1)
             
       !Computes the initial vector field with the translation generator applied in x and y:
 
@@ -568,8 +575,11 @@
       END DO
 
       !Projects with dX (proposed variation of initial field)
-      CALL scal(proj_x, dX, Xtras_x)
-      CALL scal(proj_y, dX, Xtras_y)
+      CALL Scal(aux1, dX, Xtras_x)
+      CALL Scal(aux2, dX, Xtras_y)
+
+      proj_x = REAL(aux1)
+      proj_y = REAL(aux2)
 
       RETURN 
       END SUBROUTINE CalculateProjection
@@ -606,7 +616,7 @@
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(n_dim_1d) :: Res
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(3) :: Res_aux
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(n_dim_1d) :: dX, X_partial_diff, f_Y, Y_shift_x, Y_shift_y
-      COMPLEX(KIND=GP), INTENT(IN) :: proj_f, proj_x, proj_y
+      REAL(KIND=GP), INTENT(IN) :: proj_f, proj_x, proj_y
       INTEGER, INTENT(IN) :: n
       INTEGER :: i
 
@@ -621,7 +631,10 @@
             DO i = 1,n_dim_1d
             Res(i) = 2*dX(i) - X_partial_diff(i) - Y_shift_x(i) - Y_shift_y(i) - f_Y(i)
             ENDDO
-            Res_aux(1) = -proj_x
+            ! IF (myrank.eq.0) THEN
+            ! print *, 'proj x=', proj_x, 'proj_y=',proj_y, 'proj_f=',proj_f
+            ! ENDIF
+            Res_aux(1) = -proj_x            
             Res_aux(2) = -proj_y
             Res_aux(3) = -proj_f
       ELSE 
@@ -636,9 +649,6 @@
 
       RETURN 
       END SUBROUTINE Form_Res
-
-
-
 
 !*****************************************************************
      SUBROUTINE Arnoldi_step(Res, Res_aux, Q, Q_aux, H, res_norm, n)
@@ -680,29 +690,44 @@
             ENDIF
             CALL Norm(res_norm, Res) !Produces SISGEV invalid memory reference
             IF (myrank.eq.0) THEN
-            print *, 'Called norm on Res'
+            print *, 'Computed Res(ndim1d) norm = ',res_norm
             ENDIF
 
             aux = SUM(ABS(Res_aux)**2)
+            IF (myrank.eq.0) THEN
+            print *, 'Computed aux=',aux
+            ENDIF
+
             res_norm = SQRT(res_norm**2 + aux)
-            res_norm = SQRT(SUM(ABS(Res_aux)**2)+ SUM(ABS(Res)**2))
+            IF (myrank.eq.0) THEN
+            print *, 'Computed res_norm=',res_norm
+            ENDIF
 
-            Res = Res / res_norm
             Res_aux = Res_aux / res_norm
+            IF (myrank.eq.0) THEN
+            print *, 'Normalized Res aux'
+            ENDIF
+ 
+            !Alternative since Res = Res/res_norm returned SISGEV error from parallelization
+            !$omp parallel do
+                  DO i = 1,n_dim_1d
+                  Res(i) = Res(i)/ res_norm
+                  ENDDO
 
+            ! Res = Res / res_norm
             IF (myrank.eq.0) THEN
             print *, 'Normalized Res and Res_aux'
             ENDIF
 
 
-            Q(:,1) = Res 
+            ! Q(:,1) = Res 
 
             !Instead try:
 
-            ! !$omp parallel do
-            !       DO i = 1,n_dim_1d
-            !       Q(i,1) = Res(i)
-            !       ENDDO
+            !$omp parallel do
+                  DO i = 1,n_dim_1d
+                  Q(i,1) = Res(i)
+                  ENDDO
 
             IF (myrank.eq.0) THEN
             print *, 'Filled column of Q'
@@ -715,14 +740,14 @@
             RETURN
       ENDIF
 
-      DO i = 1, n-1 !TODO: Revision: scal is parallelized but only works if dim = n_dim_1d
-            CALL scal(H(i,n-1),Q(:,i), Res) !Compute the inner product with the n_dim_1d part
+      DO i = 1, n-1 !TODO: Revision: Scal is parallelized but only works if dim = n_dim_1d
+            CALL Scal(H(i,n-1),Q(:,i), Res) !Compute the inner product with the n_dim_1d part
             H(i,n-1) = H(i,n-1) + DOT_PRODUCT(Q_aux(:,i), Res_aux)
             Res = Res - H(i,n-1) * Q(:,i)
             Res_aux = Res_aux - H(i,n-1) * Q_aux(:,i)
       END DO
 
-      !TODO: change for scal for computing norm
+      !TODO: change for Scal for computing norm
       CALL Norm(res_norm, Res)
       res_norm = SQRT(res_norm**2 + SUM(ABS(Res_aux)**2))
       H(n, n-1) = res_norm
@@ -1404,7 +1429,7 @@
 
 ! ! Compute actual error
 !          CALL gtrhs(xguess,rhs,cflow,dt,vx,vy,vz,vsq,R1,C3,C4,C5,C6)
-!          CALL scal(rhs,rhs,ss)
+!          CALL Scal(rhs,rhs,ss)
 !          errnewt = sqrt(ss)
 !          IF (myrank.eq.0) &
 !             PRINT *,' NEWTON LOOP, iter= ',inewt,' err= ',errnewt

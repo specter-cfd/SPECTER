@@ -142,8 +142,8 @@
 #endif
 #ifdef NEWT_
       REAL(KIND=GP)    :: T_guess,sx,sy,epsilon
-      COMPLEX(KIND=GP) :: proj_f, proj_x, proj_y
-      REAL(KIND=GP)    :: tol,b_norm,res_norm
+      REAL(KIND=GP) :: proj_f, proj_x, proj_y
+      REAL(KIND=GP)    :: tol,b_norm,res_norm,aux_norm
       REAL(KIND=GP)    :: d_sx,d_sy,dT_guess
       INTEGER          :: n,n_max,step_evol,t_rk 
 
