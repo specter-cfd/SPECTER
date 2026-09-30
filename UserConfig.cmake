@@ -1,5 +1,6 @@
 # -------------------------------------------------------------------
 # SPECTER UserConfig CMake file
+# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt
 #
 # Cada valor se puede cambiar al configurar, sin editar este archivo,
 # por ejemplo desde build/: "cmake .. -DNZ=128 -DPRECISION=SINGLE"

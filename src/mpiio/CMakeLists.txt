@@ -1,3 +1,4 @@
+# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
 # mpiio: escritura y lectura de los campos con MPI-IO
 add_library(mpiio_lib STATIC
   binary_mod.f90

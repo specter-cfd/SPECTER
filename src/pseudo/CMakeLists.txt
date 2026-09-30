@@ -1,3 +1,4 @@
+# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
 # pseudo: grilla y rutinas pseudoespectrales (solo lo que usa HD;
 # pseudospec_phd y pseudospec_mhd quedan afuera)
 add_library(pseudo_lib STATIC

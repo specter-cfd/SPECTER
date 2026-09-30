@@ -1,3 +1,4 @@
+# Propio de SPECTER (no existe en GHOST): ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
 # boundary: condiciones de borde. boundary_mod.fpp incluye adentro
 # vboundary.f90 (y sboundary/bboundary en otros solvers), que por eso
 # no se compilan por separado.

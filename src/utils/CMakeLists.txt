@@ -1,3 +1,4 @@
+# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
 # gtimer: sin dependencias dentro de SPECTER
 add_library(timer_lib STATIC gtimer_mod.f90)
 # gutils: usa fprecision, commtypes, mpivars y threads (de fftp) y gtimer

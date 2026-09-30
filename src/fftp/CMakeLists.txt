@@ -1,3 +1,4 @@
+# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
 # fftp: FFT paralela con FC-Gram sobre FFTW
 add_library(fftp_lib STATIC
   fftw_wrappers.h
@@ -12,9 +13,8 @@ add_library(fftp_lib STATIC
 set_source_files_properties(fprecision_mod.fpp fftp_mod.fpp fftp.fpp
   PROPERTIES Fortran_PREPROCESS ON Fortran_FORMAT FREE)
 
-# Lo que el Makefile pasaba a cpp en "make edit"
-target_compile_definitions(fftp_lib PRIVATE
-  G${PRECISION}_PRECISION IKIND_=${IKIND} CSIZE_=${CSIZE} NSTRIP_=${NSTRIP})
+# La precisión, IKIND, CSIZE y NSTRIP se definen para todo el proyecto
+# en el CMakeLists.txt de la raíz
 
 # Directorios de inclusión
 target_include_directories(fftp_lib PUBLIC
