@@ -1092,6 +1092,7 @@
       USE kes
       USE mpivars
       USE grid
+      USE boxsize
 !$    USE threads
       IMPLICIT NONE
 

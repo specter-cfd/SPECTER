@@ -476,6 +476,7 @@ MODULE boundary
       USE kes
       USE var
       USE grid
+      USE boxsize
       USE fft
       USE mpivars
       USE commtypes

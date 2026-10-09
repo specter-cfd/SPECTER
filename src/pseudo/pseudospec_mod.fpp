@@ -20,12 +20,6 @@
       INTEGER, PARAMETER :: nz = NZ_
 
 !
-! Lx, Ly, Lz, are the lengths of the sides of the physical (i.e.
-! non-continued) box, either in units of 2.pi (if periodic
-! direction) or 1 (non-periodic case)
-      REAL(KIND=GP) :: Lx,Ly,Lz
-
-!
 ! Global number of continuation points and derivative order.
       INTEGER, PARAMETER :: Cx = CX_
       INTEGER, PARAMETER :: Cy = CY_
@@ -83,12 +77,156 @@
 
   MODULE kes
       USE fprecision
-      REAL(KIND=GP)    :: Dkx,Dky,Dkz
       REAL(KIND=GP), ALLOCATABLE, DIMENSION (:)     :: kx,ky,kz
       REAL(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: kk2
       REAL(KIND=GP), ALLOCATABLE, DIMENSION (:,:)   :: khom
       SAVE
   END MODULE kes
+!=================================================================
+
+  MODULE boxsize
+!
+! Lx, Ly, Lz are the lengths of the sides of the physical (i.e.
+! non-continued) box, either in units of 2.pi (if periodic
+! direction) or 1 (non-periodic case). Dkx, Dky, Dkz are the
+! spacings between wavenumbers in each direction.
+! Como boxsize de GHOST, sin Dkk ni anis (SPECTER no escribe
+! espectros); las grillas x, y, z siguen en grid y los números
+! de onda en kes.
+      USE fprecision
+      REAL(KIND=GP)    :: Lx,Ly,Lz
+      REAL(KIND=GP)    :: Dkx,Dky,Dkz
+    CONTAINS
+!-----------------------------------------------------------------
+      SUBROUTINE box_init(infile_)
+!
+! Reads the box size from the namelist 'boxparams' and builds the
+! grids in physical and Fourier space.
+! For periodic diractions the length is in units of 2.pi (=1 gives a
+! side of length 2.pi). For non-periodic directions it is measured
+! in units of 1 (=1 gives a side length of 1).
+!     Lx  : Length in x
+!     Ly  : Length in y
+!     Lz  : Length in z
+      USE commtypes
+      USE mpivars
+      USE grid
+      USE kes
+      USE var
+!$    USE threads
+      IMPLICIT NONE
+
+      CHARACTER(len=*), INTENT(IN) :: infile_
+      REAL(KIND=GP)                :: rmp
+      INTEGER                      :: i,j,k
+      NAMELIST / boxparams / Lx,Ly,Lz
+
+      IF (myrank.eq.0) THEN
+         OPEN(1,file=infile_,status='unknown',form="formatted")
+         READ(1,NML=boxparams)
+         CLOSE(1)
+      ENDIF
+      CALL MPI_BCAST(Lx,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(Ly,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(Lz,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+
+      ALLOCATE( x(nx), y(ny), z(nz) )
+      ALLOCATE( kx(nx), ky(ny), kz(nz) )
+      ALLOCATE( kk2(nz,ny,ista:iend), khom(ny,ista:iend) )
+
+! Construct grids
+      IF ( Cx .eq. 0 ) THEN
+         ! Periodic in x
+         rmp = Lx*2.0_GP*pi/nx
+         Dkx = 1.0_GP/Lx
+      ELSE
+         ! Non-periodic in x
+         rmp = Lx/(nx-Cx-1)
+         Dkx = 2.0_GP*pi/(rmp*nx)
+      ENDIF
+      DO i=1,nx
+        x(i) = rmp*(i-1)
+      ENDDO
+
+      IF ( Cy .eq. 0 ) THEN
+         ! Periodic in y
+         rmp = Ly*2.0_GP*pi/ny
+         Dky = 1.0_GP/Ly
+      ELSE
+         ! Non-periodic in y
+         rmp = Ly/(ny-Cy-1)
+         Dky = 2.0_GP*pi/(rmp*ny)
+      ENDIF
+      DO j=1,ny
+        y(j) = rmp*(j-1)
+      ENDDO
+
+      IF ( Cz .eq. 0 ) THEN
+         ! Periodic in z
+         rmp = Lz*2.0_GP*pi/nz
+         Dkz = 1.0_GP/Lz
+      ELSE
+        ! Non-periodic in z
+        rmp = Lz/(nz-Cz-1)
+        Dkz = 2.0_GP*pi/(rmp*nz)
+      ENDIF
+      DO k=1,nz
+        z(k) = rmp*(k-1)
+      ENDDO
+      pkend = min(nz-Cz,kend)  ! kend of physical domain
+
+      ! Save grid
+      IF ( myrank .eq. 0 ) THEN
+         OPEN(1,file='x.txt',action='write')
+         OPEN(2,file='y.txt',action='write')
+         OPEN(3,file='z.txt',action='write')
+         DO i = 1,nx-Cx
+            WRITE(1,FMT='(1P E23.15)') x(i)
+         ENDDO
+         DO i = 1,ny-Cy
+            WRITE(2,FMT='(1P E23.15)') y(i)
+         ENDDO
+         DO i = 1,nz-Cz
+            WRITE(3,FMT='(1P E23.15)') z(i)
+         ENDDO
+         CLOSE(1)
+         CLOSE(2)
+         CLOSE(3)
+      ENDIF
+
+! Construct grids for wavenumber domain
+      DO i = 1,nx/2
+         kx(i) = real(i-1,kind=GP)
+         kx(i+nx/2) = real(i-nx/2-1,kind=GP)
+      END DO
+      IF (ny.eq.1) THEN
+        ky(1) = 0.0_GP
+      ENDIF
+      DO j = 1,ny/2
+         ky(j) = real(j-1,kind=GP)
+         ky(j+ny/2) = real(j-ny/2-1,kind=GP)
+      END DO
+      DO k = 1,nz/2
+         kz(k) = real(k-1,kind=GP)
+         kz(k+nz/2) = real(k-nz/2-1,kind=GP)
+      END DO
+      kx = kx*Dkx
+      ky = ky*Dky
+      kz = kz*Dkz
+
+!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      DO i = ista,iend
+!$omp parallel do if (iend-ista.lt.nth) private (k)
+         DO j = 1,ny
+            DO k = 1,nz
+               kk2(k,j,i) = kx(i)**2+ky(j)**2+kz(k)**2
+            END DO
+            khom(j,i) = SQRT(kk2(1,j,i))
+         END DO
+      END DO
+      END SUBROUTINE box_init
+
+  END MODULE boxsize
 !=================================================================
 
   MODULE random

@@ -61,6 +61,7 @@
       USE threads
       USE gtimer
       USE status
+      USE boxsize
 
 #if defined(DEF_GHOST_CUDA_)
       USE, INTRINSIC :: iso_c_binding
@@ -190,7 +191,6 @@
 
 !
 ! Namelists for the input files
-      NAMELIST / boxparams / Lx,Ly,Lz
 
       NAMELIST / velocity / f0,u0,kdn,kup,nu
       NAMELIST / velocity / fparam0,fparam1,fparam2,fparam3,fparam5
@@ -291,10 +291,6 @@
 
       ALLOCATE( R1(nx,ny,ksta:kend), R2(nx,ny,ksta:kend), R3(nx,ny,ksta:kend) )
 
-      ALLOCATE( x(nx), y(ny), z(nz) )
-      ALLOCATE( kx(nx), ky(ny), kz(nz) )
-      ALLOCATE( kk2(nz,ny,ista:iend), khom(ny,ista:iend) )
-
 #ifdef SCALAR_
       ALLOCATE( th(nz,ny,ista:iend), fs(nz,ny,ista:iend) )
       ALLOCATE( C7(nz,ny,ista:iend), C8(nz,ny,ista:iend) )
@@ -313,24 +309,6 @@
 ! Reads the namelist 'status' on the external file
 ! 'parameter.inp' (see pdes/status_mod.f90)
       CALL status_init('parameter.inp')
-
-
-! Reads parameters to set the box size
-! For periodic diractions the length is in units of 2.pi (=1 gives a
-! side of length 2.pi). For non-periodic directions it is measured
-! in units of 1 (=1 gives a side length of 1).
-!     Lx  : Length in x
-!     Ly  : Length in y
-!     Lz  : Length in z
-
-      IF (myrank.eq.0) THEN
-         OPEN(1,file='parameter.inp',status='unknown',form="formatted")
-         READ(1,NML=boxparams)
-         CLOSE(1)
-      ENDIF
-      CALL MPI_BCAST(Lx,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(Ly,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(Lz,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
 
 
 ! Reads parameters for the velocity field from the 
@@ -616,13 +594,12 @@
       CALL MPI_BCAST(omegaz,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
 #endif
 
-
 !
-! Construct grids
+! Box size and grids (see pseudo/pseudospec_mod.fpp)
+      CALL box_init('parameter.inp')
+
+! Periodic directions get periodic boundary conditions
       IF ( Cx .eq. 0 ) THEN
-         ! Periodic in x
-         rmp = Lx*2.0_GP*pi/nx
-         Dkx = 1.0_GP/Lx
          vbcxsta = "periodic"
          vbcxend = "periodic"
 #ifdef SCALAR_
@@ -633,19 +610,8 @@
          bbcxsta = "periodic"
          bbcxend = "periodic"
 #endif
-      ELSE
-         ! Non-periodic in x
-         rmp = Lx/(nx-Cx-1)
-         Dkx = 2.0_GP*pi/(rmp*nx)
       ENDIF
-      DO i=1,nx
-        x(i) = rmp*(i-1)
-      ENDDO
-
       IF ( Cy .eq. 0 ) THEN
-         ! Periodic in y
-         rmp = Ly*2.0_GP*pi/ny
-         Dky = 1.0_GP/Ly
          vbcysta = "periodic"
          vbcyend = "periodic"
 #ifdef SCALAR_
@@ -656,18 +622,8 @@
          bbcysta = "periodic"
          bbcyend = "periodic"
 #endif
-      ELSE
-         ! Non-periodic in y
-         rmp = Ly/(ny-Cy-1)
-         Dky = 2.0_GP*pi/(rmp*ny)
       ENDIF
-      DO j=1,ny
-        y(j) = rmp*(j-1)
-      ENDDO
       IF ( Cz .eq. 0 ) THEN
-         ! Periodic in z
-         rmp = Lz*2.0_GP*pi/nz
-         Dkz = 1.0_GP/Lz
          vbczsta = "periodic"
          vbczend = "periodic"
 #ifdef SCALAR_
@@ -678,65 +634,8 @@
          bbczsta = "periodic"
          bbczend = "periocic"
 #endif
-      ELSE
-        ! Non-periodic in z
-        rmp = Lz/(nz-Cz-1)
-        Dkz = 2.0_GP*pi/(rmp*nz)
-      ENDIF
-      DO k=1,nz
-        z(k) = rmp*(k-1)
-      ENDDO
-      pkend = min(nz-Cz,kend)  ! kend of physical domain
-
-      ! Save grid
-      IF ( myrank .eq. 0 ) THEN
-         OPEN(1,file='x.txt',action='write')
-         OPEN(2,file='y.txt',action='write')
-         OPEN(3,file='z.txt',action='write')
-         DO i = 1,nx-Cx
-            WRITE(1,FMT='(1P E23.15)') x(i)
-         ENDDO
-         DO i = 1,ny-Cy
-            WRITE(2,FMT='(1P E23.15)') y(i)
-         ENDDO
-         DO i = 1,nz-Cz
-            WRITE(3,FMT='(1P E23.15)') z(i)
-         ENDDO
-         CLOSE(1)
-         CLOSE(2)
-         CLOSE(3)
       ENDIF
 
-! Construct grids for wavenumber domain
-      DO i = 1,nx/2
-         kx(i) = real(i-1,kind=GP)
-         kx(i+nx/2) = real(i-nx/2-1,kind=GP)
-      END DO
-      IF (ny.eq.1) THEN
-        ky(1) = 0.0_GP
-      ENDIF
-      DO j = 1,ny/2
-         ky(j) = real(j-1,kind=GP)
-         ky(j+ny/2) = real(j-ny/2-1,kind=GP)
-      END DO
-      DO k = 1,nz/2
-         kz(k) = real(k-1,kind=GP)
-         kz(k+nz/2) = real(k-nz/2-1,kind=GP)
-      END DO
-      kx = kx*Dkx
-      ky = ky*Dky
-      kz = kz*Dkz
-
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               kk2(k,j,i) = kx(i)**2+ky(j)**2+kz(k)**2
-            END DO
-            khom(j,i) = SQRT(kk2(1,j,i))
-         END DO
-      END DO
 
  ! Initializes the FFT library. This must be done at
  ! this stage as it requires the variable "bench" to
