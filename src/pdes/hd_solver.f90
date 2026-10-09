@@ -11,10 +11,12 @@
 !                VELOCITY (VELOCITY+1, VELOCITY+2)
 !
 ! Versión de SPECTER del hd_solver.f90 de GHOST (rama new_paradigm,
-! afaf9ea), que se arma de a un método por vez. Por ahora init lee
-! &velbound, arma el plan de bordes de la velocidad y reserva la
-! presión, global escribe las cantidades globales y write_states los
-! binarios (incluida la presión); nu y el paso de RK siguen en el main.
+! afaf9ea), que se arma de a un método por vez. init lee nu de
+! &velocity y &velbound, arma el plan de bordes y reserva la presión;
+! dudt calcula el lado derecho sin la presión y end_stage impone las
+! paredes y proyecta después de cada etapa del RK (las llama el
+! integrador, src/steppers/canuto_stepper.f90); global y write_states
+! escriben las salidas.
 !
 ! La presión pr_ (p' = p.dt, en el dominio (z,ky,kx)) es un arreglo
 ! auxiliar del solver, como los de los solvers cuánticos de GHOST: no
@@ -39,11 +41,17 @@ module hd_mod
 
   implicit none
 
+  ! ================= Solver traits ===================================
+  type, public  :: NHTraits
+    real(kind=GP) :: nu = 0.0_GP  ! kinematic viscosity
+  end type NHTraits
+
   ! ================= Solver ==========================================
   ! Define class:
   type, extends(VelocityBase) :: HDSolver
     ! Member data:
     logical           :: binit_  = .false. ! is initialized?
+    type (NHTraits)   :: traits_
     type  (BCPLAN)    :: vplanbc_          ! plan de bordes de la velocidad
     real (kind=GP)    :: vzsta_(2)         ! (vx,vy) de la pared en z=0
     real (kind=GP)    :: vzend_(2)         ! (vx,vy) de la pared en z=Lz
@@ -51,6 +59,7 @@ module hd_mod
   CONTAINS
     procedure, public :: init          =>          init_impl ! init method
     procedure, public :: dudt          =>          dudt_impl ! RHS method
+    procedure, public :: end_stage     =>     end_stage_impl ! RK stage correction
     procedure, public :: global        =>        global_impl ! Writes global qtys
     procedure, public :: spectra       =>       spectra_impl ! Writes spectra
     procedure, public :: write_states  =>  write_states_impl ! Binary output
@@ -85,14 +94,35 @@ CONTAINS
     ! Temporary data to read from namelists:
     character(len=15) :: vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
     real  (kind=GP)   :: vxzsta,vxzend,vyzsta,vyzend
+    real  (kind=GP)   :: f0,u0,kdn,kup,nu
+    real  (kind=GP)   :: fparam0,fparam1,fparam2,fparam3,fparam4
+    real  (kind=GP)   :: fparam5,fparam6,fparam7,fparam8,fparam9
+    real  (kind=GP)   :: vparam0,vparam1,vparam2,vparam3,vparam4
+    real  (kind=GP)   :: vparam5,vparam6,vparam7,vparam8,vparam9
     integer           :: ierr
 
     ! Required namelists:
     namelist / velbound / vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
     namelist / velbound / vxzsta,vxzend,vyzsta,vyzend
+    namelist / velocity / f0,u0,kdn,kup,nu
+    namelist / velocity / fparam0,fparam1,fparam2,fparam3,fparam4
+    namelist / velocity / fparam5,fparam6,fparam7,fparam8,fparam9
+    namelist / velocity / vparam0,vparam1,vparam2,vparam3,vparam4
+    namelist / velocity / vparam5,vparam6,vparam7,vparam8,vparam9
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD,this%nprocs_,ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD,this%myrank_,ierr)
+
+    ! Viscosity, from the &velocity namelist (the rest of the list is
+    ! for the initial condition and the forcing, still in the main)
+    nu = 0.0_GP
+    if ( this%myrank_ .eq. 0 ) then
+      open(1,file=this%infile_,status='unknown',form="formatted")
+      read(1,NML=velocity)
+      close(1)
+    endif
+    call MPI_BCAST(nu,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+    this%traits_%nu = nu
 
     ! Boundary conditions for the velocity field
     vbcxsta = ""; vbcxend = ""
@@ -157,15 +187,95 @@ CONTAINS
   ! ===================================================================
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Todavía no: el paso de RK sigue en el main
+  !! Computes the RHS of the momentum equation without the
+  !! pressure, which is taken into account by end_stage:
+  !!   dudt = nu Del^2 v - (v.Grad) v + f
+  !! The nonlinear term is filtered (FC-Gram dealiasing). uin
+  !! and dudt can be the same array (the stepper does that).
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine dudt_impl(this, time, uin, uf, dt, dudt)
+    use grid
+    use mpivars
+    implicit none
+
     class (HDSolver), intent(inout)             :: this
     real   (kind=GP), intent   (in)             :: time, dt
     type(GStateComp), intent(inout), target     :: uin(:),uf(:)
     type(GStateComp), intent(inout), target     :: dudt(:)
-    stop 'HDSolver::dudt: todavía no implementado'
+    complex(kind=GP), pointer, dimension(:,:,:) :: fx,fy,fz,vx,vy,vz
+    complex(kind=GP), pointer, dimension(:,:,:) :: dx,dy,dz
+    complex(kind=GP), pointer, dimension(:,:,:) :: C1,C2,C3,C4,C5,C6
+    real   (kind=GP)                            :: nu
+    integer                                     :: i,j,k
+
+    if ( .not. this%binit_ ) then
+      stop 'HDSolver::dudt: Solver not initialized'
+    endif
+    nu = this%traits_%nu
+
+    call this%workspace_%get_complex_tmp(C1)
+    call this%workspace_%get_complex_tmp(C2)
+    call this%workspace_%get_complex_tmp(C3)
+    call this%workspace_%get_complex_tmp(C4)
+    call this%workspace_%get_complex_tmp(C5)
+    call this%workspace_%get_complex_tmp(C6)
+
+    vx => uin (this%VELOCITY  )%ccomp
+    vy => uin (this%VELOCITY+1)%ccomp
+    vz => uin (this%VELOCITY+2)%ccomp
+    fx => uf  (this%VELOCITY  )%ccomp
+    fy => uf  (this%VELOCITY+1)%ccomp
+    fz => uf  (this%VELOCITY+2)%ccomp
+    dx => dudt(this%VELOCITY  )%ccomp
+    dy => dudt(this%VELOCITY+1)%ccomp
+    dz => dudt(this%VELOCITY+2)%ccomp
+
+    call gradre(vx,vy,vz,C4,C5,C6)   ! (v.Grad) v
+    call fc_filter(C4)               ! dealiasing of the
+    call fc_filter(C5)               ! nonlinear term
+    call fc_filter(C6)
+    call laplak(vx,C1)               ! Del^2 v
+    call laplak(vy,C2)
+    call laplak(vz,C3)
+
+    do i = ista,iend
+       do j = 1,ny
+          do k = 1,nz
+             dx(k,j,i) = nu*C1(k,j,i)-C4(k,j,i)+fx(k,j,i)
+             dy(k,j,i) = nu*C2(k,j,i)-C5(k,j,i)+fy(k,j,i)
+             dz(k,j,i) = nu*C3(k,j,i)-C6(k,j,i)+fz(k,j,i)
+          end do
+       end do
+    end do
+
+    call this%workspace_%free_complex_tmp(C1)
+    call this%workspace_%free_complex_tmp(C2)
+    call this%workspace_%free_complex_tmp(C3)
+    call this%workspace_%free_complex_tmp(C4)
+    call this%workspace_%free_complex_tmp(C5)
+    call this%workspace_%free_complex_tmp(C6)
   end subroutine dudt_impl
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Correction after each RK stage o (norder, ..., 1): imposes
+  !! the velocity of the walls and projects v onto solenoidal
+  !! fields. The pressure p' of the previous stage is used for
+  !! the walls, and the new one is left in pr_.
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine end_stage_impl(this, uout, o, norder)
+    use fft
+    implicit none
+
+    class (HDSolver), intent(inout)             :: this
+    type(GStateComp), intent(inout), target     :: uout(:)
+    integer         , intent   (in)             :: o, norder
+
+    call v_imposebc_and_project(this%vplanbc_,planfc,               &
+             uout(this%VELOCITY)%ccomp,uout(this%VELOCITY+1)%ccomp, &
+             uout(this%VELOCITY+2)%ccomp,this%pr_,rki=o,            &
+             v_zsta=this%vzsta_,v_zend=this%vzend_)
+  end subroutine end_stage_impl
 
 
   ! ===================================================================

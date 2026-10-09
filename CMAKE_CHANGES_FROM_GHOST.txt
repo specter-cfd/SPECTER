@@ -9,7 +9,7 @@ CMakeLists.txt (raíz)
 - IO: el mensaje de error dice SPECTER en vez de GHOST.
 - SOLVER no se define acá sino en UserConfig.cmake (HD). project_defs queda igual y le pasa HD_SOL al main.
 - project_includes suma src/include (los pasos de cada solver, hd/hd_*.f90), src/boundary y build/src/boundary.
-- Subdirectorios: se suman boundary y pdes. memmgt, particles, ic, force, icpart, steppers y tools quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable.
+- Subdirectorios: se suman boundary, memmgt, pdes y steppers. particles, ic, force, icpart y tools quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable.
 - Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib, pdes_lib y memmgt_lib.
 - Instalador: instala solo el ejecutable, porque BOOTS y ghost_python no existen en SPECTER.
 
@@ -58,3 +58,8 @@ src/memmgt/CMakeLists.txt
 - memmgt_lib depende de pseudo_lib (donde está el módulo grid en SPECTER) en vez de pseudobase_lib.
 - Como en GHOST, memmgt_lib no publica build/src/memmgt, donde quedan sus módulos: quien los usa agrega esa carpeta a mano (project_includes y pdes_lib).
 - El ejecutable lo enlaza directamente; el main usa gstate_mod (velocidad y forzado) y el pool de class_GWorkspace3D (temporarios). La presión es un arreglo auxiliar del solver HD, reservado con galloc.
+
+src/steppers/CMakeLists.txt
+- stepper_lib compila gstepper_base.f90 y canuto_stepper.f90, versiones de SPECTER de los de GHOST sin partículas (solo step). El de Canuto llama a solver%end_stage después de actualizar cada etapa.
+- Todavía no está stepper_factory: el main construye el integrador con el orden ORD fijado al compilar, en vez de leer &stepper.
+- stepper_lib depende de pdes_lib y la enlaza; a través de ella le llegan memmgt, pseudo, fftp y boundary.

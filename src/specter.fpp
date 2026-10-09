@@ -65,6 +65,7 @@
       USE gstate_mod
       USE class_GWorkspace3D
       USE hd_mod
+      USE canuto_stepper_mod
 
 #if defined(DEF_GHOST_CUDA_)
       USE, INTRINSIC :: iso_c_binding
@@ -74,7 +75,7 @@
 
       IMPLICIT NONE
 
-      TYPE(GStateComp), ALLOCATABLE, TARGET :: field(:), force(:)
+      TYPE(GStateComp), ALLOCATABLE, TARGET :: field(:), field_nxt(:), force(:)
       COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: vx,vy,vz
       COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: fx,fy,fz
       COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: pr
@@ -167,6 +168,9 @@
 #endif
 
       TYPE(HDSolver), TARGET :: fluid
+      TYPE(CanutoStepper)  :: stepper
+      TYPE(GStepperTraits) :: straits
+
 #ifdef SCALAR_
       TYPE(BCPLAN)          :: splanbc
 #endif
@@ -287,6 +291,7 @@
       vx => field(1)%ccomp
       vy => field(2)%ccomp
       vz => field(3)%ccomp
+      CALL GState_alloc(field_nxt, 3)
       CALL GState_alloc(force, 3)
       fx => force(1)%ccomp
       fy => force(2)%ccomp
@@ -644,6 +649,15 @@
 ! Set up boundary conditions
       CALL fluid%Solver_ctor('parameter.inp',workspace,planio)
       pr => fluid%pr_
+
+! Time stepper (Canuto); by now the order is ORD, set at compile time
+      straits%itype  = 1
+      straits%norder = ord
+      straits%nstage = ord
+      straits%nstate = fluid%state_size()
+      straits%sname  = 'TRADITIONAL'
+      CALL stepper%GStepper_ctor(straits,workspace,fluid)
+
 #ifdef SCALAR_
       CALL setup_bc(splanbc,planfc, &
           (/ sbcxsta,sbcxend,sbcysta,sbcyend,sbczsta,sbczend /),'s')
@@ -788,6 +802,9 @@
 #endif
       ENDIF IC
 
+! field_nxt is the state that is advanced and written
+      CALL GState_copy(field_nxt,field)
+
 !
 ! Time integration scheme starts here.
 ! Does ord iterations of Runge-Kutta. If 
@@ -817,7 +834,7 @@
  BIN:    IF ((timet.eq.tstep).and.(bench.eq.0)) THEN
             timet = 0
             tind = tind+1
-            CALL fluid%write_states(field,planio)
+            CALL fluid%write_states(field_nxt,planio)
 
 #ifdef SCALAR_
             rmp = 1.0_GP/ &
@@ -900,32 +917,13 @@
 
          IF ((timec.eq.cstep).and.(bench.eq.0)) THEN
             timec = 0
-            CALL fluid%global(field,force,t)
+            CALL fluid%global(field_nxt,force,t)
          ENDIF
 
-! Runge-Kutta step 1
-! Copies the fields into auxiliary arrays
-
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-         DO k = 1,nz
-
-            INCLUDE RKSTEP1_
-
-         END DO
-         END DO
-         END DO
-
-! Runge-Kutta step 2
-! Evolves the system in time
-
-         DO o = ord,1,-1
-
-         INCLUDE RKSTEP2_
-      
-         END DO
+! Time step (GHOST Canuto stepper): field keeps the state at the
+! beginning of the step and field_nxt is advanced
+         CALL GState_copy(field,field_nxt)
+         CALL stepper%step((t-1)*dt,field,force,dt,field_nxt)
 
          timet = timet+1
          timec = timec+1
@@ -1006,6 +1004,7 @@
       CALL fcgram_destroy_plan(planfc)
 
       CALL GState_dealloc(field)
+      CALL GState_dealloc(field_nxt)
       CALL GState_dealloc(force)
 
       CALL workspace%free_complex_tmp(C1)

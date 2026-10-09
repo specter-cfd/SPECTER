@@ -275,7 +275,7 @@ add_subdirectory("${SRC_DIR}/pdes")
 # add_subdirectory("${SRC_DIR}/ic")
 # add_subdirectory("${SRC_DIR}/force")
 # add_subdirectory("${SRC_DIR}/icpart")
-# add_subdirectory("${SRC_DIR}/steppers")
+add_subdirectory("${SRC_DIR}/steppers")
 # add_subdirectory("${SRC_DIR}/tools")
 
 # ---------------------- Main executable ------------------------------
@@ -298,7 +298,7 @@ target_link_libraries(${SOLVER}
         # ic_lib
         # force_lib
         # icp_lib
-        # stepper_lib
+        stepper_lib
 )
 
 set_target_properties(${SOLVER} PROPERTIES
