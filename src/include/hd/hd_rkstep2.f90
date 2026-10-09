@@ -32,5 +32,5 @@
          ENDDO
 
          ! Apply boundary conditions and project onto solenoidal space
-         CALL v_imposebc_and_project(vplanbc,planfc,vx,vy,vz,pr,rki=o,&
-                 v_zsta=(/ vxzsta, vyzsta/), v_zend=(/ vxzend, vyzend/))
+         CALL v_imposebc_and_project(fluid%vplanbc_,planfc,vx,vy,vz,pr,rki=o,&
+                 v_zsta=fluid%vzsta_, v_zend=fluid%vzend_)

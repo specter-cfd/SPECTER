@@ -62,6 +62,9 @@
       USE gtimer
       USE status
       USE boxsize
+      USE gstate_mod
+      USE class_GWorkspace3D
+      USE hd_mod
 
 #if defined(DEF_GHOST_CUDA_)
       USE, INTRINSIC :: iso_c_binding
@@ -71,9 +74,10 @@
 
       IMPLICIT NONE
 
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: vx,vy,vz
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: fx,fy,fz
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: pr
+      TYPE(GStateComp), ALLOCATABLE, TARGET :: field(:), force(:), pressure(:)
+      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: vx,vy,vz
+      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: fx,fy,fz
+      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: pr
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: th,fs
 #endif
@@ -86,8 +90,8 @@
 !
 ! Temporal data storage arrays
 
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C1,C2,C3
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C4,C5,C6
+      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: C1,C2,C3
+      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: C4,C5,C6
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C7,C8
 #endif
@@ -96,7 +100,8 @@
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C12,C13,C14
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C15,C16,C17
 #endif
-      REAL(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:)    :: R1,R2,R3
+      REAL(KIND=GP), POINTER, DIMENSION (:,:,:)    :: R1,R2,R3
+      TYPE(GWorkspace), TARGET :: workspace
 
 !
 ! Variables for temporal storage
@@ -116,7 +121,6 @@
       REAL(KIND=GP)    :: kup,kdn
       REAL(KIND=GP)    :: dump
       REAL(KIND=GP)    :: f0,u0
-      REAL(KIND=GP)    :: vxzsta,vxzend,vyzsta,vyzend
       REAL(KIND=GP)    :: fparam0,fparam1,fparam2,fparam3,fparam4
       REAL(KIND=GP)    :: fparam5,fparam6,fparam7,fparam8,fparam9
       REAL(KIND=GP)    :: vparam0,vparam1,vparam2,vparam3,vparam4
@@ -162,7 +166,7 @@
       INTEGER :: dyna
 #endif
 
-      TYPE(BCPLAN)          :: vplanbc
+      TYPE(HDSolver) :: fluid
 #ifdef SCALAR_
       TYPE(BCPLAN)          :: splanbc
 #endif
@@ -175,10 +179,9 @@
       INTEGER :: idevice, iret, ncuda, ngcuda, ppn
       TYPE(cudaDevicePropG) :: devprop
 #endif
-      TYPE(IOPLAN)          :: planio
+      TYPE(IOPLAN), TARGET :: planio
 
 ! Strings to hold the kind of boundary condition
-      CHARACTER(len=15)     :: vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
 #ifdef SCALAR_
       CHARACTER(len=15)     :: sbcxsta,sbcxend,sbcysta,sbcyend,sbczsta,sbczend
 #endif
@@ -198,8 +201,6 @@
       NAMELIST / velocity / vparam0,vparam1,vparam2,vparam3,vparam4
       NAMELIST / velocity / vparam5,vparam6,vparam7,vparam8,vparam9
 
-      NAMELIST / velbound / vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
-      NAMELIST / velbound / vxzsta,vxzend,vyzsta,vyzend
 #ifdef BOUSSINESQ_
       NAMELIST / boussinesq / gama,xmom,xtemp
 #endif
@@ -282,14 +283,28 @@
 
 !
 ! Allocates memory for distributed blocks
-      ALLOCATE( vx(nz,ny,ista:iend), vy(nz,ny,ista:iend), vz(nz,ny,ista:iend) )
-      ALLOCATE( pr(nz,ny,ista:iend) )
-      ALLOCATE( fx(nz,ny,ista:iend), fy(nz,ny,ista:iend), fz(nz,ny,ista:iend) )
+      CALL GState_alloc(field, 3)
+      vx => field(1)%ccomp
+      vy => field(2)%ccomp
+      vz => field(3)%ccomp
+      CALL GState_alloc(pressure, 1)
+      pr => pressure(1)%ccomp
+      CALL GState_alloc(force, 3)
+      fx => force(1)%ccomp
+      fy => force(2)%ccomp
+      fz => force(3)%ccomp
 
-      ALLOCATE( C1(nz,ny,ista:iend), C2(nz,ny,ista:iend), C3(nz,ny,ista:iend) )
-      ALLOCATE( C4(nz,ny,ista:iend), C5(nz,ny,ista:iend), C6(nz,ny,ista:iend) )
+      CALL workspace%initialize_pool(3,6)
+      CALL workspace%get_complex_tmp(C1)
+      CALL workspace%get_complex_tmp(C2)
+      CALL workspace%get_complex_tmp(C3)
+      CALL workspace%get_complex_tmp(C4)
+      CALL workspace%get_complex_tmp(C5)
+      CALL workspace%get_complex_tmp(C6)
 
-      ALLOCATE( R1(nx,ny,ksta:kend), R2(nx,ny,ksta:kend), R3(nx,ny,ksta:kend) )
+      CALL workspace%get_real_tmp(R1)
+      CALL workspace%get_real_tmp(R2)
+      CALL workspace%get_real_tmp(R3)
 
 #ifdef SCALAR_
       ALLOCATE( th(nz,ny,ista:iend), fs(nz,ny,ista:iend) )
@@ -353,39 +368,6 @@
       CALL MPI_BCAST(vparam7,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(vparam8,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(vparam9,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-
-! Reads parameters for the velocity field boundary conditions
-! namelist 'velbound' on the external file 'parameter.inp' 
-!     vbcista : boundary condition in the i direction at the
-!              start of the domain.
-!     vbciend : boundary condition in the i direction at the
-!              start of the domain.
-!     vizsta  : boundary velocity at z=0 in the i direction
-!     vizend  : boundary velocity at z=Lz in the i direction
-!
-      vbcxsta = ""; vbcxend = ""
-      vbcysta = ""; vbcyend = ""
-      vbczsta = ""; vbczend = ""
-
-      vxzsta = .0_GP; vxzend = .0_GP
-      vyzsta = .0_GP; vyzend = .0_GP
-
-      IF (myrank.eq.0) THEN
-         OPEN(1,file='parameter.inp',status='unknown',form="formatted")
-         READ(1,NML=velbound)
-         CLOSE(1)
-      ENDIF
-      CALL MPI_BCAST(vbcxsta,15,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vbcxend,15,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vbcysta,15,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vbcyend,15,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vbczsta,15,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vbczend,15,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vxzsta,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vxzend,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vyzsta,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vyzend,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-
 
 #ifdef BOUSSINESQ_
 ! Reads parameters specifically for Boussinesq solver from the 
@@ -598,10 +580,9 @@
 ! Box size and grids (see pseudo/pseudospec_mod.fpp)
       CALL box_init('parameter.inp')
 
-! Periodic directions get periodic boundary conditions
+! Periodic directions get periodic boundary conditions (for the
+! velocity this is done by the solver, see pdes/hd_solver.f90)
       IF ( Cx .eq. 0 ) THEN
-         vbcxsta = "periodic"
-         vbcxend = "periodic"
 #ifdef SCALAR_
          sbcxsta = "periodic"
          sbcxend = "periodic"
@@ -612,8 +593,6 @@
 #endif
       ENDIF
       IF ( Cy .eq. 0 ) THEN
-         vbcysta = "periodic"
-         vbcyend = "periodic"
 #ifdef SCALAR_
          sbcysta = "periodic"
          sbcyend = "periodic"
@@ -624,8 +603,6 @@
 #endif
       ENDIF
       IF ( Cz .eq. 0 ) THEN
-         vbczsta = "periodic"
-         vbczend = "periodic"
 #ifdef SCALAR_
          sbczsta = "periodic"
          sbczend = "periodic"
@@ -635,7 +612,6 @@
          bbczend = "periocic"
 #endif
       ENDIF
-
 
  ! Initializes the FFT library. This must be done at
  ! this stage as it requires the variable "bench" to
@@ -668,8 +644,7 @@
 
 #ifndef TESTS_  /* If building tests jump to after Runge-Kutta*/
 ! Set up boundary conditions
-      CALL setup_bc(vplanbc,planfc, &
-          (/ vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend /),'v')
+      CALL fluid%Solver_ctor('parameter.inp',workspace,planio)
 #ifdef SCALAR_
       CALL setup_bc(splanbc,planfc, &
           (/ sbcxsta,sbcxend,sbcysta,sbcyend,sbczsta,sbczend /),'s')
@@ -677,7 +652,7 @@
 #ifdef MAGFIELD_
       CALL setup_bc(bplanbc,planfc, &
           (/ bbcxsta,bbcxend,bbcysta,bbcyend,bbczsta,bbczend/),'b', &
-          vplan=vplanbc)
+          vplan=fluid%vplanbc_)
 #endif
 !
 ! Sets the external forcing
@@ -1076,14 +1051,21 @@
 
       CALL fcgram_destroy_plan(planfc)
 
-      DEALLOCATE( vx,vy,vz )
-      DEALLOCATE( pr )
-      DEALLOCATE( fx,fy,fz )
+      CALL GState_dealloc(field)
+      CALL GState_dealloc(pressure)
+      CALL GState_dealloc(force)
 
-      DEALLOCATE( C1,C2,C3 )
-      DEALLOCATE( C4,C5,C6 )
+      CALL workspace%free_complex_tmp(C1)
+      CALL workspace%free_complex_tmp(C2)
+      CALL workspace%free_complex_tmp(C3)
+      CALL workspace%free_complex_tmp(C4)
+      CALL workspace%free_complex_tmp(C5)
+      CALL workspace%free_complex_tmp(C6)
 
-      DEALLOCATE( R1,R2,R3 )
+      CALL workspace%free_real_tmp(R1)
+      CALL workspace%free_real_tmp(R2)
+      CALL workspace%free_real_tmp(R3)
+
 
       DEALLOCATE( x,y,z )
       DEALLOCATE( kx,ky,kz )

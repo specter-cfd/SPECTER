@@ -268,9 +268,9 @@ add_subdirectory("${SRC_DIR}/pseudo")
 add_subdirectory("${SRC_DIR}/utils")
 add_subdirectory("${SRC_DIR}/mpiio")
 add_subdirectory("${SRC_DIR}/boundary")
-# Todavía no implementados en SPECTER:
-# add_subdirectory("${SRC_DIR}/memmgt")
+add_subdirectory("${SRC_DIR}/memmgt")
 add_subdirectory("${SRC_DIR}/pdes")
+# Todavía no implementados en SPECTER:
 # add_subdirectory("${SRC_DIR}/particles")
 # add_subdirectory("${SRC_DIR}/ic")
 # add_subdirectory("${SRC_DIR}/force")
@@ -292,6 +292,7 @@ target_link_libraries(${SOLVER}
         pseudo_lib
         boundary_lib
         pdes_lib
+        memmgt_lib
         # Todavía no implementados en SPECTER:
         # particles_lib
         # ic_lib

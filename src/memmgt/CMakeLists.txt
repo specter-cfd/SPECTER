@@ -1,3 +1,5 @@
+# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
+
 # gdevice: device management, no dependencies inside GHOST
 add_library(gdevice_lib STATIC gdevice_mod.f90)
 target_include_directories(gdevice_lib PUBLIC ${CMAKE_BINARY_DIR})
@@ -28,8 +30,8 @@ target_include_directories(memmgt_lib PUBLIC
 add_dependencies(memmgt_lib
   fftp_lib
   gmem_lib
-  pseudobase_lib
+  pseudo_lib
   )
 
 # Link libraries
-target_link_libraries(memmgt_lib PUBLIC project_mpi gmem_lib pseudobase_lib)
+target_link_libraries(memmgt_lib PUBLIC project_mpi gmem_lib pseudo_lib)

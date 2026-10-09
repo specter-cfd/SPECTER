@@ -10,7 +10,7 @@ CMakeLists.txt (raíz)
 - SOLVER no se define acá sino en UserConfig.cmake (HD). project_defs queda igual y le pasa HD_SOL al main.
 - project_includes suma src/include (los pasos de cada solver, hd/hd_*.f90), src/boundary y build/src/boundary.
 - Subdirectorios: se suman boundary y pdes. memmgt, particles, ic, force, icpart, steppers y tools quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable.
-- Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib y pdes_lib.
+- Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib, pdes_lib y memmgt_lib.
 - Instalador: instala solo el ejecutable, porque BOOTS y ghost_python no existen en SPECTER.
 
 UserConfig.cmake
@@ -47,7 +47,14 @@ src/boundary/CMakeLists.txt
 - No existe en GHOST: las condiciones de borde son propias de SPECTER. boundary_mod.fpp recibe el solver (HD_SOL) e incluye vboundary.f90.
 
 src/pdes/CMakeLists.txt
-- Por ahora pdes_lib compila solo status_mod.f90; equation_base, equation_factory y los solvers se suman cuando se implementen.
+- pdes_lib compila status_mod.f90, equation_base.f90 y hd_solver.f90. equation_factory y los otros solvers se suman cuando se implementen.
 - status_mod.f90 es el de GHOST con tdir agregado, directorios de 100 caracteres y sin USE grid, kes ni ali. Lee un único &status, así que el parameter.inp de SPECTER pasa a tener dt, step, tstep, cstep y seed adentro de &status.
-- pdes_lib depende solo de fftp_lib, que da fprecision, commtypes y mpivars.
+- equation_base.f90 es una versión reducida del de GHOST: solo EquationBase y VelocityBase (sin escalares pasivos), con un método end_stage que el integrador llama después de cada etapa.
+- hd_solver.f90 es el solver HD de SPECTER, que se arma de a un método por vez.
+- pdes_lib depende de fftp_lib, pseudo_lib, mpiio_lib, memmgt_lib y boundary_lib (el solver usa el plan de bordes) y los enlaza (GHOST enlaza pseudo_lib y utils_lib). Agrega a mano build/src/memmgt a sus directorios de inclusión, como GHOST.
 - El ejecutable enlaza pdes_lib directamente; en GHOST no figura en la lista del ejecutable.
+
+src/memmgt/CMakeLists.txt
+- memmgt_lib depende de pseudo_lib (donde está el módulo grid en SPECTER) en vez de pseudobase_lib.
+- Como en GHOST, memmgt_lib no publica build/src/memmgt, donde quedan sus módulos: quien los usa agrega esa carpeta a mano (project_includes y pdes_lib).
+- El ejecutable lo enlaza directamente; el main usa gstate_mod (campos y presión) y el pool de class_GWorkspace3D (temporarios).
