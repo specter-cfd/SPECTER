@@ -39,8 +39,10 @@ file(MAKE_DIRECTORY "${BIN_DIR}")
 
 # ----------------------- Compiler options ---------------------------
 if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-    # Las mismas de Makefile.in de SPECTER
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -funroll-loops -mtune=native -mfpmath=both")
+    # Las mismas de Makefile.in de SPECTER, salvo -mfpmath=both: con x87 el
+    # redondeo depende de cómo se compila cada versión del código
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -funroll-loops -mtune=native")
+    # set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -mfpmath=both")
     # GNU debug flags
     # set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -gdwarf-2 -O0 \
     #      -fno-omit-frame-pointer -fbacktrace -fcheck=bounds \
@@ -268,7 +270,7 @@ add_subdirectory("${SRC_DIR}/mpiio")
 add_subdirectory("${SRC_DIR}/boundary")
 # Todavía no implementados en SPECTER:
 # add_subdirectory("${SRC_DIR}/memmgt")
-# add_subdirectory("${SRC_DIR}/pdes")
+add_subdirectory("${SRC_DIR}/pdes")
 # add_subdirectory("${SRC_DIR}/particles")
 # add_subdirectory("${SRC_DIR}/ic")
 # add_subdirectory("${SRC_DIR}/force")
@@ -289,6 +291,7 @@ target_link_libraries(${SOLVER}
         mpiio_lib
         pseudo_lib
         boundary_lib
+        pdes_lib
         # Todavía no implementados en SPECTER:
         # particles_lib
         # ic_lib

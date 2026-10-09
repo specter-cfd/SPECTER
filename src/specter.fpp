@@ -60,6 +60,7 @@
       USE random
       USE threads
       USE gtimer
+      USE status
 
 #if defined(DEF_GHOST_CUDA_)
       USE, INTRINSIC :: iso_c_binding
@@ -110,10 +111,9 @@
 
 !
 ! Simulation, forcing and initial conditions parameters
-      REAL(KIND=GP)    :: dt,nu,mu
+      REAL(KIND=GP)    :: nu,mu
       REAL(KIND=GP)    :: kup,kdn
       REAL(KIND=GP)    :: dump
-      REAL(KIND=GP)    :: stat
       REAL(KIND=GP)    :: f0,u0
       REAL(KIND=GP)    :: vxzsta,vxzend,vyzsta,vyzend
       REAL(KIND=GP)    :: fparam0,fparam1,fparam2,fparam3,fparam4
@@ -149,16 +149,9 @@
 
 !
 ! Book keeping variables, options holders and clocks 
-      INTEGER :: ini,step
-      INTEGER :: tstep,cstep
-      INTEGER :: bench,outs
-      INTEGER :: seed
-      INTEGER :: mult
       INTEGER :: t,o
       INTEGER :: i,j,k
       INTEGER :: ki,kj,kk
-      INTEGER :: tind
-      INTEGER :: timet,timec
       INTEGER :: ihcpu1,ihcpu2
       INTEGER :: ihomp1,ihomp2
       INTEGER :: ihwtm1,ihwtm2
@@ -182,7 +175,6 @@
       TYPE(cudaDevicePropG) :: devprop
 #endif
       TYPE(IOPLAN)          :: planio
-      CHARACTER(len=100)    :: odir,idir,tdir
 
 ! Strings to hold the kind of boundary condition
       CHARACTER(len=15)     :: vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
@@ -198,8 +190,6 @@
 
 !
 ! Namelists for the input files
-      NAMELIST / status / idir,odir,tdir,stat,mult,bench,outs
-      NAMELIST / parameter / dt,step,tstep,cstep,seed
       NAMELIST / boxparams / Lx,Ly,Lz
 
       NAMELIST / velocity / f0,u0,kdn,kup,nu
@@ -320,60 +310,9 @@
       ALLOCATE( C15(nz,ny,ista:iend), C16(nz,ny,ista:iend), C17(nz,ny,ista:iend) )
 #endif
 
-
-!
-! The following lines read the file 'parameter.inp'
-! Reads general configuration flags from the namelist
-! 'status' on the external file 'parameter.inp'
-!     idir : directory for unformatted input
-!     odir : directory for unformatted output
-!     tdir : directory for FC-Gram tables
-!     stat : = 0 starts a new run
-!            OR  gives the number of the file used to continue a run
-!     mult : time step multiplier
-!     bench: = 0 production run
-!            = 1 benchmark run (no I/O)
-!            = 2 higher level benchmark run (+time to create plans)
-!     outs : = 0 writes velocity [and vector potential (MAGFIELD_)]
-!            = 1 writes vorticity [and magnetic field (MAGFIELD_)]
-!            = 2 writes current density (MAGFIELD_)
-
-      IF (myrank.eq.0) THEN
-         OPEN(1,file='parameter.inp',status='unknown',form="formatted")
-         READ(1,NML=status)
-         CLOSE(1)
-      ENDIF
-      CALL MPI_BCAST(idir,100,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(odir,100,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(tdir,100,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(stat,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(mult,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(bench,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(outs,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
-
-! Reads parameters that will be used to control the
-! time integration from the namelist 'parameter' on
-! the external file 'parameter.inp'
-!     dt   : time step size
-!     step : total number of time steps to compute
-!     tstep: number of steps between binary output
-!     cstep: number of steps between output of global quantities
-!     seed : seed for the random number generator
-
-      IF (myrank.eq.0) THEN
-         OPEN(1,file='parameter.inp',status='unknown',form="formatted")
-         READ(1,NML=parameter)
-         CLOSE(1)
-         dt = dt/real(mult,kind=GP)
-         step = step*mult
-         tstep = tstep*mult
-         cstep = cstep*mult
-      ENDIF
-      CALL MPI_BCAST(dt,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(step,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(tstep,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(cstep,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(seed,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+! Reads the namelist 'status' on the external file
+! 'parameter.inp' (see pdes/status_mod.f90)
+      CALL status_init('parameter.inp')
 
 
 ! Reads parameters to set the box size

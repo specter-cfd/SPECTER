@@ -7,6 +7,11 @@ stat = 0             ! last binary file if restarting an old run
 mult = 1             ! timestep multiplier
 bench = 0            ! benchmark mode if 1
 outs = 0             ! controls the amount of output
+dt =  1e-3           ! time step
+step = 10001         ! total number of steps
+tstep = 100          ! number of steps between binary output
+cstep = 5            ! number of steps between writing global quantities
+seed = 1000          ! seed for the random number generator
 /
 
 ! Boz size
@@ -16,15 +21,6 @@ outs = 0             ! controls the amount of output
 Lx = 1.00            ! length of the box in x
 Ly = 0.50            ! length of the box in y
 Lz = 1.00            ! length of the box in z
-/
-
-! Parameters for time integration
-&parameter
-dt =  1e-3           ! time step
-step = 10001         ! total number of steps
-tstep = 100          ! number of steps between binary output
-cstep = 5            ! number of steps between writing global quantities
-seed = 1000          ! seed for the random number generator
 /
 
 ! Parameters for the velocity field

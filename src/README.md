@@ -273,6 +273,11 @@ stat = 0             ! status
 mult = 1             ! timestep multiplier
 bench = 0            ! benchmark
 outs = 0             ! output
+dt = 1.0e-3          ! time step
+step = 10001         ! number of steps
+tstep = 500          ! binary output
+cstep = 10           ! global quantities
+seed = 1000          ! random seed
 /
 ```
 
@@ -288,22 +293,6 @@ The variables in this list are
     is defined in the dt parameter.
 - `benchmark`: if 1, performs a benchmark run.
 - `output`: controls the amount of output written in the binary files.
-
-# 
-All runs also read a list with parameters for the integration,
-named `parameter`
-
-```
-&parameter
-dt = 1.0e-3      ! time step
-step = 10001     ! number of steps
-tstep = 500      ! binary output
-cstep = 10       ! global quantities
-seed = 1000      ! random seed
-/
-```
-
-The variables in this list are
 - `dt`  : sets the time step, which must satisfy the CFL condition
       `dt <= d/u`, where `u` is a characteristic speed, and `d` is
       the smallest of `dx,dy,dz` (the grid spacings).

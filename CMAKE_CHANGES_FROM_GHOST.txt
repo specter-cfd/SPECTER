@@ -3,14 +3,14 @@ Cambios de los archivos de CMake de SPECTER respecto de los de GHOST (rama new_p
 CMakeLists.txt (raíz)
 - Parte de una copia literal del de GHOST y conserva todas sus secciones.
 - El proyecto se llama SPECTER. El encabezado aclara que PRECISION vale DOUBLE por defecto, que la grilla y el FC-Gram se pasan con -DNX=... (ver UserConfig.cmake) y que P_HYBRID, P_GPU y GPU_* todavía no tienen efecto.
-- Flags de gfortran: las de Makefile.in (-O3 -funroll-loops -mtune=native -mfpmath=both) en vez de -O4 -funroll-loops, para que el binario sea comparable con el del Makefile. Desde GCC 10 se agrega -w -fallow-argument-mismatch, necesario porque SPECTER usa mpif.h (GHOST usa mpi_f08).
+- Flags de gfortran: las de Makefile.in salvo -mfpmath=both (-O3 -funroll-loops -mtune=native) en vez de -O4 -funroll-loops. Con -mfpmath=both gfortran usa registros x87 de 80 bits según cómo quede compilado cada archivo, y dos versiones del código que hacen las mismas cuentas dejan de dar idénticas byte a byte; sin ella sí (probado el 2026-10-09 al pasar &status a un módulo). La flag queda comentada. Desde GCC 10 se agrega -w -fallow-argument-mismatch, necesario porque SPECTER usa mpif.h (GHOST usa mpi_f08).
 - add_compile_definitions suma IKIND_, que usa fftp_mod.fpp.
 - FFT: la biblioteca con FFTW se llama fftp (en GHOST, fftp-3).
 - IO: el mensaje de error dice SPECTER en vez de GHOST.
 - SOLVER no se define acá sino en UserConfig.cmake (HD). project_defs queda igual y le pasa HD_SOL al main.
 - project_includes suma src/include (los pasos de cada solver, hd/hd_*.f90), src/boundary y build/src/boundary.
-- Subdirectorios: se suma boundary. memmgt, pdes, particles, ic, force, icpart, steppers y tools quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable.
-- Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib y boundary_lib.
+- Subdirectorios: se suman boundary y pdes. memmgt, particles, ic, force, icpart, steppers y tools quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable.
+- Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib y pdes_lib.
 - Instalador: instala solo el ejecutable, porque BOOTS y ghost_python no existen en SPECTER.
 
 UserConfig.cmake
@@ -45,3 +45,9 @@ src/pseudo/CMakeLists.txt
 
 src/boundary/CMakeLists.txt
 - No existe en GHOST: las condiciones de borde son propias de SPECTER. boundary_mod.fpp recibe el solver (HD_SOL) e incluye vboundary.f90.
+
+src/pdes/CMakeLists.txt
+- Por ahora pdes_lib compila solo status_mod.f90; equation_base, equation_factory y los solvers se suman cuando se implementen.
+- status_mod.f90 es el de GHOST con tdir agregado, directorios de 100 caracteres y sin USE grid, kes ni ali. Lee un único &status, así que el parameter.inp de SPECTER pasa a tener dt, step, tstep, cstep y seed adentro de &status.
+- pdes_lib depende solo de fftp_lib, que da fprecision, commtypes y mpivars.
+- El ejecutable enlaza pdes_lib directamente; en GHOST no figura en la lista del ejecutable.
