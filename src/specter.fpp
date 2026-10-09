@@ -74,7 +74,7 @@
 
       IMPLICIT NONE
 
-      TYPE(GStateComp), ALLOCATABLE, TARGET :: field(:), force(:), pressure(:)
+      TYPE(GStateComp), ALLOCATABLE, TARGET :: field(:), force(:)
       COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: vx,vy,vz
       COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: fx,fy,fz
       COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: pr
@@ -166,7 +166,7 @@
       INTEGER :: dyna
 #endif
 
-      TYPE(HDSolver) :: fluid
+      TYPE(HDSolver), TARGET :: fluid
 #ifdef SCALAR_
       TYPE(BCPLAN)          :: splanbc
 #endif
@@ -287,14 +287,12 @@
       vx => field(1)%ccomp
       vy => field(2)%ccomp
       vz => field(3)%ccomp
-      CALL GState_alloc(pressure, 1)
-      pr => pressure(1)%ccomp
       CALL GState_alloc(force, 3)
       fx => force(1)%ccomp
       fy => force(2)%ccomp
       fz => force(3)%ccomp
 
-      CALL workspace%initialize_pool(3,6)
+      CALL workspace%initialize_pool(6,12)
       CALL workspace%get_complex_tmp(C1)
       CALL workspace%get_complex_tmp(C2)
       CALL workspace%get_complex_tmp(C3)
@@ -645,6 +643,7 @@
 #ifndef TESTS_  /* If building tests jump to after Runge-Kutta*/
 ! Set up boundary conditions
       CALL fluid%Solver_ctor('parameter.inp',workspace,planio)
+      pr => fluid%pr_
 #ifdef SCALAR_
       CALL setup_bc(splanbc,planfc, &
           (/ sbcxsta,sbcxend,sbcysta,sbcyend,sbczsta,sbczend /),'s')
@@ -818,52 +817,7 @@
  BIN:    IF ((timet.eq.tstep).and.(bench.eq.0)) THEN
             timet = 0
             tind = tind+1
-            WRITE(ext, fmtext) tind
-            rmp = 1.0_GP/ &
-	          (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-            DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-               DO j = 1,ny
-                  DO k = 1,nz
-                     C1(k,j,i) = vx(k,j,i)*rmp
-                     C2(k,j,i) = vy(k,j,i)*rmp
-                     C3(k,j,i) = vz(k,j,i)*rmp
-                  END DO
-               END DO
-            END DO
-            IF (outs.ge.1) THEN
-               CALL curlk(C2,C3,C4,1)
-               CALL curlk(C1,C3,C5,2)
-               CALL curlk(C1,C2,C6,3)
-               CALL fftp3d_complex_to_real(planfc,C4,R1,MPI_COMM_WORLD)
-               CALL fftp3d_complex_to_real(planfc,C5,R2,MPI_COMM_WORLD)
-               CALL fftp3d_complex_to_real(planfc,C6,R3,MPI_COMM_WORLD)
-               CALL io_write(1,odir,'wx',ext,planio,R1)
-               CALL io_write(1,odir,'wy',ext,planio,R2)
-               CALL io_write(1,odir,'wz',ext,planio,R3)
-            ENDIF
-            CALL fftp3d_complex_to_real(planfc,C1,R1,MPI_COMM_WORLD)
-            CALL fftp3d_complex_to_real(planfc,C2,R2,MPI_COMM_WORLD)
-            CALL fftp3d_complex_to_real(planfc,C3,R3,MPI_COMM_WORLD)
-            CALL io_write(1,odir,'vx',ext,planio,R1)
-            CALL io_write(1,odir,'vy',ext,planio,R2)
-            CALL io_write(1,odir,'vz',ext,planio,R3)
-
-            ! Pressure. Transform from p' to p to save
-            rmp = 1.0_GP/ &
-	          (real(nx,kind=GP)*real(ny,kind=GP)*dt)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-            DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-               DO j = 1,ny
-                  DO k = 1,nz
-                     C1(k,j,i) = pr(k,j,i)*rmp
-                  END DO
-               END DO
-            END DO
-            CALL fftp2d_complex_to_real_xy(planfc,C1,R1,MPI_COMM_WORLD)
-            CALL io_write(1,odir,'pr',ext,planio,R1)
+            CALL fluid%write_states(field,planio)
 
 #ifdef SCALAR_
             rmp = 1.0_GP/ &
@@ -946,7 +900,7 @@
 
          IF ((timec.eq.cstep).and.(bench.eq.0)) THEN
             timec = 0
-            INCLUDE GLOBALOUTPUT_
+            CALL fluid%global(field,force,t)
          ENDIF
 
 ! Runge-Kutta step 1
@@ -1052,7 +1006,6 @@
       CALL fcgram_destroy_plan(planfc)
 
       CALL GState_dealloc(field)
-      CALL GState_dealloc(pressure)
       CALL GState_dealloc(force)
 
       CALL workspace%free_complex_tmp(C1)

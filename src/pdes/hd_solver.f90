@@ -12,8 +12,14 @@
 !
 ! Versión de SPECTER del hd_solver.f90 de GHOST (rama new_paradigm,
 ! afaf9ea), que se arma de a un método por vez. Por ahora init lee
-! &velbound y arma el plan de bordes de la velocidad; nu, el paso de
-! RK, los globales y la escritura de binarios siguen en el main.
+! &velbound, arma el plan de bordes de la velocidad y reserva la
+! presión, global escribe las cantidades globales y write_states los
+! binarios (incluida la presión); nu y el paso de RK siguen en el main.
+!
+! La presión pr_ (p' = p.dt, en el dominio (z,ky,kx)) es un arreglo
+! auxiliar del solver, como los de los solvers cuánticos de GHOST: no
+! es parte del estado que avanza el integrador, sobrevive entre etapas
+! y pasos de tiempo, y la usan la proyección y la escritura.
 !
 ! INPUT FILE : looks for a "&velbound" namelist with:
 !              vbcista : boundary condition in the i direction at the
@@ -41,14 +47,17 @@ module hd_mod
     type  (BCPLAN)    :: vplanbc_          ! plan de bordes de la velocidad
     real (kind=GP)    :: vzsta_(2)         ! (vx,vy) de la pared en z=0
     real (kind=GP)    :: vzend_(2)         ! (vx,vy) de la pared en z=Lz
+    complex(kind=GP), allocatable, dimension(:,:,:) :: pr_ ! presión p'
   CONTAINS
     procedure, public :: init          =>          init_impl ! init method
     procedure, public :: dudt          =>          dudt_impl ! RHS method
     procedure, public :: global        =>        global_impl ! Writes global qtys
     procedure, public :: spectra       =>       spectra_impl ! Writes spectra
+    procedure, public :: write_states  =>  write_states_impl ! Binary output
     procedure, public :: state_size    =>    state_size_impl ! state size
     procedure, public :: get_sstate    =>    get_sstate_impl ! get state name list
     procedure, public :: Solver_ctor   =>      HDSolver_ctor ! constructor
+    final             :: HDSolver_dtor
   end type HDSolver
 
 CONTAINS
@@ -60,14 +69,17 @@ CONTAINS
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Subroutine to initialize the solver
   !! Reads the &velbound namelist, sets up the boundary
-  !! conditions and sets sector indices. Uses the FC-Gram
-  !! plan, so it must be called after fcgram_create_plan.
+  !! conditions, allocates the pressure and sets sector
+  !! indices. Uses the FC-Gram plan, so it must be called
+  !! after fcgram_create_plan.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine init_impl(this)
     use commtypes
     use status
     use grid
     use fft
+    use gmem
+    use mpivars, only: ista, iend
     class  (HDSolver), intent (inout) :: this
 
     ! Temporary data to read from namelists:
@@ -122,6 +134,9 @@ CONTAINS
     this%vzsta_ = (/ vxzsta, vyzsta /)
     this%vzend_ = (/ vxzend, vyzend /)
 
+    ! Pressure (auxiliary array of the solver)
+    call galloc(this%pr_, nz, ny, ista, iend)
+
     ! I/O directories, as in GHOST without the &HD namelist
     this%idir_  = idir
     this%odir_  = odir
@@ -158,14 +173,27 @@ CONTAINS
   ! ===================================================================
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Todavía no: los globales siguen en el main
+  !! Function to compute and write global quantities
+  !!   balance.txt          : energy, enstrophy and injection rate
+  !!   helicity.txt         : kinetic helicity
+  !!   noslip_diagnostic.txt: divergence and boundary conditions
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine global_impl(this, uin, uf, t)
     use status
+    use fft
     class (HDSolver), intent(in)                :: this
     type(GStateComp), intent(in), target        :: uin(:), uf(:)
     integer         , intent(in)                :: t
-    return
+    complex(kind=GP), pointer, dimension(:,:,:) :: fx,fy,fz,vx,vy,vz
+
+    vx => uin(this%VELOCITY  )%ccomp
+    vy => uin(this%VELOCITY+1)%ccomp
+    vz => uin(this%VELOCITY+2)%ccomp
+    fx => uf (this%VELOCITY  )%ccomp
+    fy => uf (this%VELOCITY+1)%ccomp
+    fz => uf (this%VELOCITY+2)%ccomp
+    call hdcheck(vx,vy,vz,fx,fy,fz,t,dt,1)
+    call vdiagnostic(this%vplanbc_,planfc,vx,vy,vz,t,dt)
   end subroutine global_impl
 
 
@@ -178,6 +206,46 @@ CONTAINS
     type(GStateComp), intent(in), target        :: uin(:)
     return
   end subroutine spectra_impl
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Writes the states and the vorticity (write_states_base)
+  !! and the pressure, transformed from p' to p
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine write_states_impl(this, uin, planio)
+    use grid
+    use mpivars
+    use commtypes
+    use iovar
+    use status
+    use filefmt
+    use fft
+    implicit none
+
+    class   (HDSolver), intent   (in)             :: this
+    type  (GStateComp), intent(inout)             :: uin(:)
+    type      (ioplan), intent   (in)             :: planio
+    complex  (kind=GP), pointer, dimension(:,:,:) :: C1
+    real     (kind=GP), pointer, dimension(:,:,:) :: R1
+    real     (kind=GP)                            :: rmp
+    integer                                       :: i,j,k
+
+    call write_states_base(this, uin, planio)
+    call this%workspace_%get_complex_tmp(C1)
+    call this%workspace_%get_real_tmp   (R1)
+    rmp = 1.0_GP/(real(nx,kind=GP)*real(ny,kind=GP)*dt)
+    do i = ista,iend
+       do j = 1,ny
+          do k = 1,nz
+            C1(k,j,i) = this%pr_(k,j,i)*rmp
+          end do
+       end do
+    end do
+    call fftp2d_complex_to_real_xy(planfc,C1,R1,MPI_COMM_WORLD)
+    call io_write(1,this%odir_,'pr',ext,planio,R1)
+    call this%workspace_%free_complex_tmp(C1)
+    call this%workspace_%free_real_tmp   (R1)
+  end subroutine write_states_impl
 
 
   ! ===================================================================
@@ -198,6 +266,19 @@ CONTAINS
     this%planio_    => plan
     call this%init()
   end subroutine HDSolver_ctor
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Destructor
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine HDSolver_dtor(this)
+    use gmem
+    type  (HDSolver), intent(inout) :: this
+    if (associated(this%workspace_)) nullify(this%workspace_)
+    if (associated(this%planio_))    nullify(this%planio_)
+    if (allocated(this%sstate_))     deallocate(this%sstate_)
+    if (allocated(this%pr_))         call gfree(this%pr_)
+  end subroutine HDSolver_dtor
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

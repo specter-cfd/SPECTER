@@ -57,4 +57,4 @@ src/pdes/CMakeLists.txt
 src/memmgt/CMakeLists.txt
 - memmgt_lib depende de pseudo_lib (donde está el módulo grid en SPECTER) en vez de pseudobase_lib.
 - Como en GHOST, memmgt_lib no publica build/src/memmgt, donde quedan sus módulos: quien los usa agrega esa carpeta a mano (project_includes y pdes_lib).
-- El ejecutable lo enlaza directamente; el main usa gstate_mod (campos y presión) y el pool de class_GWorkspace3D (temporarios).
+- El ejecutable lo enlaza directamente; el main usa gstate_mod (velocidad y forzado) y el pool de class_GWorkspace3D (temporarios). La presión es un arreglo auxiliar del solver HD, reservado con galloc.

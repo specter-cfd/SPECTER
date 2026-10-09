@@ -7,8 +7,9 @@
 ! pasivos), que es lo que usa HD. Se agrega end_stage, que el integrador
 ! llama después de actualizar cada etapa; por defecto no hace nada, y
 ! los solvers con paredes lo usan para imponer los bordes y proyectar.
-! write_states todavía no está: la escritura de binarios sigue en el
-! main.
+! La parte genérica de write_states está en write_states_base, que los
+! solvers con salidas propias (como la presión en HD) llaman antes de
+! escribir las suyas.
 !
 ! DATE       : 11/29/25 (DLR)
 ! ===================================================================
@@ -42,6 +43,7 @@ module equationbase_mod
       procedure(spectra_interface),     deferred :: spectra     ! Spectra
       procedure(state_size_interface),  deferred :: state_size  ! Number of states
       procedure, public                          :: end_stage   ! After each RK stage
+      procedure, public :: write_states => write_states_base    ! Binary output
       procedure, public                          :: sync_device ! Aux. arrays to the device
   end type EquationBase
 
@@ -131,5 +133,89 @@ CONTAINS
     class (EquationBase), intent(inout) :: this
     return
   end subroutine sync_device
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Concrete method to write field states: every state
+  !! component with its name and, for solvers with a velocity
+  !! field and outs >= 1, the vorticity. The fields are
+  !! written in the physical domain, through the FC-Gram plan.
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine write_states_base(this, uin, planio)
+    use grid
+    use mpivars
+    use commtypes
+    use iovar
+    use status
+    use filefmt
+    use fft
+    implicit none
+
+    class (EquationBase), intent   (in)             :: this
+    type    (GStateComp), intent(inout)             :: uin(:)
+    type        (ioplan), intent   (in)             :: planio
+    complex    (kind=GP), pointer, dimension(:,:,:) :: C1,C2,C3
+    complex    (kind=GP), pointer, dimension(:,:,:) :: C4,C5,C6
+    real       (kind=GP), pointer, dimension(:,:,:) :: R1,R2,R3
+    real       (kind=GP)                            :: rmp
+    integer                                         :: i,j,k,nc
+
+    WRITE(ext, fmtext) tind
+    rmp = 1.0_GP/(real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
+    call this%workspace_%get_complex_tmp(C1)
+    call this%workspace_%get_real_tmp   (R1)
+    do nc = 1,this%state_size()
+      do i = ista,iend
+         do j = 1,ny
+            do k = 1,nz
+              C1(k,j,i) = uin(nc)%ccomp(k,j,i)*rmp
+            end do
+         end do
+      end do
+      call fftp3d_complex_to_real(planfc,C1,R1,MPI_COMM_WORLD)
+      call io_write(1,this%odir_,trim(this%sstate_(nc)),ext,planio,R1)
+    end do
+    if ( outs .ge. 1 ) then
+      ! The workspace is used outside select type: inside it, this
+      ! is an associate name and cannot be passed as INTENT(INOUT)
+      call this%workspace_%get_complex_tmp(C2)
+      call this%workspace_%get_complex_tmp(C3)
+      call this%workspace_%get_complex_tmp(C4)
+      call this%workspace_%get_complex_tmp(C5)
+      call this%workspace_%get_complex_tmp(C6)
+      call this%workspace_%get_real_tmp   (R2)
+      call this%workspace_%get_real_tmp   (R3)
+      select type (this)
+      class is (VelocityBase)
+        do i = ista,iend
+           do j = 1,ny
+              do k = 1,nz
+                C1(k,j,i) = uin(this%VELOCITY  )%ccomp(k,j,i)*rmp
+                C2(k,j,i) = uin(this%VELOCITY+1)%ccomp(k,j,i)*rmp
+                C3(k,j,i) = uin(this%VELOCITY+2)%ccomp(k,j,i)*rmp
+              end do
+           end do
+        end do
+        call curlk(C2,C3,C4,1)
+        call curlk(C1,C3,C5,2)
+        call curlk(C1,C2,C6,3)
+        call fftp3d_complex_to_real(planfc,C4,R1,MPI_COMM_WORLD)
+        call fftp3d_complex_to_real(planfc,C5,R2,MPI_COMM_WORLD)
+        call fftp3d_complex_to_real(planfc,C6,R3,MPI_COMM_WORLD)
+        call io_write(1,this%odir_,'wx',ext,planio,R1)
+        call io_write(1,this%odir_,'wy',ext,planio,R2)
+        call io_write(1,this%odir_,'wz',ext,planio,R3)
+      end select
+      call this%workspace_%free_complex_tmp(C2)
+      call this%workspace_%free_complex_tmp(C3)
+      call this%workspace_%free_complex_tmp(C4)
+      call this%workspace_%free_complex_tmp(C5)
+      call this%workspace_%free_complex_tmp(C6)
+      call this%workspace_%free_real_tmp   (R2)
+      call this%workspace_%free_real_tmp   (R3)
+    endif
+    call this%workspace_%free_complex_tmp(C1)
+    call this%workspace_%free_real_tmp   (R1)
+  end subroutine write_states_base
 
 end module equationbase_mod
