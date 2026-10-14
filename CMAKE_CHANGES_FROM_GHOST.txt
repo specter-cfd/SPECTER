@@ -50,7 +50,7 @@ src/pdes/CMakeLists.txt
 - pdes_lib compila status_mod.f90, equation_base.f90 y hd_solver.f90. equation_factory y los otros solvers se suman cuando se implementen.
 - status_mod.f90 es el de GHOST con tdir agregado, directorios de 100 caracteres y sin USE grid, kes ni ali. Lee un único &status, así que el parameter.inp de SPECTER pasa a tener dt, step, tstep, cstep y seed adentro de &status.
 - equation_base.f90 es una versión reducida del de GHOST: solo EquationBase y VelocityBase (sin escalares pasivos), con un método end_stage que el integrador llama después de cada etapa.
-- hd_solver.f90 es el solver HD de SPECTER, que se arma de a un método por vez.
+- hd_solver.f90 es el solver HD de SPECTER, que se arma de a un método por vez. Lee &HD como el de GHOST (nu, y los directorios fidir, fodir y todir), sin la rotación, los escalares pasivos ni spectlod, que SPECTER no tiene.
 - pdes_lib depende de fftp_lib, pseudo_lib, mpiio_lib, memmgt_lib y boundary_lib (el solver usa el plan de bordes) y los enlaza (GHOST enlaza pseudo_lib y utils_lib). Agrega a mano build/src/memmgt a sus directorios de inclusión, como GHOST.
 - El ejecutable enlaza pdes_lib directamente; en GHOST no figura en la lista del ejecutable.
 

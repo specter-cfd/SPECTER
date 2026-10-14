@@ -11,20 +11,27 @@
 !                VELOCITY (VELOCITY+1, VELOCITY+2)
 !
 ! Versión de SPECTER del hd_solver.f90 de GHOST (rama new_paradigm,
-! afaf9ea), que se arma de a un método por vez. init lee nu de
-! &velocity y &velbound, arma el plan de bordes, y reserva e inicializa
-! la presión (init_pressure: cero en una corrida nueva, leída del
-! archivo pr al continuar una); dudt calcula el lado derecho sin la presión y end_stage impone las
-! paredes y proyecta después de cada etapa del RK (las llama el
-! integrador, src/steppers/canuto_stepper.f90); global y write_states
-! escriben las salidas.
+! afaf9ea), que se arma de a un método por vez. init lee &HD y
+! &velbound, arma el plan de bordes, y reserva e inicializa la presión
+! (init_pressure: cero en una corrida nueva, leída del archivo pr al
+! continuar una); dudt calcula el lado derecho sin la presión y
+! end_stage impone las paredes y proyecta después de cada etapa del RK
+! (las llama el integrador, src/steppers/canuto_stepper.f90); global y
+! write_states escriben las salidas. De &HD faltan la rotación, los
+! escalares pasivos y spectlod de GHOST, que SPECTER no tiene.
 !
 ! La presión pr_ (p' = p.dt, en el dominio (z,ky,kx)) es un arreglo
 ! auxiliar del solver, como los de los solvers cuánticos de GHOST: no
 ! es parte del estado que avanza el integrador, sobrevive entre etapas
 ! y pasos de tiempo, y la usan la proyección y la escritura.
 !
-! INPUT FILE : looks for a "&velbound" namelist with:
+! INPUT FILE : looks for a "&HD" namelist with:
+!              fidir   : changes class binary input  dir (default: idir)
+!              fodir   : changes class binary output dir (default: odir)
+!              todir   : changes the class TXT output dir (default: '.')
+!              nu      : fluid kinematic viscosity
+!
+!              and a "&velbound" namelist with:
 !              vbcista : boundary condition in the i direction at the
 !                        start of the domain ('periodic' or 'noslip')
 !              vbciend : boundary condition in the i direction at the
@@ -78,10 +85,10 @@ CONTAINS
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Subroutine to initialize the solver
-  !! Reads the &velbound namelist, sets up the boundary
-  !! conditions, allocates and initializes the pressure and
-  !! sets sector indices. Uses the FC-Gram plan, so it must
-  !! be called after fcgram_create_plan.
+  !! Reads the &HD and &velbound namelists, sets up the
+  !! boundary conditions, allocates and initializes the
+  !! pressure and sets sector indices. Uses the FC-Gram plan,
+  !! so it must be called after fcgram_create_plan.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine init_impl(this)
     use commtypes
@@ -93,36 +100,34 @@ CONTAINS
     class  (HDSolver), intent (inout) :: this
 
     ! Temporary data to read from namelists:
-    character(len=15) :: vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
-    real  (kind=GP)   :: vxzsta,vxzend,vyzsta,vyzend
-    real  (kind=GP)   :: f0,u0,kdn,kup,nu
-    real  (kind=GP)   :: fparam0,fparam1,fparam2,fparam3,fparam4
-    real  (kind=GP)   :: fparam5,fparam6,fparam7,fparam8,fparam9
-    real  (kind=GP)   :: vparam0,vparam1,vparam2,vparam3,vparam4
-    real  (kind=GP)   :: vparam5,vparam6,vparam7,vparam8,vparam9
-    integer           :: ierr
+    character(len=15)  :: vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
+    real  (kind=GP)    :: vxzsta,vxzend,vyzsta,vyzend
+    real  (kind=GP)    :: nu
+    character(len=128) :: fidir,fodir,todir
+    integer            :: ierr
 
     ! Required namelists:
+    namelist / HD       / fidir,fodir,todir,nu
     namelist / velbound / vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
     namelist / velbound / vxzsta,vxzend,vyzsta,vyzend
-    namelist / velocity / f0,u0,kdn,kup,nu
-    namelist / velocity / fparam0,fparam1,fparam2,fparam3,fparam4
-    namelist / velocity / fparam5,fparam6,fparam7,fparam8,fparam9
-    namelist / velocity / vparam0,vparam1,vparam2,vparam3,vparam4
-    namelist / velocity / vparam5,vparam6,vparam7,vparam8,vparam9
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD,this%nprocs_,ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD,this%myrank_,ierr)
 
-    ! Viscosity, from the &velocity namelist (the rest of the list is
-    ! for the initial condition and the forcing, still in the main)
-    nu = 0.0_GP
+    ! Get I/O and trait variables from input file:
+    fidir = idir ! Set the default to status idir
+    fodir = odir ! Set the default to status odir
+    todir = '.'  ! Set the default to the current dir
+    nu    = 0.0_GP
     if ( this%myrank_ .eq. 0 ) then
       open(1,file=this%infile_,status='unknown',form="formatted")
-      read(1,NML=velocity)
+      read(1,NML=HD)
       close(1)
     endif
-    call MPI_BCAST(nu,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(fidir,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(fodir,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(todir,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(nu   ,1  ,GC_REAL      ,0,MPI_COMM_WORLD,ierr)
     this%traits_%nu = nu
 
     ! Boundary conditions for the velocity field
@@ -168,10 +173,11 @@ CONTAINS
     ! Pressure (auxiliary array of the solver)
     call galloc(this%pr_, nz, ny, ista, iend)
 
-    ! I/O directories, as in GHOST without the &HD namelist
-    this%idir_  = idir
-    this%odir_  = odir
-    this%todir_ = '.'
+    ! Set I/O from inputfile data (if present in &HD, replaces the
+    ! class defaults)
+    this%idir_  = fidir
+    this%odir_  = fodir
+    this%todir_ = todir
 
     ! Initial pressure (uses idir_)
     call init_pressure(this)

@@ -304,27 +304,23 @@ The variables in this list are
 - `seed`: seed for the random number generator.
 
 # 
-If solvers with a velocity field are used, `SPECTER` reads initial
-parameters for the velocity field from the list 'velocity':
+The HD solver reads its parameters from the list 'HD', as in
+`GHOST`:
 
 ```
-&velocity
-f0 = 0.37714265   ! amplitude of mechanical forcing
-u0 = 1.00         ! amplitude of initial velocity field
-kdn = 2.00        ! minimum wavenumber
-kup = 4.00        ! maximum wavenumber
-nu = 1.e-3        ! viscosity
-vibot = 0.0       ! value of vi at z=0 (i can be x or y)
-vitop = 0.0       ! value of vi at z=Lz (i can be x or y)
-fparam0 = 0.90    ! free parameter for the forcing
-vparam0 = 0.90    ! free parameter for the velocity
+&HD
+nu = 1.e-3        ! kinematic viscosity
 /
 ```
 
-The only variable used from this list is `nu`, the kinematic
-viscosity. The others are still accepted, but the initial
-conditions and the forcing no longer use them: each one has its
-own list.
+where
+- `nu`   : kinematic viscosity.
+- `fidir`, `fodir` and `todir` (optional): directories for the binary
+    input, the binary output and the text output of the solver. By
+    default they are `idir`, `odir` and the current directory.
+
+The initial conditions and the forcing have their own lists (see
+below); the list 'velocity' of older versions is no longer read.
 
 # 
 The initial velocity field is set by the list 'initial_conditions':

@@ -118,14 +118,8 @@
 
 !
 ! Simulation, forcing and initial conditions parameters
-      REAL(KIND=GP)    :: nu,mu
-      REAL(KIND=GP)    :: kup,kdn
+      REAL(KIND=GP)    :: mu
       REAL(KIND=GP)    :: dump
-      REAL(KIND=GP)    :: f0,u0
-      REAL(KIND=GP)    :: fparam0,fparam1,fparam2,fparam3,fparam4
-      REAL(KIND=GP)    :: fparam5,fparam6,fparam7,fparam8,fparam9
-      REAL(KIND=GP)    :: vparam0,vparam1,vparam2,vparam3,vparam4
-      REAL(KIND=GP)    :: vparam5,vparam6,vparam7,vparam8,vparam9
 #ifdef BOUSSINESQ_
       REAL(KIND=GP)    :: gama,xmom,xtemp
 #endif
@@ -196,16 +190,6 @@
 #endif
 
       LOGICAL               :: bbenchexist
-
-
-!
-! Namelists for the input files
-
-      NAMELIST / velocity / f0,u0,kdn,kup,nu
-      NAMELIST / velocity / fparam0,fparam1,fparam2,fparam3,fparam5
-      NAMELIST / velocity / fparam5,fparam6,fparam7,fparam8,fparam9
-      NAMELIST / velocity / vparam0,vparam1,vparam2,vparam3,vparam4
-      NAMELIST / velocity / vparam5,vparam6,vparam7,vparam8,vparam9
 
 #ifdef BOUSSINESQ_
       NAMELIST / boussinesq / gama,xmom,xtemp
@@ -326,50 +310,6 @@
 ! Reads the namelist 'status' on the external file
 ! 'parameter.inp' (see pdes/status_mod.f90)
       CALL status_init('parameter.inp')
-
-
-! Reads parameters for the velocity field from the 
-! namelist 'velocity' on the external file 'parameter.inp' 
-!     f0    : amplitude of the mechanical forcing
-!     u0    : amplitude of the initial velocity field
-!     kdn   : minimum wave number in v/mechanical forcing
-!     kup   : maximum wave number in v/mechanical forcing
-!     nu    : kinematic viscosity
-!     fparam0-9 : ten real numbers to control properties of 
-!            the mechanical forcing
-!     vparam0-9 : ten real numbers to control properties of
-!            the initial conditions for the velocity field
-
-      IF (myrank.eq.0) THEN
-         OPEN(1,file='parameter.inp',status='unknown',form="formatted")
-         READ(1,NML=velocity)
-         CLOSE(1)
-      ENDIF
-      CALL MPI_BCAST(f0,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(u0,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(kdn,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(kup,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(nu,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam0,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam1,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam2,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam3,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam4,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam5,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam6,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam7,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam8,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(fparam9,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam0,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam1,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam2,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam3,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam4,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam5,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam6,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam7,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam8,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(vparam9,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
 
 #ifdef BOUSSINESQ_
 ! Reads parameters specifically for Boussinesq solver from the 

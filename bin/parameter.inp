@@ -23,8 +23,8 @@ Ly = 0.50            ! length of the box in y
 Lz = 1.00            ! length of the box in z
 /
 
-! Parameters for the velocity field
-&velocity
+! Parameters of the HD solver (see src/pdes/hd_solver.f90)
+&HD
 nu = 1.e-3           ! kinematic viscosity
 /
 
@@ -64,7 +64,7 @@ vxzend = 0.0         ! velocity of the wall at z=Lz (as in &velbound)
 ! Laminar Poiseuille profile, added to vx
 &poiseuille_v
 f0 = 1.0             ! amplitude of the forcing (as in &uniform_fv)
-nu = 1.e-3           ! kinematic viscosity (as in &velocity)
+nu = 1.e-3           ! kinematic viscosity (as in &HD)
 /
 
 ! Mechanical forcing (see src/force/force_velocity.f90): pairs
