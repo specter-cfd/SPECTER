@@ -36,9 +36,12 @@ module canuto_stepper_mod
 contains
 
   ! ===================================================================
-  ! Constructor, destructor and initialization
+  ! Stepper-specific methods
   ! ===================================================================
 
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Constructor
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine CanutoStepper_ctor(this, traits, workspace, solver)
     class(CanutoStepper), intent(inout)         :: this
     type(GStepperTraits), intent(inout)         :: traits
@@ -46,24 +49,32 @@ contains
     class (EquationBase), intent   (in), target :: solver
     this%workspace_ => workspace
     this%solver_    => solver
+    if (.not. associated(this%workspace_)) then
+      stop 'CanutoStepper::CanutoStepper_ctor: Worskpace not associated'
+    endif
     call this%init(traits)
   end subroutine CanutoStepper_ctor
 
-  subroutine CanutoStepper_dtor(this) 
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Destructor
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine CanutoStepper_dtor(this)
     type(CanutoStepper), intent(inout) :: this
     if (associated(this%workspace_)) nullify(this%workspace_)
     if (associated(this%solver_))    nullify(this%solver_)
   end subroutine CanutoStepper_dtor
 
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Subroutine to initialize the stepper
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine init_impl(this, traits)
     class(CanutoStepper), intent(inout) :: this
     type(GStepperTraits), intent   (in) :: traits
     this%traits_ = traits;
   end subroutine init_impl
 
-  ! ===================================================================
-  ! Time stepping
-  ! ===================================================================
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Implementation function to take one step of fields
@@ -71,8 +82,6 @@ contains
   !! uout: at input, a copy of uin; at output, the new state
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine step_impl(this, time, uin, uf, dt, uout)
-    use grid
-    use mpivars
     implicit none
 
     class(CanutoStepper), intent(inout) :: this
@@ -94,6 +103,7 @@ contains
       do ic = 1,this%traits_%nstate
         po => uout(ic)%ccomp
         pi => uin (ic)%ccomp
+!$omp parallel do collapse(2) private (k)
         do i = ista,iend
           do j = 1,ny
             do k = 1,nz

@@ -195,7 +195,7 @@ seed = 1000          ! random seed
 The variables in this list are
 - `idir`  : directory for binary input
 - `odir`  : directory for binary output
-- `tdir`  : directory for binary output
+- `tdir`  : directory for the FC-Gram tables
 - `status`: the number of the last binary file available if a
         simulation is restarted. If zero, a new simulation is done.
 - `mult`  : time step multiplier. Useful for restarting a run with

@@ -34,7 +34,7 @@ MODULE fcgram
       TYPE FCPLAN
          TYPE(FCCOORD)      :: x,y,z
          TYPE(FFTPLAN)      :: planrc, plancr
-         CHARACTER(len=100) :: tdir
+         CHARACTER(len=128) :: tdir
       END TYPE FCPLAN
 
       ! Timers for reconstruction subroutines. The periodic

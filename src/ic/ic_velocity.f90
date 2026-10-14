@@ -74,8 +74,6 @@ CONTAINS
     use status
     use filefmt
     use fft
-    use grid
-    use mpivars
     use commtypes
     implicit none
 
@@ -86,12 +84,13 @@ CONTAINS
     real   (kind=GP), pointer, dimension(:,:,:) :: R1
     real   (kind=GP)                            :: rmp
     integer                                     :: i,j,k,nc
+    logical                                     :: bret
 
     if ((stat .eq. 0).and.(solver%myrank_ .eq. 0)) then
       stop 'Cannot read files if starting a new run with stat=0'
     endif
-    call solver%workspace_%get_complex_tmp(C1)
-    call solver%workspace_%get_real_tmp(R1)
+    call solver%workspace_%get_complex_tmp(C1,bret)
+    call solver%workspace_%get_real_tmp(R1,bret)
     select type (solver)
     class is (VelocityBase)
       tind = int(stat)
@@ -104,9 +103,10 @@ CONTAINS
       if ( stat .eq. 1 ) then
         rmp = 1.0_GP/(real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
         do nc = solver%VELOCITY,solver%VELOCITY+solver%nc_-1
+!$omp parallel do collapse(2) private (k)
           do i = ista,iend
              do j = 1,ny
-                do k = 1,nz
+                do concurrent (k=1:nz)
                   C1(k,j,i) = state(nc)%ccomp(k,j,i)*rmp
                 end do
              end do
@@ -195,14 +195,15 @@ CONTAINS
     integer                                     :: nmin,nmax
     logical                                     :: rphase
     integer                                     :: i,j,k,kk
+    logical                                     :: bret
 
     namelist/ cbnoise_v / u0,kdn,kup,nmin,nmax,rphase
-    call solver%workspace_%get_complex_tmp(C1)
-    call solver%workspace_%get_complex_tmp(C2)
-    call solver%workspace_%get_complex_tmp(C3)
-    call solver%workspace_%get_complex_tmp(C4)
-    call solver%workspace_%get_complex_tmp(C5)
-    call solver%workspace_%get_complex_tmp(C6)
+    call solver%workspace_%get_complex_tmp(C1,bret)
+    call solver%workspace_%get_complex_tmp(C2,bret)
+    call solver%workspace_%get_complex_tmp(C3,bret)
+    call solver%workspace_%get_complex_tmp(C4,bret)
+    call solver%workspace_%get_complex_tmp(C5,bret)
+    call solver%workspace_%get_complex_tmp(C6,bret)
     select type (solver)
     class is (VelocityBase)
     ! Read parameters from a namelist in the input file
@@ -430,9 +431,10 @@ CONTAINS
     real   (kind=GP), pointer, dimension(:,:,:) :: R1
     real   (kind=GP)                            :: vxzsta,vxzend
     integer                                     :: i,j,k
+    logical                                     :: bret
 
     namelist/ couette_v / vxzsta,vxzend
-    call solver%workspace_%get_real_tmp(R1)
+    call solver%workspace_%get_real_tmp(R1,bret)
     select type (solver)
     class is (VelocityBase)
     ! Read parameters from a namelist in the input file
@@ -447,9 +449,10 @@ CONTAINS
     CALL fftp3d_complex_to_real(planfc,state(solver%VELOCITY)%ccomp, &
                    R1,MPI_COMM_WORLD)
     R1 = R1/nx/ny/nz
+!$omp parallel do collapse(2) private (i)
     DO k = ksta,kend
        DO j = 1,ny
-          DO i = 1,nx
+          DO CONCURRENT (i=1:nx)
              R1(i,j,k) = R1(i,j,k)+(vxzend-vxzsta)*z(k)/Lz+vxzsta
           END DO
        END DO
@@ -469,8 +472,8 @@ CONTAINS
   !! máximo f0.Lz^2/(8 nu). Va después de otra condición
   !! inicial en iclist: "cbnoise_v;poiseuille_v".
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !   f0: amplitud del forzado (la misma que en &velocity)
-  !   nu: viscosidad cinemática (la misma que en &velocity)
+  !   f0: amplitud del forzado (la misma que en &uniform_fv)
+  !   nu: viscosidad cinemática (la misma que en &HD)
   subroutine init_poiseuillev(this,solver,state)
     use gstate_mod
     use hd_mod
@@ -487,9 +490,10 @@ CONTAINS
     real   (kind=GP), pointer, dimension(:,:,:) :: R1
     real   (kind=GP)                            :: f0,nu
     integer                                     :: i,j,k
+    logical                                     :: bret
 
     namelist/ poiseuille_v / f0,nu
-    call solver%workspace_%get_real_tmp(R1)
+    call solver%workspace_%get_real_tmp(R1,bret)
     select type (solver)
     class is (VelocityBase)
     ! Read parameters from a namelist in the input file
@@ -504,9 +508,10 @@ CONTAINS
     CALL fftp3d_complex_to_real(planfc,state(solver%VELOCITY)%ccomp, &
                    R1,MPI_COMM_WORLD)
     R1 = R1/nx/ny/nz
+!$omp parallel do collapse(2) private (i)
     DO k = ksta,kend
        DO j = 1,ny
-          DO i = 1,nx
+          DO CONCURRENT (i=1:nx)
              R1(i,j,k) = R1(i,j,k)-f0*z(k)*(z(k)-Lz)/(2*nu)
           END DO
        END DO

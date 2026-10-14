@@ -49,8 +49,8 @@ src/boundary/CMakeLists.txt
 src/pdes/CMakeLists.txt
 - pdes_lib compila status_mod.f90, equation_base.f90, hd_solver.f90 y equation_factory.f90. Los otros solvers de GHOST no están.
 - equation_factory.f90 es el de GHOST solo con HD: lee &pdes y crea el solver, y fija el pool de temporarios en el pico medido en SPECTER con report_peaks (6 complejos y 3 reales). El pool solo-host queda en cero, porque SPECTER no lo usa.
-- status_mod.f90 es el de GHOST con tdir agregado, directorios de 100 caracteres y sin USE grid, kes ni ali. Lee un único &status, así que el parameter.inp de SPECTER pasa a tener dt, step, tstep, cstep y seed adentro de &status.
-- equation_base.f90 es una versión reducida del de GHOST: solo EquationBase y VelocityBase (sin escalares pasivos), con un método end_stage que el integrador llama después de cada etapa.
+- status_mod.f90 es el de GHOST con tdir agregado, sin sstep ni los contadores de los espectros (sind, times) y sin USE grid, kes ni ali. Lee un único &status, así que el parameter.inp de SPECTER pasa a tener dt, step, tstep, cstep y seed adentro de &status.
+- equation_base.f90 es una versión reducida del de GHOST: solo EquationBase y VelocityBase (sin escalares pasivos), con un método end_stage que el integrador llama después de cada etapa. Los solvers con salidas propias (la presión en HD) redefinen write_states y llaman antes al write_states del módulo. No tiene el método spectra: SPECTER no escribe espectros, así que el main tampoco los llama.
 - hd_solver.f90 es el solver HD de SPECTER, que se arma de a un método por vez. Lee &HD como el de GHOST (nu, y los directorios fidir, fodir y todir), sin la rotación, los escalares pasivos ni spectlod, que SPECTER no tiene.
 - pdes_lib depende de fftp_lib, pseudo_lib, mpiio_lib, memmgt_lib y boundary_lib (el solver usa el plan de bordes) y los enlaza (GHOST enlaza pseudo_lib y utils_lib). Agrega a mano build/src/memmgt a sus directorios de inclusión, como GHOST.
 - El ejecutable enlaza pdes_lib directamente; en GHOST no figura en la lista del ejecutable.

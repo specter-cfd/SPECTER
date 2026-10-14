@@ -7,9 +7,9 @@
 ! pasivos), que es lo que usa HD. Se agrega end_stage, que el integrador
 ! llama después de actualizar cada etapa; por defecto no hace nada, y
 ! los solvers con paredes lo usan para imponer los bordes y proyectar.
-! La parte genérica de write_states está en write_states_base, que los
-! solvers con salidas propias (como la presión en HD) llaman antes de
-! escribir las suyas.
+! Los solvers con salidas propias (como la presión en HD) redefinen
+! write_states y llaman antes al procedimiento write_states de este
+! módulo, que escribe los estados y la vorticidad.
 !
 ! DATE       : 11/29/25 (DLR)
 ! ===================================================================
@@ -22,7 +22,7 @@ module equationbase_mod
 
   private :: Solver_ctor_interface, init_interface
   private :: dudt_interface       , global_interface
-  private :: spectra_interface    , state_size_interface
+  private :: state_size_interface
 
   ! ================= Base class for all PDEs =======================
   ! Define an abstract base class
@@ -40,10 +40,9 @@ module equationbase_mod
       procedure(init_interface),        deferred :: init        ! init method
       procedure(dudt_interface),        deferred :: dudt        ! RHS method
       procedure(global_interface),      deferred :: global      ! Global qtys
-      procedure(spectra_interface),     deferred :: spectra     ! Spectra
       procedure(state_size_interface),  deferred :: state_size  ! Number of states
       procedure, public                          :: end_stage   ! After each RK stage
-      procedure, public :: write_states => write_states_base    ! Binary output
+      procedure, public                          :: write_states
       procedure, public                          :: sync_device ! Aux. arrays to the device
   end type EquationBase
 
@@ -88,16 +87,6 @@ module equationbase_mod
        integer            , intent(in)            :: t
      end subroutine global_interface
 
-     subroutine spectra_interface(this, uin)
-       use gstate_mod
-       use fprecision
-       use filefmt
-       use status
-       import :: EquationBase
-       class(EquationBase), intent(in)            :: this
-       type   (GStateComp), intent(in), target    :: uin(:)
-     end subroutine spectra_interface
-
      function state_size_interface(this) result(num)
        import :: EquationBase
        class(EquationBase), intent   (in)         :: this
@@ -141,14 +130,13 @@ CONTAINS
   !! field and outs >= 1, the vorticity. The fields are
   !! written in the physical domain, through the FC-Gram plan.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine write_states_base(this, uin, planio)
+  subroutine write_states(this, uin, planio)
     use grid
-    use mpivars
-    use commtypes
     use iovar
     use status
     use filefmt
     use fft
+    use commtypes
     implicit none
 
     class (EquationBase), intent   (in)             :: this
@@ -158,16 +146,19 @@ CONTAINS
     complex    (kind=GP), pointer, dimension(:,:,:) :: C4,C5,C6
     real       (kind=GP), pointer, dimension(:,:,:) :: R1,R2,R3
     real       (kind=GP)                            :: rmp
-    integer                                         :: i,j,k,nc
+    integer                          :: i,j,k,state_size,nc
+    logical                          :: bret
 
     WRITE(ext, fmtext) tind
-    rmp = 1.0_GP/(real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
-    call this%workspace_%get_complex_tmp(C1)
-    call this%workspace_%get_real_tmp   (R1)
-    do nc = 1,this%state_size()
+    call this%workspace_%get_complex_tmp(C1,bret)
+    call this%workspace_%get_real_tmp   (R1,bret)
+    state_size = this%state_size()
+    do nc = 1,state_size
+      rmp = 1.0_GP/(real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
+!$omp parallel do collapse(2) private (k)
       do i = ista,iend
          do j = 1,ny
-            do k = 1,nz
+            do concurrent (k=1:nz)
               C1(k,j,i) = uin(nc)%ccomp(k,j,i)*rmp
             end do
          end do
@@ -175,21 +166,20 @@ CONTAINS
       call fftp3d_complex_to_real(planfc,C1,R1,MPI_COMM_WORLD)
       call io_write(1,this%odir_,trim(this%sstate_(nc)),ext,planio,R1)
     end do
-    if ( outs .ge. 1 ) then
-      ! The workspace is used outside select type: inside it, this
-      ! is an associate name and cannot be passed as INTENT(INOUT)
-      call this%workspace_%get_complex_tmp(C2)
-      call this%workspace_%get_complex_tmp(C3)
-      call this%workspace_%get_complex_tmp(C4)
-      call this%workspace_%get_complex_tmp(C5)
-      call this%workspace_%get_complex_tmp(C6)
-      call this%workspace_%get_real_tmp   (R2)
-      call this%workspace_%get_real_tmp   (R3)
+    if ( outs .ge. 1) then
+      call this%workspace_%get_complex_tmp(C2,bret)
+      call this%workspace_%get_complex_tmp(C3,bret)
+      call this%workspace_%get_complex_tmp(C4,bret)
+      call this%workspace_%get_complex_tmp(C5,bret)
+      call this%workspace_%get_complex_tmp(C6,bret)
+      call this%workspace_%get_real_tmp   (R2,bret)
+      call this%workspace_%get_real_tmp   (R3,bret)
       select type (this)
       class is (VelocityBase)
+!$omp parallel do collapse(2) private (k)
         do i = ista,iend
            do j = 1,ny
-              do k = 1,nz
+              do concurrent (k=1:nz)
                 C1(k,j,i) = uin(this%VELOCITY  )%ccomp(k,j,i)*rmp
                 C2(k,j,i) = uin(this%VELOCITY+1)%ccomp(k,j,i)*rmp
                 C3(k,j,i) = uin(this%VELOCITY+2)%ccomp(k,j,i)*rmp
@@ -216,6 +206,6 @@ CONTAINS
     endif
     call this%workspace_%free_complex_tmp(C1)
     call this%workspace_%free_real_tmp   (R1)
-  end subroutine write_states_base
+  end subroutine write_states
 
 end module equationbase_mod

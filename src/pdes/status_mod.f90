@@ -2,8 +2,9 @@
 ! General MODULES for pde methods
 !
 ! Adaptado de status_mod.f90 de GHOST (rama new_paradigm, afaf9ea).
-! Diferencias: suma tdir (tablas del FC-Gram), los directorios
-! miden 100 caracteres y status_init no usa grid, kes ni ali.
+! Diferencias: suma tdir (tablas del FC-Gram), no tiene sstep ni los
+! contadores de los espectros (SPECTER no los escribe) y status_init
+! no usa grid, kes ni ali.
 !
 ! 2026 Pablo D. Mininni.
 !      Department of Physics,
@@ -30,7 +31,6 @@
 !  dt   : time step size
 !  step : total number of time steps to compute
 !  tstep: number of steps between binary output
-!  sstep: number of steps between power spectrum output
 !  cstep: number of steps between output of global quantities
 !  cort : global correlation time for random forcings (when needed)
 !  seed : global seed for random number generation (when needed)
@@ -39,15 +39,15 @@
       INTEGER            :: stat ,ini
       INTEGER            :: step
       INTEGER            :: tstep,cstep
-      INTEGER            :: sstep,fstep
+      INTEGER            :: fstep
       INTEGER            :: bench = 0
       INTEGER            :: outs
       INTEGER            :: mult
       INTEGER            :: seed
-      INTEGER            :: tind,sind
+      INTEGER            :: tind
       INTEGER            :: timet,timec
-      INTEGER            :: times,timef
-      CHARACTER(len=100) :: odir,idir,tdir
+      INTEGER            :: timef
+      CHARACTER(len=128) :: odir,idir,tdir
     CONTAINS
 !-----------------------------------------------------------------
       SUBROUTINE status_init(infile_)
@@ -60,7 +60,7 @@
       REAL(KIND=GP)                :: cort
       CHARACTER(len=*), INTENT(IN) :: infile_
       NAMELIST / status / idir,odir,tdir,stat,mult,bench,outs,dt
-      NAMELIST / status / step,tstep,sstep,cstep,seed,cort
+      NAMELIST / status / step,tstep,cstep,seed,cort
 
       cort = 1000.0_GP
       IF (myrank.eq.0) THEN
@@ -70,13 +70,12 @@
          dt = dt/real(mult,kind=GP)
          step = step*mult
          tstep = tstep*mult
-         sstep = sstep*mult
          cstep = cstep*mult
          fstep = int(cort/dt)
       ENDIF
-      CALL MPI_BCAST(idir ,100,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(odir ,100,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(tdir ,100,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(idir ,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(odir ,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(tdir ,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(stat ,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(mult ,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(bench,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
@@ -84,7 +83,6 @@
       CALL MPI_BCAST(dt   ,1  ,GC_REAL      ,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(step ,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(tstep,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
-      CALL MPI_BCAST(sstep,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(cstep,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(fstep,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(seed ,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)

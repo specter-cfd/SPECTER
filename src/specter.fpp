@@ -40,25 +40,20 @@
 ! - Bruno OP, Lyon M; Jour. Comp. Phys. 229, 2009 (2010)
 !
 ! Modules
-      USE fprecision
       USE commtypes
-      USE mpivars
       USE filefmt
       USE iovar
-      USE grid
-      USE fcgram
       USE fft
+      USE fcgram
       USE kes
       USE threads
-      USE gtimer
-      USE status
       USE boxsize
-      USE gstate_mod
-      USE class_GWorkspace3D
-      USE equation_factory
-      USE stepper_factory
+      USE status
+      USE gtimer
       USE ic_factory
       USE force_factory
+      USE equation_factory
+      USE stepper_factory
 
       IMPLICIT NONE
 

@@ -69,7 +69,6 @@ module hd_mod
     procedure, public :: dudt          =>          dudt_impl ! RHS method
     procedure, public :: end_stage     =>     end_stage_impl ! RK stage correction
     procedure, public :: global        =>        global_impl ! Writes global qtys
-    procedure, public :: spectra       =>       spectra_impl ! Writes spectra
     procedure, public :: write_states  =>  write_states_impl ! Binary output
     procedure, public :: state_size    =>    state_size_impl ! state size
     procedure, public :: get_sstate    =>    get_sstate_impl ! get state name list
@@ -93,10 +92,7 @@ CONTAINS
   subroutine init_impl(this)
     use commtypes
     use status
-    use grid
     use fft
-    use gmem
-    use mpivars, only: ista, iend
     class  (HDSolver), intent (inout) :: this
 
     ! Temporary data to read from namelists:
@@ -217,18 +213,20 @@ CONTAINS
     complex(kind=GP), pointer, dimension(:,:,:) :: C1,C2,C3,C4,C5,C6
     real   (kind=GP)                            :: nu
     integer                                     :: i,j,k
+    logical                                     :: bret
 
     if ( .not. this%binit_ ) then
       stop 'HDSolver::dudt: Solver not initialized'
     endif
+
     nu = this%traits_%nu
 
-    call this%workspace_%get_complex_tmp(C1)
-    call this%workspace_%get_complex_tmp(C2)
-    call this%workspace_%get_complex_tmp(C3)
-    call this%workspace_%get_complex_tmp(C4)
-    call this%workspace_%get_complex_tmp(C5)
-    call this%workspace_%get_complex_tmp(C6)
+    call this%workspace_%get_complex_tmp(C1,bret)
+    call this%workspace_%get_complex_tmp(C2,bret)
+    call this%workspace_%get_complex_tmp(C3,bret)
+    call this%workspace_%get_complex_tmp(C4,bret)
+    call this%workspace_%get_complex_tmp(C5,bret)
+    call this%workspace_%get_complex_tmp(C6,bret)
 
     vx => uin (this%VELOCITY  )%ccomp
     vy => uin (this%VELOCITY+1)%ccomp
@@ -248,6 +246,7 @@ CONTAINS
     call laplak(vy,C2)
     call laplak(vz,C3)
 
+!$omp parallel do collapse(2) private (k)
     do i = ista,iend
        do j = 1,ny
           do k = 1,nz
@@ -289,7 +288,7 @@ CONTAINS
 
 
   ! ===================================================================
-  ! Computation of global quantities and spectra
+  ! Computation of global quantities
   ! ===================================================================
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -318,28 +317,16 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! SPECTER no escribe espectros
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine spectra_impl(this, uin)
-    use status
-    class (HDSolver), intent(in)                :: this
-    type(GStateComp), intent(in), target        :: uin(:)
-    return
-  end subroutine spectra_impl
-
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Writes the states and the vorticity (write_states_base)
-  !! and the pressure, transformed from p' to p
+  !! Writes the states and the vorticity (write_states of
+  !! EquationBase) and the pressure, transformed from p' to p
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine write_states_impl(this, uin, planio)
     use grid
-    use mpivars
-    use commtypes
     use iovar
     use status
     use filefmt
     use fft
+    use commtypes
     implicit none
 
     class   (HDSolver), intent   (in)             :: this
@@ -349,14 +336,16 @@ CONTAINS
     real     (kind=GP), pointer, dimension(:,:,:) :: R1
     real     (kind=GP)                            :: rmp
     integer                                       :: i,j,k
+    logical                                       :: bret
 
-    call write_states_base(this, uin, planio)
-    call this%workspace_%get_complex_tmp(C1)
-    call this%workspace_%get_real_tmp   (R1)
+    call write_states(this, uin, planio)
+    call this%workspace_%get_complex_tmp(C1,bret)
+    call this%workspace_%get_real_tmp   (R1,bret)
     rmp = 1.0_GP/(real(nx,kind=GP)*real(ny,kind=GP)*dt)
+!$omp parallel do collapse(2) private (k)
     do i = ista,iend
        do j = 1,ny
-          do k = 1,nz
+          do concurrent (k=1:nz)
             C1(k,j,i) = this%pr_(k,j,i)*rmp
           end do
        end do
@@ -379,27 +368,28 @@ CONTAINS
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine init_pressure(this)
     use grid
-    use mpivars
-    use commtypes
     use iovar
     use status
     use filefmt
     use fft
+    use commtypes
     implicit none
 
     class (HDSolver), intent(inout)             :: this
     real   (kind=GP), pointer, dimension(:,:,:) :: R1
     integer                                     :: i,j,k
+    logical                                     :: bret
 
     this%pr_ = 0.0_GP
     if ( stat .eq. 0 ) return
-    call this%workspace_%get_real_tmp(R1)
+    call this%workspace_%get_real_tmp(R1,bret)
     WRITE(ext, fmtext) stat
     call io_read(1,this%idir_,'pr',ext,this%planio_,R1)
     call fftp2d_real_to_complex_xy(planfc,R1,this%pr_,MPI_COMM_WORLD)
+!$omp parallel do collapse(2) private (k)
     do i = ista,iend
        do j = 1,ny
-          do k = 1,nz-Cz
+          do concurrent (k=1:nz-Cz)
              this%pr_(k,j,i) = this%pr_(k,j,i)*dt   ! p -> p'
           end do
        end do
