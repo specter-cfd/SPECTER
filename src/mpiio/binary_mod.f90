@@ -9,11 +9,12 @@
 !=================================================================
 
   MODULE iovar
+      USE commtypes
       TYPE IOPLAN
-         INTEGER      :: ksta,kend
-         INTEGER      :: nx,ny,nz
-         INTEGER      :: iotype
-         INTEGER      :: iocomm
+         INTEGER            :: ksta,kend
+         INTEGER            :: nx,ny,nz
+         TYPE(MPI_Datatype) :: iotype
+         TYPE(MPI_Comm)     :: iocomm
       END TYPE IOPLAN
       INTEGER :: iswap=0
       INTEGER :: oswap=0
@@ -23,7 +24,6 @@
 !=================================================================
  
   MODULE iompi
-!     INCLUDE 'mpif.h'
       USE commtypes
       INTEGER, SAVE :: ioerr
       INTEGER(KIND=MPI_OFFSET_KIND), SAVE :: disp = 0

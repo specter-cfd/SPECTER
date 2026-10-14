@@ -19,6 +19,7 @@
 ! transposition. Often set to 1.
 !
       USE fprecision
+      USE mpi_f08, only   :  MPI_Datatype
 
       IMPLICIT NONE
 
@@ -39,7 +40,7 @@
          COMPLEX(KIND=GP), DIMENSION (:,:,:), POINTER  :: ccarr
          COMPLEX(KIND=GP), DIMENSION (:,:,:), POINTER  :: carr
          REAL(KIND=GP),    DIMENSION (:,:,:), POINTER  :: rarr
-         INTEGER, DIMENSION (:), POINTER :: itype1, itype2
+         TYPE(MPI_Datatype), DIMENSION (:), POINTER :: itype1, itype2
          INTEGER(kind=ikind) :: planrxy,plancz
          INTEGER(kind=ikind) :: planrx,plancyz
          INTEGER :: nx,ny,nz

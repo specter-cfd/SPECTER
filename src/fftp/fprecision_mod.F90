@@ -25,24 +25,19 @@
 !=================================================================
 
   MODULE commtypes
-      INCLUDE 'mpif.h'
+     USE mpi_f08
 !
 ! 
 #if defined(GDOUBLE_PRECISION)
-      INTEGER, SAVE :: GC_REAL    = MPI_DOUBLE_PRECISION
-      INTEGER, SAVE :: GC_COMPLEX = MPI_DOUBLE_COMPLEX
-
-      INTEGER, SAVE :: GC_2REAL    = MPI_2DOUBLE_PRECISION
-      INTEGER, SAVE :: GC_2COMPLEX = MPI_2DOUBLE_COMPLEX
+      TYPE(mpi_datatype), SAVE :: GC_REAL    = MPI_DOUBLE_PRECISION
+      TYPE(mpi_datatype), SAVE :: GC_COMPLEX = MPI_DOUBLE_COMPLEX
 #elif defined(GSINGLE_PRECISION)
-      INTEGER, SAVE :: GC_REAL    = MPI_REAL
-      INTEGER, SAVE :: GC_COMPLEX = MPI_COMPLEX
-
-      INTEGER, SAVE :: GC_2REAL    = MPI_2REAL
-      INTEGER, SAVE :: GC_2COMPLEX = MPI_2COMPLEX
+      TYPE(mpi_datatype), SAVE :: GC_REAL    = MPI_REAL
+      TYPE(mpi_datatype), SAVE :: GC_COMPLEX = MPI_COMPLEX
 #else
 #  error 'MODULE COMMTYPES: PRECISION must be GDOUBLE_PRECISION or GSINGLE_PRECISION'
 #endif
 
   END MODULE commtypes
 !=================================================================
+

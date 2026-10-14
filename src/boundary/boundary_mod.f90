@@ -299,7 +299,7 @@ MODULE boundary
       ELSE
           IF ( myrank .eq. 0) PRINT*, "[ERROR] Unsupported BC kind in call "&
               "to sol_project. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -329,7 +329,7 @@ MODULE boundary
       ELSE
           IF ( myrank .eq. 0) PRINT*, "[ERROR] Unsupported BC kind in call "&
               "to sol_project. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -609,7 +609,7 @@ MODULE boundary
       ELSE  ! Unsupported combination of BC
          IF ( myrank .eq. 0) PRINT*, "[ERROR] Unsupported BC combination in call "&
               "to laplace_z. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF  !End coefficients
 

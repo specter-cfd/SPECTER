@@ -30,7 +30,7 @@
       ELSE
          IF ( myrank .eq. 0 ) PRINT*, "[ERROR] Unknown boundary ",& 
              "condition type", str, " Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr) 
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
       RETURN
@@ -103,14 +103,14 @@
       IF ( planbc%bcysta .ne. -1 .OR. planbc%bcyend .ne. -1) THEN
          IF ( myrank .eq. 0 ) PRINT*, "[ERROR] Non-periodic boundary ", &
              "conditions in Y direction not supported yet. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr) 
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
       ! Check BC in Z direction
       IF ( planbc%bczsta .ne. 0 .OR. planbc%bczend .ne. 0 ) THEN
          IF ( myrank .eq. 0 ) PRINT*, "[ERROR] Unsupported boundary ", &
              "conditions in Z direction. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr) 
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -120,7 +120,7 @@
             (.NOT. PRESENT(rki) .OR. .NOT. PRESENT(rko)) ) THEN
          IF ( myrank .eq. 0 ) PRINT*, "[ERROR] Non-slip BC require `rki` ", &
              "and `rko` keyword arguments in call to imposebc_and_project. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr) 
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 

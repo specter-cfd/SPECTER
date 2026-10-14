@@ -2,7 +2,6 @@
 # pseudo: grilla y rutinas pseudoespectrales (solo lo que usa HD)
 add_library(pseudo_lib STATIC
   pseudospec_mod.f90
-  module_dns.f90
   pseudospec_hd.f90
 )
 

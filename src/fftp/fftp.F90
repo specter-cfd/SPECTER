@@ -357,14 +357,14 @@
       USE commtypes
       IMPLICIT NONE
 
-      INTEGER, INTENT(OUT), DIMENSION(0:nprocs-1) :: itype1,itype2
+      TYPE(MPI_Datatype), INTENT(OUT), DIMENSION(0:nprocs-1) :: itype1,itype2
       INTEGER, INTENT(IN) :: n(3),nprocs
       INTEGER, INTENT(IN) :: myrank
 
       INTEGER :: ista,iend
       INTEGER :: ksta,kend
       INTEGER :: irank,krank
-      INTEGER :: itemp1,itemp2
+      TYPE(MPI_Datatype) :: itemp1,itemp2
 
       CALL range(1,n(3),nprocs,myrank,ksta,kend)
       DO irank = 0,nprocs-1
@@ -411,7 +411,7 @@
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: out
       REAL(KIND=GP), INTENT(IN), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: in
 
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
 
       IF (plan%y%C .gt. 0) THEN
          CALL fftp1d_real_to_complex_x(plan,in,out,comm)
@@ -452,9 +452,9 @@
       COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%y%n,plan%z%n)          :: c1
       REAL(KIND=GP), INTENT(IN), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: IN
 
-      INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
-      INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Request), DIMENSION(0:nprocs-1) :: ireq1,ireq2
+      TYPE(MPI_Status)                         :: istatus
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
       INTEGER :: i,j,k
       INTEGER :: ii,jj,kk
       INTEGER :: irank
@@ -547,7 +547,7 @@
 
       TYPE(FCPLAN), INTENT(IN) :: plan
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
 
       INTEGER :: ny,Cy,dy,nz,Cz,dz
       INTEGER :: i,j,ii,jj
@@ -644,9 +644,9 @@
       COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%y%n,plan%z%n)          :: c1
       REAL(KIND=GP), INTENT(IN), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: IN
 
-      INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
-      INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Request), DIMENSION(0:nprocs-1) :: ireq1,ireq2
+      TYPE(MPI_Status)                         :: istatus
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
       INTEGER :: i,j,k
       INTEGER :: ii,jj,kk
       INTEGER :: irank
@@ -740,7 +740,7 @@
 
       TYPE(FCPLAN), INTENT(IN) :: plan
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
 
       INTEGER :: n,C,d
       INTEGER :: i,j,ii,jj
@@ -804,6 +804,7 @@
 
       USE fprecision
       USE mpivars
+      USE commtypes
       USE fcgram
       IMPLICIT NONE
 
@@ -812,7 +813,7 @@
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: in 
       REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
 
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
 
       CALL fftp1d_complex_to_real_z(plan,in,comm)
       CALL fftp2d_complex_to_real_xy(plan,in,out,comm)
@@ -849,9 +850,9 @@
       COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%y%n,plan%z%n)           :: c1
       REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
 
-      INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
-      INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Request), DIMENSION(0:nprocs-1) :: ireq1,ireq2
+      TYPE(MPI_Status)                         :: istatus
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
       INTEGER :: i,j,k
       INTEGER :: ii,jj,kk
       INTEGER :: irank
@@ -940,7 +941,7 @@
 
       TYPE(FCPLAN), INTENT(IN) :: plan
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout 
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
 
       INTEGER :: i,j,k
 
@@ -986,9 +987,9 @@
       COMPLEX(KIND=GP), DIMENSION(ista:iend,plan%y%n,plan%z%n)           :: c1
       REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
 
-      INTEGER, DIMENSION(0:nprocs-1)      :: ireq1,ireq2
-      INTEGER, DIMENSION(MPI_STATUS_SIZE) :: istatus
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Request), DIMENSION(0:nprocs-1) :: ireq1,ireq2
+      TYPE(MPI_Status)                         :: istatus
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
       INTEGER :: i,j,k
       INTEGER :: ii,jj,kk
       INTEGER :: irank
@@ -1078,7 +1079,7 @@
 
       TYPE(FCPLAN), INTENT(IN) :: plan
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout 
-      INTEGER, INTENT(IN)                 :: comm
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
 
       INTEGER :: i,j,k
 
@@ -1125,13 +1126,16 @@
       INTEGER, INTENT(IN)  :: ksta,kend
       INTEGER, INTENT(IN)  :: imin,imax
       INTEGER, INTENT(IN)  :: jmin,jmax,kmin
-      INTEGER, INTENT(IN)  :: ioldtype
-      INTEGER, INTENT(OUT) :: inewtype
+      TYPE(MPI_Datatype), INTENT(IN)  :: ioldtype
+      TYPE(MPI_Datatype), INTENT(OUT) :: inewtype
 
-      INTEGER(KIND=MPI_ADDRESS_KIND) :: ilb,isize,idist
+      INTEGER(MPI_ADDRESS_KIND) :: ilb,isize,idist
+      TYPE(MPI_Datatype)        :: itemp,itemp2
       INTEGER :: ilen,jlen,klen
-      INTEGER :: itemp,itemp2
       INTEGER :: ierr
+      INTEGER :: blocklengths(1)
+      INTEGER(MPI_ADDRESS_KIND) :: displs(1)
+      TYPE(MPI_Datatype) :: types(1)
 
       CALL MPI_TYPE_GET_EXTENT(ioldtype,ilb,isize,ierr)
       ilen = iend-ista+1
@@ -1143,7 +1147,10 @@
       CALL MPI_TYPE_FREE(itemp,ierr)
       idist = ((imax-imin+1)*(jmax-jmin+1)*(ksta-kmin) &
               +(imax-imin+1)*(jsta-jmin)+(ista-imin))*isize
-      CALL MPI_TYPE_CREATE_STRUCT(1,1,idist,itemp2,inewtype,ierr)
+      blocklengths(1) = 1
+      displs(1) = idist
+      types(1) = itemp2
+      CALL MPI_TYPE_CREATE_STRUCT(1,blocklengths,displs,types,inewtype,ierr)
       CALL MPI_TYPE_FREE(itemp2,ierr)
       CALL MPI_TYPE_COMMIT(inewtype,ierr)
 

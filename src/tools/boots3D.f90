@@ -73,7 +73,10 @@
       INTEGER :: oxt,oyt,ozt
       INTEGER :: i,ib,ie,ind,itsta,itend,j,k,ktsta,ktend
       INTEGER :: istak,iendk,kstak,kendk
-      INTEGER :: commtrunc, fh, groupworld, flags, grouptrunc
+      INTEGER :: flags
+      TYPE(MPI_Comm)  :: commtrunc
+      TYPE(MPI_Group) :: groupworld, grouptrunc
+      TYPE(MPI_File)  :: fh
       INTEGER :: iExclude(3,1), iInclude(3,1)
       INTEGER :: Czt, Czn, Czkeep, GCD
 

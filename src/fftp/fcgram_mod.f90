@@ -113,7 +113,7 @@ MODULE fcgram
       ELSE 
          IF (myrank .eq. 0) PRINT*, "[ERROR] Mismatch in continuation",&
             " or matching points in x direction. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
       ! Y
@@ -125,7 +125,7 @@ MODULE fcgram
       ELSE 
          IF (myrank .eq. 0) PRINT*, "[ERROR] Mismatch in continuation",&
             " or matching points in y direction. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
       ! Z
@@ -137,7 +137,7 @@ MODULE fcgram
       ELSE 
          IF (myrank .eq. 0) PRINT*, "[ERROR] Mismatch in continuation",&
             " or matching points in z direction. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -231,7 +231,7 @@ MODULE fcgram
          CLOSE(10)
       ELSE
          IF (myrank .eq. 0) PRINT*, "Could not find table ", trim(astr)
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -243,7 +243,7 @@ MODULE fcgram
          CLOSE(10)
       ELSE
          IF (myrank .eq. 0) PRINT*, "Could not find table ", trim(qstr)
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -332,7 +332,7 @@ MODULE fcgram
          CLOSE(10)
       ELSE
          IF (myrank .eq. 0) PRINT*, "Could not find table ", trim(qstr)
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -345,7 +345,7 @@ MODULE fcgram
          CLOSE(10)
       ELSE
          IF (myrank .eq. 0) PRINT*, "Could not find table ", trim(qnstr)
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -501,7 +501,7 @@ MODULE fcgram
          IF ( myrank .eq. 0) PRINT*, "[ERROR] Neumann reconstruction not ", &
              "performed. Unsupported derivative order, boundary surface or ", &
              "unallocated table. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -562,14 +562,14 @@ MODULE fcgram
          IF ( .NOT. ALLOCATED(plan%y%neu) ) THEN
             IF (myrank.eq.0) PRINT*, "[ERROR] Neumann table not loaded in", &
                 "robin_reconstruct. Aborting..."
-            CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+            CALL MPI_FINALIZE(ierr)
             STOP
          ENDIF
       ELSE IF (boun .eq. 5 .OR. boun .eq. 6) THEN
          IF ( .NOT. ALLOCATED(plan%z%neu) ) THEN
             IF (myrank.eq.0) PRINT*, "[ERROR] Neumann table not loaded in", &
                 "robin_reconstruct. Aborting..."
-            CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+            CALL MPI_FINALIZE(ierr)
             STOP
          ENDIF
       ENDIF
@@ -635,7 +635,7 @@ MODULE fcgram
       ELSE
          IF ( myrank .eq. 0) PRINT*, "[ERROR] Robin reconstruction not ", &
              "performed. Wrong boundary specified. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 
@@ -664,7 +664,7 @@ MODULE fcgram
       ELSE
          IF ( myrank .eq. 0) PRINT*, "[ERROR] Failed to check status ", &
          "of Neumann tables, unrecognized order. Aborting..."
-         CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr)
+         CALL MPI_FINALIZE(ierr)
          STOP
       ENDIF
 

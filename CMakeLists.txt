@@ -47,7 +47,8 @@ if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     #      -finit-real=snan -finit-integer=-999999 -finit-logical=true \
     #      -finit-character=0 -Wall -Wextra")
     # Apply version-specific flags
-    # SPECTER usa mpif.h, que desde GCC 10 no compila sin esto
+    # Las llamadas a FFTW del caso con continuación en y (fftp.F90) pasan
+    # argumentos de distinto rango, que desde GCC 10 no compilan sin esto
     if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
         set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -w -fallow-argument-mismatch")
     endif()

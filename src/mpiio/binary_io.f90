@@ -38,8 +38,10 @@
       INTEGER, DIMENSION(3) :: subsizes,starts
       TYPE(IOPLAN), INTENT(OUT) :: plan
 
-      INTEGER :: rankend, groupworld, grouptrunc, commtrunc
+      INTEGER         :: rankend
+      TYPE(MPI_Group) :: groupworld, grouptrunc
       INTEGER :: tmp
+      INTEGER :: iInclude(3,1)
 
       plan%nx = n(1)
       plan%ny = n(2)
@@ -66,7 +68,8 @@
 
       ! Create new communicator with only IO tasks
       CALL MPI_COMM_GROUP(MPI_COMM_WORLD, groupworld, ioerr)
-      CALL MPI_GROUP_RANGE_INCL(groupworld,1,(/0,rankend,1/),grouptrunc,ioerr)
+      iInclude(:,1) = (/0,rankend,1/)
+      CALL MPI_GROUP_RANGE_INCL(groupworld,1,iInclude,grouptrunc,ioerr)
       CALL MPI_COMM_CREATE(MPI_COMM_WORLD,grouptrunc,plan%iocomm,ioerr)
 
 
@@ -115,7 +118,7 @@
       TYPE(IOPLAN),INTENT  (IN)      :: plan
       REAL(KIND=GP),INTENT(OUT) :: var(plan%nx,plan%ny,plan%ksta:plan%kend)
       INTEGER, INTENT(IN)            :: unit
-      INTEGER                        :: fh
+      TYPE(MPI_File)                 :: fh
       CHARACTER(len=*), INTENT(IN)   :: dir
       CHARACTER(len=*), INTENT(IN)   :: nmb
       CHARACTER(len=*), INTENT(IN)   :: fname
@@ -190,7 +193,7 @@ if (myrank.eq.0) write(*,*)' io_read: read time:',GTGetTime(ihread)
       TYPE(IOPLAN), INTENT(IN)       :: plan
       REAL(KIND=GP), INTENT(INOUT) :: var(plan%nx,plan%ny,plan%ksta:plan%kend)
       INTEGER, INTENT(IN)            :: unit
-      INTEGER                        :: fh
+      TYPE(MPI_File)                 :: fh
       CHARACTER(len=*), INTENT(IN)   :: dir
       CHARACTER(len=*), INTENT(IN)   :: nmb
       CHARACTER(len=*), INTENT(IN)   :: fname
@@ -298,7 +301,7 @@ if (myrank.eq.0) write(*,*)' io_read: read time:',GTGetTime(ihread)
       TYPE(IOPLAN), INTENT(IN)       :: plan
       COMPLEX(KIND=GP), INTENT(OUT) :: var(plan%nz,plan%ny,plan%ksta:plan%kend)
       INTEGER, INTENT(IN)            :: unit
-      INTEGER                        :: fh
+      TYPE(MPI_File)                 :: fh
       CHARACTER(len=100), INTENT(IN) :: dir
       CHARACTER(len=*), INTENT(IN)   :: nmb
       CHARACTER(len=*), INTENT(IN)   :: fname
@@ -347,7 +350,7 @@ if (myrank.eq.0) write(*,*)' io_read: read time:',GTGetTime(ihread)
       TYPE(IOPLAN), INTENT(IN)       :: plan
       REAL(KIND=GP), INTENT(INOUT)   :: var(plan%nz,plan%ny,plan%ksta:plan%kend)
       INTEGER, INTENT(IN)            :: unit
-      INTEGER                        :: fh
+      TYPE(MPI_File)                 :: fh
       CHARACTER(len=*), INTENT(IN)   :: dir
       CHARACTER(len=*), INTENT(IN)   :: nmb
       CHARACTER(len=*), INTENT(IN)   :: fname
