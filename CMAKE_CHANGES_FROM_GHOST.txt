@@ -18,7 +18,7 @@ UserConfig.cmake
 - PRECISION vale DOUBLE por defecto (en GHOST, SINGLE), como en Makefile.in.
 - FFTP vale fftp (en GHOST, fftp-3).
 - IKIND, CSIZE y NSTRIP se toman de Makefile.in: IKIND=8 no existe en GHOST, CSIZE=32 en vez de 8 y NSTRIP=1 igual.
-- Se agregan los parámetros que SPECTER fija al compilar y GHOST lee al correr: SOLVER (HD), la grilla (NX, NY, NZ), las continuaciones (CX, CY, CZ), los órdenes de borde (OX, OY, OZ) y ORD.
+- Se agregan los parámetros que SPECTER fija al compilar y GHOST lee al correr: SOLVER (HD), la grilla (NX, NY, NZ), las continuaciones (CX, CY, CZ), los órdenes de borde (OX, OY, OZ) y ORD. ORD ya no tiene efecto: el orden del Runge-Kutta se lee de &stepper.
 
 FindFFTW3.cmake
 - Sin cambios.
@@ -71,6 +71,6 @@ src/force/CMakeLists.txt
 - Como ic_lib: publica src/force y build/src/force, depende de pdes_lib y utils_lib y los enlaza (GHOST depende de fftp_lib, pseudo_lib, memmgt_lib, pdes_lib y utils_lib, y enlaza project_mpi y utils_lib).
 
 src/steppers/CMakeLists.txt
-- stepper_lib compila gstepper_base.f90 y canuto_stepper.f90, versiones de SPECTER de los de GHOST sin partículas (solo step). El de Canuto llama a solver%end_stage después de actualizar cada etapa.
-- Todavía no está stepper_factory: el main construye el integrador con el orden ORD fijado al compilar, en vez de leer &stepper.
+- stepper_lib compila gstepper_base.f90, canuto_stepper.f90 y stepper_factory.f90, versiones de SPECTER de los de GHOST sin partículas (solo step, y el genérico gstep agrupa solo step). El de Canuto llama a solver%end_stage después de actualizar cada etapa.
+- stepper_factory.f90 lee &stepper como el de GHOST y arma el integrador, solo el de Canuto (GEXRK no está en SPECTER). El orden se lee al correr: ORD ya no lo usa el integrador, y llega a las paredes (noslip_z, en boundary/vboundary.f90) como argumento desde end_stage.
 - stepper_lib depende de pdes_lib y la enlaza; a través de ella le llegan memmgt, pseudo, fftp y boundary.

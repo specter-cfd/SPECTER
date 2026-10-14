@@ -283,7 +283,7 @@ CONTAINS
 
     call v_imposebc_and_project(this%vplanbc_,planfc,               &
              uout(this%VELOCITY)%ccomp,uout(this%VELOCITY+1)%ccomp, &
-             uout(this%VELOCITY+2)%ccomp,this%pr_,rki=o,            &
+             uout(this%VELOCITY+2)%ccomp,this%pr_,rki=o,rko=norder, &
              v_zsta=this%vzsta_,v_zend=this%vzend_)
   end subroutine end_stage_impl
 

@@ -64,7 +64,7 @@
       END SUBROUTINE v_setup
 
 !***********************************************************************
-      SUBROUTINE v_imposebc_and_project(planbc,planfc,vx,vy,vz,pr,rki, &
+      SUBROUTINE v_imposebc_and_project(planbc,planfc,vx,vy,vz,pr,rki,rko, &
                                         v_zsta,v_zend)
 !-----------------------------------------------------------------------
 !   Subroutine to apply boundary conditions to the velocity field and
@@ -78,6 +78,7 @@
 !    pr     : Array containing the pressure in the (z,ky,kx) domain
 !             or (z,y,kx) domain if y is non-periodic. [IN]
 !    rki    : Current iteration of Runge-Kutta scheme. (OPTIONAL) [IN]
+!    rko    : Order of the Runge-Kutta scheme. (OPTIONAL) [IN]
 !    v_zsta : x and y components of v at z=0.  (OPTIONAL) [IN]
 !    v_zend : x and y components of v at z=Lz. (OPTIONAL) [IN]
 !-----------------------------------------------------------------------
@@ -93,7 +94,7 @@
       COMPLEX(KIND=GP),INTENT(INOUT),DIMENSION(planfc%z%n,planfc%y%n,ista:iend) :: vx,vy,vz,pr
 
       REAL(KIND=GP), INTENT(IN), DIMENSION(2), OPTIONAL :: v_zsta, v_zend
-      INTEGER, INTENT(IN), OPTIONAL       :: rki
+      INTEGER, INTENT(IN), OPTIONAL       :: rki,rko
 
 !TODO Create interface for the case of non-periodic BC in X
 !(in that case pr should be real)
@@ -116,9 +117,9 @@
       CALL goto_domain_w_boundaries(planbc,planfc,vx,vy)
 
       IF ( (planbc%bczsta .eq. 0 .OR. planbc%bczend .eq. 0) .AND. &
-            .NOT. PRESENT(rki) ) THEN
+            (.NOT. PRESENT(rki) .OR. .NOT. PRESENT(rko)) ) THEN
          IF ( myrank .eq. 0 ) PRINT*, "[ERROR] Non-slip BC require `rki` ", &
-             "keyword argument in call to imposebc_and_project. Aborting..."
+             "and `rko` keyword arguments in call to imposebc_and_project. Aborting..."
          CALL MPI_FINALIZE(MPI_COMM_WORLD, ierr) 
          STOP
       ENDIF
@@ -126,18 +127,18 @@
       ! Z=0
       IF (planbc%bczsta .eq. 0) THEN
           IF( .NOT. PRESENT(v_zsta) ) THEN
-             CALL noslip_z(planfc,rki,vx,vy,vz,pr,(/.0_GP,.0_GP/),0)
+             CALL noslip_z(planfc,rki,rko,vx,vy,vz,pr,(/.0_GP,.0_GP/),0)
           ELSE
-             CALL noslip_z(planfc,rki,vx,vy,vz,pr,v_zsta,0)
+             CALL noslip_z(planfc,rki,rko,vx,vy,vz,pr,v_zsta,0)
           ENDIF
       ENDIF
 
       ! Z=Lz
       IF (planbc%bczend .eq. 0) THEN
           IF( .NOT. PRESENT(v_zend) ) THEN
-             CALL noslip_z(planfc,rki,vx,vy,vz,pr,(/.0_GP,.0_GP/),1)
+             CALL noslip_z(planfc,rki,rko,vx,vy,vz,pr,(/.0_GP,.0_GP/),1)
           ELSE
-             CALL noslip_z(planfc,rki,vx,vy,vz,pr,v_zend,1)
+             CALL noslip_z(planfc,rki,rko,vx,vy,vz,pr,v_zend,1)
           ENDIF
       ENDIF
 
@@ -151,13 +152,14 @@
       END SUBROUTINE v_imposebc_and_project
       
 !***********************************************************************
-      SUBROUTINE noslip_z(planfc,o,vx,vy,vz,pr,vbound,pos)
+      SUBROUTINE noslip_z(planfc,o,ord,vx,vy,vz,pr,vbound,pos)
 !-----------------------------------------------------------------------
 !  Subroutine to apply non-slip boundary conditions in top and bottom
 !  boundaries.
 !  ARGUMENTS:
 !    fcplan : FCPLAN to use during the imposition. [IN]
 !    o      : Current iteration of the Runge-Kutta scheme. [IN]
+!    ord    : Order of the Runge-Kutta scheme. [IN]
 !    vi     : Array containing the ith component of the velocity field
 !              (kz,ky,kx) domain. [INOUT]
 !    pr     : Array containing the pressure in the (z,ky,kx) domain
@@ -171,7 +173,6 @@
       USE fcgram
       USE kes
       USE var
-      USE order
 !$    USE threads
 
       IMPLICIT NONE
@@ -180,7 +181,7 @@
       COMPLEX(KIND=GP),INTENT(INOUT),DIMENSION(planfc%z%n,planfc%y%n,ista:iend) :: vx,vy,vz
       COMPLEX(KIND=GP),INTENT(IN),DIMENSION(planfc%z%n,planfc%y%n,ista:iend)    :: pr
       REAL(KIND=GP), INTENT(IN), DIMENSION(2) :: vbound
-      INTEGER, INTENT(IN)  :: o,pos
+      INTEGER, INTENT(IN)  :: o,ord,pos
 
       REAL(KIND=GP) :: tmp
       INTEGER       :: ind

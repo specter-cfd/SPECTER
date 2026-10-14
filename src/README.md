@@ -74,13 +74,9 @@ OZ       = 5
 defines the order of approximation in each non-periodic direction.
 Should be set to zero for periodic directions.
 
-Also, the variable
-
-```
-ORD      = 2
-```
-
-controls the number of iterations in the Runge-Kutta method.
+The order of the Runge-Kutta method is no longer set at compile
+time: it is read at run time from the list 'stepper' (see section
+3.1). The variable `ORD` is still accepted but has no effect.
 
 The set of PDEs and boundary conditions are defined by the variable
 
@@ -321,6 +317,21 @@ where
 
 The initial conditions and the forcing have their own lists (see
 below); the list 'velocity' of older versions is no longer read.
+
+# 
+The time stepper is set by the list 'stepper', as in `GHOST`:
+
+```
+&stepper
+sname = "TRADITIONAL"   ! Runge-Kutta of Canuto et al.
+itype = 1
+norder = 2              ! order of the Runge-Kutta method
+nstage = 2              ! number of stages (= norder)
+/
+```
+
+The only stepper available is `TRADITIONAL`, a low storage
+Runge-Kutta with `norder` stages.
 
 # 
 The initial velocity field is set by the list 'initial_conditions':

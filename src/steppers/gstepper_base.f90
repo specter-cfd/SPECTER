@@ -3,7 +3,8 @@
 ! DESCRIPTION: Forms base class for all time steppers
 !
 ! Versión de SPECTER del gstepper_base.fpp de GHOST (rama new_paradigm,
-! afaf9ea), sin partículas: solo el paso de los campos (step).
+! afaf9ea), sin partículas: solo el paso de los campos (step), y el
+! genérico gstep agrupa solo step.
 !
 ! DATE       : 2/8/26 (DLR)
 ! ===================================================================
@@ -32,6 +33,7 @@ module gstepperbase_mod
       procedure(GStepper_ctor_interface), deferred :: GStepper_ctor ! Constructor
       procedure         (init_interface), deferred :: init          ! init method
       procedure         (step_interface), deferred :: step          ! fluid step method
+      generic              , public :: gstep => step                ! general method
   end type GStepperBase 
   
   abstract interface

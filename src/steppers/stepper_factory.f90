@@ -1,0 +1,77 @@
+! ===================================================================
+! Factory for all allowed time stepper objects
+!
+! Versión de SPECTER del stepper_factory.f90 de GHOST (rama
+! new_paradigm, afaf9ea): sin partículas y solo con el integrador de
+! Canuto (TRADITIONAL); GEXRK no está en SPECTER.
+!
+! DATE : 02/8/26 (DLR)
+! ===================================================================
+
+module stepper_factory
+  use gstepperbase_mod
+  use canuto_stepper_mod
+  implicit none
+
+  ! ================= Global parameters ===============================
+
+contains
+
+  ! ================= Factory subroutine ============================
+  ! Allocates and constructs the stepper in the caller's variable. It
+  ! is a subroutine and not a function on purpose: the constructor
+  ! allocates temporaries with device copies (GEXRK), and returning
+  ! the object as a function result would copy them into new host
+  ! arrays without device copies while finalizing the registered ones.
+  subroutine build_stepper_from_file(infile, new_object, workspace, solver)
+    use equationbase_mod
+    use commtypes
+    class(GStepperBase), allocatable, intent(out) :: new_object
+    class  (GWorkspace), intent(inout)            :: workspace
+    class(EquationBase), intent   (in), target    :: solver
+    character   (len=*), intent   (in)            :: infile
+
+    ! Temporary data to read from namelists:
+    integer                                :: itype,norder,nstage
+    character(len=128)                     :: sname    ! stepper name
+    type(GStepperTraits)                   :: straits
+
+    ! Required namelists:
+    namelist/ stepper / sname, itype, norder, nstage
+    sname          = 'TRADITIONAL' ! TRADITIONAL
+    itype          = 1             ! Butcher type if using GEXRK object
+    norder         = 2             ! 2nd order
+    nstage         = 2             ! 2 stages
+
+    call MPI_COMM_SIZE(MPI_COMM_WORLD,nprocs,ierr)
+    call MPI_COMM_RANK(MPI_COMM_WORLD,myrank,ierr)
+    if ( myrank .eq. 0 ) then
+      open(1,file=infile,status='unknown',form="formatted")
+      read(1,NML=stepper)
+      close(1)
+    endif
+    call mpi_bcast(itype ,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
+    call mpi_bcast(norder,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
+    call mpi_bcast(nstage,1  ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
+    call mpi_bcast(sname ,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+
+    ! Build stepper traits structure:
+    straits%sname   = sname
+    straits%itype   = itype
+    straits%norder  = norder
+    straits%nstage  = nstage
+    straits%nstate  = solver%state_size()
+
+    ! Allocate child object:
+    select case (trim(adjustl(sname)))
+      case ('traditional', 'TRADITIONAL')
+        allocate( CanutoStepper :: new_object )
+      case default
+        stop 'stepper_factory::build_stepper_from_file: Invalid stepper type'
+    end select
+
+    ! Call constructor:
+    call new_object%GStepper_ctor(straits,workspace,solver)
+  end subroutine build_stepper_from_file
+
+end module stepper_factory

@@ -65,7 +65,7 @@
       USE gstate_mod
       USE class_GWorkspace3D
       USE hd_mod
-      USE canuto_stepper_mod
+      USE stepper_factory
       USE ic_factory
       USE force_factory
 
@@ -162,8 +162,7 @@
 #endif
 
       TYPE(HDSolver), TARGET :: fluid
-      TYPE(CanutoStepper)  :: stepper
-      TYPE(GStepperTraits) :: straits
+      CLASS(GStepperBase), ALLOCATABLE :: stepper
       CLASS(icChain), ALLOCATABLE :: iclist(:)
       CLASS(forceChain), ALLOCATABLE :: forcemethod(:)
 
@@ -588,14 +587,6 @@
 ! Set up boundary conditions
       CALL fluid%Solver_ctor('parameter.inp',workspace,planio)
 
-! Time stepper (Canuto); by now the order is ORD, set at compile time
-      straits%itype  = 1
-      straits%norder = ord
-      straits%nstage = ord
-      straits%nstate = fluid%state_size()
-      straits%sname  = 'TRADITIONAL'
-      CALL stepper%GStepper_ctor(straits,workspace,fluid)
-
 ! Initial conditions (see ic/ic_factory.f90)
       iclist = init_ic_from_file('parameter.inp')
 
@@ -701,6 +692,9 @@
       CALL GState_copy(field_nxt,field)
 
       CALL init_forcing(forcemethod,fluid,force)
+
+! Sets up the time stepper (&stepper, see steppers/stepper_factory.f90)
+      CALL build_stepper_from_file('parameter.inp',stepper,workspace,fluid)
 
 !
 ! Time integration scheme starts here.
@@ -823,7 +817,7 @@
 ! Time step (GHOST Canuto stepper): field keeps the state at the
 ! beginning of the step and field_nxt is advanced
          CALL GState_copy(field,field_nxt)
-         CALL stepper%step((t-1)*dt,field,force,dt,field_nxt)
+         CALL stepper%gstep((t-1)*dt,field,force,dt,field_nxt)
 
          timet = timet+1
          timec = timec+1

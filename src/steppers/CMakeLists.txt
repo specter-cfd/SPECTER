@@ -1,8 +1,9 @@
 # Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
-# steppers: integradores temporales (por ahora solo el de Canuto)
+# steppers: integradores temporales (por ahora solo el de Canuto) y su fábrica
 add_library(stepper_lib STATIC
   gstepper_base.f90
   canuto_stepper.f90
+  stepper_factory.f90
 )
 
 # Directorios de inclusión
