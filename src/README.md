@@ -85,7 +85,9 @@ SOLVER   = BOUSS
 ```
 
 See the file `SOLVERS_AND_BOUNDARY_CONDITIONS.info` for a list of the
-implemented solvers.
+implemented solvers. The CMake build only supports `HD`, and the
+solver must also be named at run time in the list 'pdes' (see
+section 3.1).
 
 Finally the variable
 
@@ -298,6 +300,15 @@ The variables in this list are
 - `tstep` and `cstep`: number of time steps done between exporting
       global quantities (`cstep`), and binary files (`tstep`).
 - `seed`: seed for the random number generator.
+
+# 
+The solver is chosen with the list 'pdes', as in `GHOST`:
+
+```
+&pdes
+solver = "HD"     ! the only solver available
+/
+```
 
 # 
 The HD solver reads its parameters from the list 'HD', as in

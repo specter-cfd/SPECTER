@@ -64,7 +64,7 @@
       USE boxsize
       USE gstate_mod
       USE class_GWorkspace3D
-      USE hd_mod
+      USE equation_factory
       USE stepper_factory
       USE ic_factory
       USE force_factory
@@ -78,7 +78,6 @@
       IMPLICIT NONE
 
       TYPE(GStateComp), ALLOCATABLE, TARGET :: field(:), field_nxt(:), force(:)
-      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: vx,vy,vz
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: th,fs
 #endif
@@ -91,8 +90,6 @@
 !
 ! Temporal data storage arrays
 
-      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: C1,C2,C3
-      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: C4,C5,C6
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C7,C8
 #endif
@@ -101,7 +98,6 @@
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C12,C13,C14
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C15,C16,C17
 #endif
-      REAL(KIND=GP), POINTER, DIMENSION (:,:,:)    :: R1,R2,R3
       TYPE(GWorkspace), TARGET :: workspace
 
 !
@@ -150,6 +146,7 @@
 !
 ! Book keeping variables, options holders and clocks 
       INTEGER :: t,o
+      INTEGER :: num_components
       INTEGER :: i,j,k
       INTEGER :: ki,kj,kk
       INTEGER :: ihcpu1,ihcpu2
@@ -161,7 +158,7 @@
       INTEGER :: dyna
 #endif
 
-      TYPE(HDSolver), TARGET :: fluid
+      CLASS(EquationBase), ALLOCATABLE, TARGET :: fluid
       CLASS(GStepperBase), ALLOCATABLE :: stepper
       CLASS(icChain), ALLOCATABLE :: iclist(:)
       CLASS(forceChain), ALLOCATABLE :: forcemethod(:)
@@ -267,29 +264,14 @@
 ! Create partitions across tasks
      CALL range(1,nx/2+1,nprocs,myrank,ista,iend)
      CALL range(1,nz,nprocs,myrank,ksta,kend)
- ! Initialize array IO
+! Initialize array IO
       CALL io_init(myrank,(/nx-Cx,ny-Cy,nz-Cz/),ksta,kend,planio)
 
-!
-! Allocates memory for distributed blocks
-      CALL GState_alloc(field, 3)
-      vx => field(1)%ccomp
-      vy => field(2)%ccomp
-      vz => field(3)%ccomp
-      CALL GState_alloc(field_nxt, 3)
-      CALL GState_alloc(force, 3)
-
-      CALL workspace%initialize_pool(6,12)
-      CALL workspace%get_complex_tmp(C1)
-      CALL workspace%get_complex_tmp(C2)
-      CALL workspace%get_complex_tmp(C3)
-      CALL workspace%get_complex_tmp(C4)
-      CALL workspace%get_complex_tmp(C5)
-      CALL workspace%get_complex_tmp(C6)
-
-      CALL workspace%get_real_tmp(R1)
-      CALL workspace%get_real_tmp(R2)
-      CALL workspace%get_real_tmp(R3)
+! PDE solver (&pdes, see pdes/equation_factory.f90) and the pool of
+! temporary arrays, sized for that solver
+      fluid = init_pdes_from_file('parameter.inp')
+      CALL workspace%initialize_pool(NUMTMPREAL,NUMTMPCOMP)
+      CALL workspace%init_host_entries(NUMTMPHREAL,NUMTMPHCOMP)
 
 #ifdef SCALAR_
       ALLOCATE( th(nz,ny,ista:iend), fs(nz,ny,ista:iend) )
@@ -586,6 +568,11 @@
 #ifndef TESTS_  /* If building tests jump to after Runge-Kutta*/
 ! Set up boundary conditions
       CALL fluid%Solver_ctor('parameter.inp',workspace,planio)
+
+      num_components = fluid%state_size()
+      CALL GState_alloc(field    , num_components)
+      CALL GState_alloc(field_nxt, num_components)
+      CALL GState_alloc(force    , num_components)
 
 ! Initial conditions (see ic/ic_factory.f90)
       iclist = init_ic_from_file('parameter.inp')
@@ -886,6 +873,9 @@
          ENDIF
       ENDIF
 
+! Peak usage of the pool of temporary arrays
+      CALL workspace%report_peaks()
+
       CALL MPI_FINALIZE(ierr)
 
       CALL GTFree(ihcpu1)
@@ -900,18 +890,6 @@
       CALL GState_dealloc(field)
       CALL GState_dealloc(field_nxt)
       CALL GState_dealloc(force)
-
-      CALL workspace%free_complex_tmp(C1)
-      CALL workspace%free_complex_tmp(C2)
-      CALL workspace%free_complex_tmp(C3)
-      CALL workspace%free_complex_tmp(C4)
-      CALL workspace%free_complex_tmp(C5)
-      CALL workspace%free_complex_tmp(C6)
-
-      CALL workspace%free_real_tmp(R1)
-      CALL workspace%free_real_tmp(R2)
-      CALL workspace%free_real_tmp(R3)
-
 
       DEALLOCATE( x,y,z )
       DEALLOCATE( kx,ky,kz )

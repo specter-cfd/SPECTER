@@ -1,10 +1,12 @@
 # Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
 # pdes: la lectura de &status (status_mod.f90), la clase base de los
-# solvers (equation_base.f90) y el solver HD (hd_solver.f90)
+# solvers (equation_base.f90), el solver HD (hd_solver.f90) y la
+# fábrica de solvers (equation_factory.f90)
 add_library(pdes_lib STATIC
   status_mod.f90
   equation_base.f90
   hd_solver.f90
+  equation_factory.f90
 )
 
 # Directorios de inclusión. memmgt_lib no publica la carpeta de sus

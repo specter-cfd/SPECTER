@@ -23,6 +23,11 @@ Ly = 0.50            ! length of the box in y
 Lz = 1.00            ! length of the box in z
 /
 
+! PDE solver (see src/pdes/equation_factory.f90)
+&pdes
+solver = "HD"        ! the only solver available
+/
+
 ! Parameters of the HD solver (see src/pdes/hd_solver.f90)
 &HD
 nu = 1.e-3           ! kinematic viscosity

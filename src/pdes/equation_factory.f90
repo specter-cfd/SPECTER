@@ -6,39 +6,34 @@
 ! allocate the solver class, and declare the number of field
 ! components the solver needs.
 !
+! Versión de SPECTER del equation_factory.f90 de GHOST (rama
+! new_paradigm, afaf9ea), solo con el solver HD. El pool de
+! temporarios es el pico de SPECTER (6 complejos y 3 reales, los de
+! write_states, medidos con report_peaks), y el pool solo-host no se
+! usa.
+!
 ! DATE : 03/29/26 (PDM)
 ! ===================================================================
 
 module equation_factory
   USE equationbase_mod
   USE hd_mod
-  USE mhd_mod
-  USE moist_mod
-  USE bouss_mod
-  USE cmhd_mod
-  USE gl_mod
-  USE gpe_mod
 ! USE userdefinedpde_mod
-  
+
   IMPLICIT NONE
 
   ! ================= Global parameters ===============================
   ! Number of complex and real temporary arrays in the workspace pool,
   ! the peak of the nested requests of each solver as measured with
-  ! report_peaks on the example inputs. The pseudospectral routines take
-  ! their temporaries from the pool: prodre3, gradre3 and vector3 need 7
-  ! real arrays, advect3 2 complex and 3 real, on top of the ones held by
-  ! the caller (rotor3 and derivk3 need none).
-  ! Forcing methods with permanent storage (shuffle) add their own
-  ! entries in the forcing factory.
+  ! report_peaks on the example inputs.
   integer, public :: NUMTMPCOMP = 0 ! Number of cmplx tmp arrays
   integer, public :: NUMTMPREAL = 0 ! Number of real tmp arrays
-  ! Host-only temporaries, for the diagnostics (all solvers).
-  integer, public :: NUMTMPHCOMP = 6 ! Number of host-only cmplx tmp arrays
-  integer, public :: NUMTMPHREAL = 3 ! Number of host-only real tmp arrays
-  
+  ! Host-only temporaries, for the diagnostics (not used in SPECTER).
+  integer, public :: NUMTMPHCOMP = 0 ! Number of host-only cmplx tmp arrays
+  integer, public :: NUMTMPHREAL = 0 ! Number of host-only real tmp arrays
+
 CONTAINS
-  
+
   ! ================= Factory function ==============================
   function init_pdes_from_file(infile) result(new_object)
     USE commtypes
@@ -64,30 +59,7 @@ CONTAINS
     select case (trim(adjustl(solver)))
       case ('HD')
         allocate(HDsolver    :: new_object)
-        NUMTMPCOMP =  8; NUMTMPREAL = 7
-      case ('BOUSS')
-        allocate(BOUSSsolver :: new_object)
-        NUMTMPCOMP = 10; NUMTMPREAL = 7
-      case ('MOIST')
-        allocate(MOISTsolver :: new_object)
-        NUMTMPCOMP = 10; NUMTMPREAL = 9
-      case ('MHD')
-        allocate(MHDsolver   :: new_object)
-        NUMTMPCOMP = 12; NUMTMPREAL = 7
-      case ('CMHD')
-        allocate(CMHDsolver  :: new_object)
-        NUMTMPCOMP = 19; NUMTMPREAL = 7
-      case ('GL')
-        allocate(GLsolver    :: new_object)
-        NUMTMPCOMP = 10; NUMTMPREAL = 4
-        NUMTMPHCOMP = 12; NUMTMPHREAL = 12
-      case ('GPE')
-        allocate(GPEsolver   :: new_object)
-        NUMTMPCOMP = 13; NUMTMPREAL = 4
-        NUMTMPHCOMP = 12; NUMTMPHREAL = 12
-!     case ('UserDefined')
-!       allocate(UserDefinedsolver :: new_object)
-!       NUMTMPCOMP =  8; NUMTMPREAL = 3
+        NUMTMPCOMP =  6; NUMTMPREAL = 3
       case default
         stop 'Equation factory :: init_pdes_from_file : Unknown solver name'
     end select

@@ -47,7 +47,8 @@ src/boundary/CMakeLists.txt
 - No existe en GHOST: las condiciones de borde son propias de SPECTER. boundary_mod.fpp recibe el solver (HD_SOL) e incluye vboundary.f90.
 
 src/pdes/CMakeLists.txt
-- pdes_lib compila status_mod.f90, equation_base.f90 y hd_solver.f90. equation_factory y los otros solvers se suman cuando se implementen.
+- pdes_lib compila status_mod.f90, equation_base.f90, hd_solver.f90 y equation_factory.f90. Los otros solvers de GHOST no están.
+- equation_factory.f90 es el de GHOST solo con HD: lee &pdes y crea el solver, y fija el pool de temporarios en el pico medido en SPECTER con report_peaks (6 complejos y 3 reales). El pool solo-host queda en cero, porque SPECTER no lo usa.
 - status_mod.f90 es el de GHOST con tdir agregado, directorios de 100 caracteres y sin USE grid, kes ni ali. Lee un único &status, así que el parameter.inp de SPECTER pasa a tener dt, step, tstep, cstep y seed adentro de &status.
 - equation_base.f90 es una versión reducida del de GHOST: solo EquationBase y VelocityBase (sin escalares pasivos), con un método end_stage que el integrador llama después de cada etapa.
 - hd_solver.f90 es el solver HD de SPECTER, que se arma de a un método por vez. Lee &HD como el de GHOST (nu, y los directorios fidir, fodir y todir), sin la rotación, los escalares pasivos ni spectlod, que SPECTER no tiene.
@@ -57,7 +58,7 @@ src/pdes/CMakeLists.txt
 src/memmgt/CMakeLists.txt
 - memmgt_lib depende de pseudo_lib (donde está el módulo grid en SPECTER) en vez de pseudobase_lib.
 - Como en GHOST, memmgt_lib no publica build/src/memmgt, donde quedan sus módulos: quien los usa agrega esa carpeta a mano (project_includes y pdes_lib).
-- El ejecutable lo enlaza directamente; el main usa gstate_mod (velocidad y forzado) y el pool de class_GWorkspace3D (temporarios). La presión es un arreglo auxiliar del solver HD, reservado con galloc.
+- El ejecutable lo enlaza directamente; el main usa gstate_mod (estados de los campos y del forzado) y arma el pool de class_GWorkspace3D con el tamaño que fija la fábrica de solvers, como GHOST. La presión es un arreglo auxiliar del solver HD, reservado con galloc.
 
 src/ic/CMakeLists.txt
 - ic_lib compila ic_base.f90 (igual al de GHOST), ic_velocity.f90 e ic_factory.f90. No están ic_magnetic, ic_active, ic_passive ni ic_quantum, que no tienen solver en SPECTER.
