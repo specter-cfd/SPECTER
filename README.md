@@ -52,7 +52,7 @@ The initial velocity field is chosen at run time with the list `iclist` of the n
 
 Getting FC-Gram tables
 ----------------------
-For non-periodic directions, **SPECTER** uses tables to compute appropriate periodic extensions. A collection of commonly employed tables can be found in the `tables/` directory. However, a supplementary **Fortran** program to generate these tables is available at [https://github.com/mfontanaar/fctables](https://github.com/mfontanaar/fctables).
+For non-periodic directions, **SPECTER** uses tables to compute appropriate periodic extensions. A collection of commonly employed tables can be found in the `tables/` directory. However, a supplementary **Fortran** program to generate these tables is available at [https://github.com/specter-cfd/fctables](https://github.com/specter-cfd/fctables).
 
 Regridding
 ----------

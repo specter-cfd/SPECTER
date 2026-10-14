@@ -9,4 +9,4 @@ directory `boots`.
 
 If another combination of parameters is required, it can be generated
 using the Fortran program available at:
-https://github.com/mfontanaar/fctables.
+https://github.com/specter-cfd/fctables.
