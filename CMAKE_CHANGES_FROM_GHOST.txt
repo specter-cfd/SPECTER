@@ -1,4 +1,4 @@
-Cambios de los archivos de CMake de SPECTER respecto de los de GHOST (rama new_paradigm, commit afaf9ea). Por ahora se compila solo HD, en CPU.
+Cambios de los archivos de CMake de SPECTER respecto de los de GHOST (rama new_paradigm, commit afaf9ea). Por ahora se compila solo HD, en CPU. CMake es el único build: el Makefile viejo de SPECTER (src/Makefile, src/Makefile.in y los de cada carpeta) ya no está, y las menciones a Makefile.in de abajo dicen de dónde salió cada valor. Del SPECTER original quedó solo lo que usa HD: no están los otros solvers, el código para CUDA (fftp-cu) ni las pruebas. boots (src/tools y tables/boots) está, pero todavía no se compila.
 
 CMakeLists.txt (raíz)
 - Parte de una copia literal del de GHOST y conserva todas sus secciones.
@@ -7,8 +7,8 @@ CMakeLists.txt (raíz)
 - add_compile_definitions suma IKIND_, que usa fftp_mod.fpp.
 - FFT: la biblioteca con FFTW se llama fftp (en GHOST, fftp-3).
 - IO: el mensaje de error dice SPECTER en vez de GHOST.
-- SOLVER no se define acá sino en UserConfig.cmake (HD). project_defs queda igual y le pasa HD_SOL al main.
-- project_includes suma src/include (los pasos de cada solver, hd/hd_*.f90), src/boundary y build/src/boundary.
+- SOLVER no se define acá sino en UserConfig.cmake (HD), y da el nombre del ejecutable. project_defs queda igual y define HD_SOL, aunque en SPECTER ya no lo usa nadie: el solver se elige al correr, con &pdes.
+- project_includes suma src/boundary y build/src/boundary.
 - Subdirectorios: se suman boundary, memmgt, pdes, ic, force y steppers. particles, icpart y tools quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable.
 - Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib, pdes_lib, memmgt_lib, ic_lib, force_lib y stepper_lib.
 - Instalador: instala solo el ejecutable, porque BOOTS y ghost_python no existen en SPECTER.
@@ -18,7 +18,7 @@ UserConfig.cmake
 - PRECISION vale DOUBLE por defecto (en GHOST, SINGLE), como en Makefile.in.
 - FFTP vale fftp (en GHOST, fftp-3).
 - IKIND, CSIZE y NSTRIP se toman de Makefile.in: IKIND=8 no existe en GHOST, CSIZE=32 en vez de 8 y NSTRIP=1 igual.
-- Se agregan los parámetros que SPECTER fija al compilar y GHOST lee al correr: SOLVER (HD), la grilla (NX, NY, NZ), las continuaciones (CX, CY, CZ), los órdenes de borde (OX, OY, OZ) y ORD. ORD ya no tiene efecto: el orden del Runge-Kutta se lee de &stepper.
+- Se agregan los parámetros que SPECTER fija al compilar y GHOST lee al correr: SOLVER (HD), la grilla (NX, NY, NZ), las continuaciones (CX, CY, CZ) y los órdenes de borde (OX, OY, OZ). El orden del Runge-Kutta, que SPECTER también fijaba al compilar (ORD), se lee de &stepper.
 
 FindFFTW3.cmake
 - Sin cambios.
@@ -40,11 +40,11 @@ src/mpiio/CMakeLists.txt
 
 src/pseudo/CMakeLists.txt
 - Una sola biblioteca, pseudo_lib, con los fuentes de SPECTER que usa HD: pseudospec_mod.fpp, module_dns.f90 y pseudospec_hd.f90. GHOST separa pseudobase_lib (pseudospec3D_mod.f90) y pseudo_lib (los núcleos de todos los solvers).
-- pseudospec_mod.fpp recibe la grilla y el FC-Gram (NX_, ..., OZ_, ORD_), que en GHOST se leen al correr.
+- pseudospec_mod.fpp recibe la grilla y el FC-Gram (NX_, ..., OZ_), que en GHOST se leen al correr.
 - No depende de memmgt_lib ni de gmem_lib.
 
 src/boundary/CMakeLists.txt
-- No existe en GHOST: las condiciones de borde son propias de SPECTER. boundary_mod.fpp recibe el solver (HD_SOL) e incluye vboundary.f90.
+- No existe en GHOST: las condiciones de borde son propias de SPECTER. boundary_mod.fpp incluye vboundary.f90; las del escalar y el campo magnético (sboundary.f90 y bboundary.f90), de otros solvers, ya no están.
 
 src/pdes/CMakeLists.txt
 - pdes_lib compila status_mod.f90, equation_base.f90, hd_solver.f90 y equation_factory.f90. Los otros solvers de GHOST no están.
@@ -73,5 +73,5 @@ src/force/CMakeLists.txt
 
 src/steppers/CMakeLists.txt
 - stepper_lib compila gstepper_base.f90, canuto_stepper.f90 y stepper_factory.f90, versiones de SPECTER de los de GHOST sin partículas (solo step, y el genérico gstep agrupa solo step). El de Canuto llama a solver%end_stage después de actualizar cada etapa.
-- stepper_factory.f90 lee &stepper como el de GHOST y arma el integrador, solo el de Canuto (GEXRK no está en SPECTER). El orden se lee al correr: ORD ya no lo usa el integrador, y llega a las paredes (noslip_z, en boundary/vboundary.f90) como argumento desde end_stage.
+- stepper_factory.f90 lee &stepper como el de GHOST y arma el integrador, solo el de Canuto (GEXRK no está en SPECTER). El orden se lee al correr y llega a las paredes (noslip_z, en boundary/vboundary.f90) como argumento desde end_stage.
 - stepper_lib depende de pdes_lib y la enlaza; a través de ella le llegan memmgt, pseudo, fftp y boundary.

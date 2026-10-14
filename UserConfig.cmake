@@ -49,5 +49,3 @@ set(CZ 25 CACHE STRING "Continuation points in z")
 set(OX 0 CACHE STRING "Boundary order in x")
 set(OY 0 CACHE STRING "Boundary order in y")
 set(OZ 5 CACHE STRING "Boundary order in z")
-# Cantidad de iteraciones del Runge-Kutta
-set(ORD 2 CACHE STRING "Runge-Kutta order")

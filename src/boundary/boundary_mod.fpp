@@ -3,9 +3,11 @@
 !
 !
 ! 2020 Mauro Fontana. DF-UBA.
+!
+! En el fork solo quedan las condiciones de borde de la velocidad
+! (vboundary.f90): las del escalar y el campo magnético eran de otros
+! solvers.
 !======================================================================
-! Definitions for conditional compilation
-#include "../specter.h"
 
 MODULE boundary
       USE fprecision
@@ -19,15 +21,9 @@ MODULE boundary
       CONTAINS
 
       INCLUDE 'vboundary.f90'
-#ifdef SCALAR_
-      INCLUDE 'sboundary.f90'
-#endif
-#ifdef MAGFIELD_
-      INCLUDE 'bboundary.f90'
-#endif
 
 !***************************************************************************
-      SUBROUTINE setup_bc(this,planfc,bckind,field,vplan)
+      SUBROUTINE setup_bc(this,planfc,bckind,field)
 !---------------------------------------------------------------------------
 !  Add field and boundary conditions to the plan
 !  ARGUMENTS:
@@ -35,8 +31,8 @@ MODULE boundary
 !    fcplan : FCPLAN that will be used for the boundary conditions. [INOUT]
 !    bckind : Array of strings with the kind of boundary condition
 !             for each boundary. [INOUT]
-!    field  : Field whose boundary conditions must be set up. Options
-!             include 'v', 'b', 'th'.
+!    field  : Field whose boundary conditions must be set up. Only
+!             'v' (the velocity) is available.
 !---------------------------------------------------------------------------
       USE fcgram
 
@@ -47,22 +43,8 @@ MODULE boundary
       CHARACTER(len=15), INTENT(IN)        :: bckind(6)
       CHARACTER(len=*), INTENT(IN)         :: field
 
-      TYPE(BCPLAN), INTENT(IN), OPTIONAL   :: vplan
-
       IF ( field .eq. 'v' ) THEN
          CALL v_setup(this,planfc,bckind)
-#ifdef SCALAR_
-      ELSEIF ( field .eq. 's' ) THEN
-         CALL s_setup(this,planfc,bckind)
-#endif
-#ifdef MAGFIELD_
-      ELSEIF ( field .eq. 'b' ) THEN
-         IF (PRESENT(vplan)) THEN
-            CALL b_setup(this,planfc,bckind,vplan=vplan)
-         ELSE
-            CALL b_setup(this,planfc,bckind)
-         ENDIF
-#endif
       ENDIF
 
       RETURN

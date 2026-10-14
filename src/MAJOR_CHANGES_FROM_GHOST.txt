@@ -1,12 +1,14 @@
-- No 2/3 rule. Operations are now applied over entire arrays and results are filtered with calls to `fc_filter` when needed.
-- Module `boxsize` is now in module `grid`.
+Differences of the pseudospectral and boundary routines of SPECTER with respect to those of GHOST. The changes in the structure of the code (solver, initial conditions, forcing and time stepper as classes, as in the new_paradigm branch of GHOST) are described in CMAKE_CHANGES_FROM_GHOST.txt and in the header of each file.
+
+- No 2/3 rule. Operations are applied over entire arrays and results are filtered with calls to `fc_filter` when needed.
+- Module `boxsize`, as in GHOST, but in non-periodic directions the lengths are in units of 1 and `box_init` builds the grids including the continuation points.
 - New module `fcgram` with information about continuation points and boundary approximation order.
-- Global quantities and spectras are now computed in a mixed (kx,ky,z) domain, as information in fully spectral domains contains the non-physical contribution of the FC-Gram continuation.
-- Remove trailing 3 in certain subroutines. New names are  `gradre`, `prodre`, `derivk`, `laplak`, `vector`.
+- Global quantities are computed in a mixed (kx,ky,z) domain, as information in fully spectral domains contains the non-physical contribution of the FC-Gram continuation.
+- Remove trailing 3 in certain subroutines. New names are `gradre`, `prodre`, `derivk`, `laplak`, `vector`.
 - `rotor` renamed `curlk` for consistency.
 - The subroutines that compute non-linear hd terms (`gradre`, `prodre`) return the three components of the result.
-- `nonlhd` renamed poisson, and now it returns the inhomogeneous pressure instead of projecting v over solenoidal space inplace.
-- New subroutine `pressure` that handles the projection of v into solenoidal space as well as the Neumann conditions for v.
-- New subroutine `laplace` that computes the homogeneous solution of Laplace equation for two periodic, 1 non-periodic dimension.
-- New output subroutine `diagnostic`` and new text output diagnostic.txt that contains the mean squared value of the divergence in the bulk of the fluid and of the slip velocity and normal velocity at boundaries.
-- Normalization routine for vector fields is now called `normvec` and is located in `pseudospec_hd.f90`
+- `nonlhd` is replaced by `poisson_inhomogeneous`, which returns the inhomogeneous pressure instead of projecting v over solenoidal space in place.
+- New subroutine `sol_project` (called from `v_imposebc_and_project`, which the HD solver calls after each Runge-Kutta stage) that handles the projection of v into solenoidal space as well as the boundary conditions for v.
+- New subroutine `laplace_z` that computes the homogeneous solution of Laplace equation for two periodic and one non-periodic dimension.
+- New output subroutine `vdiagnostic` and new text output `noslip_diagnostic.txt`, with the mean squared value of the divergence in the bulk of the fluid and of the slip velocity and normal velocity at the boundaries.
+- Normalization routine for vector fields is called `normvec` and is located in `pseudospec_hd.f90`.

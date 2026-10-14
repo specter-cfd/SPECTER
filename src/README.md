@@ -3,8 +3,8 @@ SPECTER code: Special PEriodic Continuation Turbulence solvER
 
 The code and different solvers provided here numerically integrate
 fluids equations in 3 dimensions with non-periodic boundary conditions.
-Different solvers are provided (check the Makefile and the comments in
-`specter.fpp` for the current list of supported solvers). A 
+The solver is chosen at run time; for now the only one is the
+hydrodynamic solver `HD`. A 
 pseudo-spectral method is used to compute spatial derivatives, 
 while a Runge-Kutta method of adjustable order is used to evolve the 
 system in the time domain. For non-periodic boundary conditions, an 
@@ -41,74 +41,64 @@ etc. You can specify an installation prefix other than `/usr/local`
 
 2 - Compiling the code
 ----------------------
-### 2.1. Setting code options:
-
-The linear resolution is set before compilation in the file
-Makefile.in. The lines
+`SPECTER` is compiled with CMake, out of the source tree. The options
+are set in the file `UserConfig.cmake`, or passed to `cmake` with `-D`
+(the values passed with `-D` are kept in the cache of the build
+directory). From the root of the repository:
 
 ```
-NX       = 64
-NY       = 64
-NZ       = 64
+mkdir build && cd build
+cmake .. -DFFTW3_ROOT=/path/to/fftw -DNZ=128 -DPRECISION=SINGLE
+make
+```
+
+The binary is placed in `bin/` and named like the solver (`HD`).
+
+### 2.1. Code options:
+
+The variables
+
+```
+NX = 256
+NY = 128
+NZ = 128
 ```
 
 set the number of grid points (including continuation regions) in
-each direction. Then the lines
+each direction. Then
 
 ```
-CX       = 0
-CY       = 0
-CZ       = 25
+CX = 0
+CY = 0
+CZ = 25
 ```
 
 set the number of continuation points to use in each direction.
 For periodic directions the desired variable should be set to zero
-(i.e. CX=0 implies that X is periodic). Similarly, the section
+(i.e. CX=0 implies that X is periodic). Similarly,
 
 ```
-OX       = 0
-OY       = 0
-OZ       = 5
+OX = 0
+OY = 0
+OZ = 5
 ```
 
-defines the order of approximation in each non-periodic direction.
-Should be set to zero for periodic directions.
+define the order of approximation in each non-periodic direction,
+and should be set to zero for periodic directions. The variable
+`PRECISION` (`SINGLE` or `DOUBLE`) sets the precision of the floating
+point numbers, and `FFTW3_ROOT` points to the installation of FFTW.
 
-The order of the Runge-Kutta method is no longer set at compile
-time: it is read at run time from the list 'stepper' (see section
-3.1). The variable `ORD` is still accepted but has no effect.
+The solver, the initial conditions, the forcing and the order of the
+Runge-Kutta method are chosen at run time (see section 3.1).
 
-The set of PDEs and boundary conditions are defined by the variable
-
-```
-SOLVER   = BOUSS
-```
-
-See the file `SOLVERS_AND_BOUNDARY_CONDITIONS.info` for a list of the
-implemented solvers. The CMake build only supports `HD`, and the
-solver must also be named at run time in the list 'pdes' (see
-section 3.1).
-
-Finally the variable
+The remaining options are optional and the defaults give good
+performance in most computers (don't change the values if you are
+unsure about the meaning of these variables). The variables
 
 ```
-PRECISION = SINGLE
-```
-
-adjust the usage of single or double precision for the representaton
-of floating point numbers in the code.
-
-The remaining options in this section are optional and the defaults
-give good performance in most computers. But if needed, you can set
-three more variables for optimization purposes in the file
-Makefile.in (again, the default values work fine in most computers,
-don't change the values if you are unsure about the meaning of
-these variables). The lines
-
-```
-IKIND    = 8
-CSIZE    = 32
-NSTRIP   = 1
+IKIND  = 8
+CSIZE  = 32
+NSTRIP = 1
 ```
 
 set the variables `ikind`, `csize`, and `nstrip` used in the
@@ -124,109 +114,30 @@ the transpositions. The default value is 1 and in that case no
 strip mining is done.
 
 Finally, if required, the users can change the number of digits
-used to label spectrum, transfer and binary files. The variables
-in the module `filefmt` (in the file `pseudo/pseudospec3D_mod.fpp`)
-control the length of the time label used to name these files.
+used to label the binary files. The variables in the module
+`filefmt` (in the file `pseudo/pseudospec_mod.fpp`) control the
+length of the time label used to name these files.
 
-### 2.2 Compiling the code:
+### 2.2. Parallelization:
 
-The initial velocity field and the mechanical forcing are chosen at
-run time, with the lists `initial_conditions` and `forcing` in
-`parameter.inp` (see section 3.1). Initial conditions and forcings
-for other fields (scalar, magnetic field) are still defined at
-compile time in the files `initial*.f90`. Examples of these files
-can be found in the directory `examples`.
+`SPECTER` uses 1D domain decomposition with pure MPI parallelization.
+The options for hybrid OpenMP-MPI parallelization and for GPUs in
+`UserConfig.cmake` come from `GHOST` and have no effect yet.
 
-Note that the name of all files in the directory `examples` finish
-with `_example-name`. To use any of these files, you must copy the
-file to the `src` directory and remove the `_example-name` from
-the name of the file. As an example, to use a null scalar source,
-from the `src` directory you must do
+### 2.3. Structure of the code:
 
-```
-cp examples/initialfs.f90_null initialfs.f90
-```
+As in `GHOST`, the main program `specter.fpp` builds the solver, the
+initial conditions, the forcing and the time stepper with their
+factories, from the lists in the input file:
 
-Check the Makefile to see all paths and variables are correct. This
-includes the variables explained above as well as the relevant
-compilers, MPI libraries and their respective flags.
+- `pdes/`     : the solver (`hd_solver.f90`) and its factory
+- `ic/`       : the initial conditions
+- `force/`    : the forcing
+- `steppers/` : the time stepper
+- `boundary/` : the boundary conditions of the velocity
 
-The path to the FFTW libraries can be changed by editting the
-variable `FFTWDIR` in `Makefile.in`. In addition, the Makefile
-supports `make clean`, `make dist`, and extra options to make code
-for data analysis after the runs are finished.
-
-### 2.3 Parallelization models
-
-By default, `SPECTER` uses 1D domain decomposition with pure MPI
-parallelization. This behavior can be changed with two settings
-in the Makefile.in file, or equivalently with two variables that
-can be passed to make at compile time.
-
-#### 2.3.1 Hybrid parallelization
-
-The code provides support for OpenMP-MPI hybridization, for use in
-supercomputers with multi-core processors and for simulations using
-a large number of cores. When the variable
-
-```
-P_HYBRID=yes
-```
-
-is defined in Makefile.in, a hybrid parallelization model is used.
-Then, the number of MPI jobs and the number of threads in each job
-can be set independently at run time. To define the number
-of threads (in this example, set to 4 threads) in a Bourne-like
-shell set the environment variable
-
-```
-export OMP_NUM_THREADS=4
-```
-
-and in a C-like shell do
-
-```
-setenv OMP_NUM_THREADS 4
-```
-
-For the hybrid code to scale properly, processor affinity and/or
-binding are crucial. How to set processor affinity and binding is
-platform dependent; check the platform documentation where you are
-running for more information.
-
-#### 2.3.2 CUDA support
-
-SPECTER has experimental support for GPU-based computation of FFTs
-using CUDA. To use this option, the NVIDIA CUDA Toolkit (the CUDA
-compilers plus the GPU-accelerated math libraries) must be
-installed in the system. Paths to the CUDA compiler and libraries
-must be declared in the file Makefile.in (check all the variables
-defined in the section "CUDA compilers" of Makefile.in).
-
-To enable this option, pass the following variable to make at
-compile time:
-
-```
-P_CUDA=yes
-```
-
-Only one GPU can be used per MPI task. In systems with multiple
-GPUs, the GPU binded to a given MPI task should be the one with
-the fastest access to the CPU in which the MPI task is running.
-How to set affinity between CPUs and GPUs is platform dependent;
-check the platform documentation where you are running for more
-information.
-
-### 2.4 About the solvers:
-The main program `specter.fpp` includes files for the different
-solvers at compile time from the directory `include`. The files
-in `include` are named `solver/solver_component.f90` where `solver`
-is the name of the solver (in lowercase) and `component` indicates
-what action is done by the file. Most common components are
-
-`global`   : contains routines to compute global quantities
-`rkstep1`  : first step of Runge-Kutta
-`rkstep2`  : second step of Runge-Kutta (contains the equations)
+The pseudo-spectral routines are in `pseudo/`, and the parallel FFT
+with the FC-Gram continuation in `fftp/`.
 
 
 3 - Running the code
@@ -409,11 +320,9 @@ where
 - `vizsta`and `vizend`    : average value of the `i`-th component of the
      velocity field at `z=0` (`zsta`) and `z=Lz` (`zend`).
 
-A list of the supported boundary conditions for a given field is given in
-`SOLVERS_AND_BOUNDARY_CONDITIONS.info`
-
-Similar lists are used for other solvers See the file
-`examples/parameter.inp` and `specter.fpp` for more details.
+The only boundary condition available in a non-periodic direction is
+`noslip`; directions without continuation points are periodic. See
+the file `examples/parameter.inp` for a complete input file.
 
 ### 3.2 Output files:
 
@@ -436,18 +345,12 @@ the file `balance.txt` has four columns with the time (`t`), two times
 the energy (`2.E`), two times the enstrophy (`2.Omega`), and the energy
 injection rate (`eps`).
 
-A description of the contents of all output files for a specific
-solver is automatically generated at compile time, named
-`README_output.infor`, and placed in the same directory as the
-executable file (by default, `../bin`). More details about the output
-files can be found in the comments in the source file (the text in
-`README_output.info` indicates the specific source file in which the
-comments for a given output file can be found).
-
-Examples of simple scripts to read and plot output from `SPECTER`
-using Python can be found in the directory `../contrib`. These
-examples also include some explanantions on the contents in the
-output files.
+The binary files of the HD solver are the velocity (`vx`, `vy`, `vz`),
+the vorticity (`wx`, `wy`, `wz`, if `outs` is 1 or larger) and the
+pressure (`pr`). When a run is continued with `stat=1`, the velocity
+read is also written with the number `0000`. The file
+`noslip_diagnostic.txt` checks the divergence and the boundary
+conditions. More details are in the comments of `pdes/hd_solver.f90`.
 
 
 4 - FC-Gram continuations

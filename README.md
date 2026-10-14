@@ -6,9 +6,9 @@ SPECTER
 
 A pseudo-spectral method is used to compute spatial derivatives, coupled with an adjustable order Runge-Kutta time stepping. When non-periodic directions are specified, **SPECTER** utilizes FC-Gram continuations to compute Fourier transforms with minimal overhead and considerable accuracy. At its present state, **SPECTER** has support for a single non-periodic direction. Support for two or more non-periodic directions is planned.
 
-**SPECTER** is programmed to scale. It can be run in your workstation as well as in top notch supercomputers. With this in mind, the code is parallelized employing **MPI**, **OpenMP** and **CUDA**.
+**SPECTER** is programmed to scale. It can be run in your workstation as well as in top notch supercomputers. With this in mind, the code is parallelized with **MPI**.
 
-Note: **CUDA** support is currently experimental and not provided publicly yet. If you are interested in CUDA support please contact the author.
+This fork organizes **SPECTER** as the `new_paradigm` branch of **GHOST**: the solver, the initial conditions, the forcing and the time stepper are classes chosen at run time from the input file. For now, only the hydrodynamic solver (`HD`) is available.
 
 ----
 Getting SPECTER
@@ -25,15 +25,17 @@ If you are using a web browser, you can also get it via [this link](https://gith
 
 Prequisites
 -----------
-**SPECTER** needs **Fortran** and **C** compilers to be present in the system, and an installation of both **FFTW** 3.x and an **MPI** flavor (`mpich`, `openmpi`, etc.) is required. Additionally, for compiling with **CUDA** support the [nVidia Cuda Compiler](https://developer.nvidia.com/cuda-llvm-compiler) is needed.
+**SPECTER** needs **Fortran** and **C** compilers to be present in the system, and an installation of both **FFTW** 3.x and an **MPI** flavor (`mpich`, `openmpi`, etc.) is required.
 
 Compiling
 ---------
-Compiling **SPECTER** is as simple as setting appropriate paths to the compilers, and the `fftw` and `mpi` libraries in the file `src/Makefile.in`. Parameters like simulation resolution, solver to employ, time-stepping order and floating-point precision can also be specified in the same file. The code is then compiled by running 
+**SPECTER** is compiled with CMake, out of the source tree. The grid, the FC-Gram continuation and the floating-point precision are set at compile time, in `UserConfig.cmake` or with `-D` options; for instance
 ```
+mkdir build && cd build
+cmake .. -DFFTW3_ROOT=/path/to/fftw -DNZ=128 -DPRECISION=SINGLE
 make
 ```
-while in the `src/` directory. After running `make`, the output binary should be placed in the `bin/` directory, and named like the chosen solver.
+The output binary is placed in the `bin/` directory, and named like the solver (`HD`, the only one available). See `src/README.md` for all the options.
 
 Running SPECTER
 ---------------
@@ -45,7 +47,7 @@ If you are running **SPECTER** in a cluster that uses a queuing system like `TOR
 
 Forcing and initial conditions
 ------------------------------
-The initial velocity field is chosen at run time with the list `iclist` of the namelist `initial_conditions` in `parameter.inp` (null field, noise that satisfies no-slip, and the laminar Couette and Poiseuille profiles, see `src/ic/ic_velocity.f90` and `src/README.md`). The mechanical forcing is also chosen at run time, with the list `forces` of the namelist `forcing` (null forcing, or a uniform forcing along x, see `src/force/force_velocity.f90`). Initial conditions and forcings for the scalar or other fields must still be specified at compile time, in the files `initial*.f90`; examples can be found in the `src/examples/` directory.
+The initial velocity field is chosen at run time with the list `iclist` of the namelist `initial_conditions` in `parameter.inp` (null field, noise that satisfies no-slip, and the laminar Couette and Poiseuille profiles, see `src/ic/ic_velocity.f90` and `src/README.md`). The mechanical forcing is also chosen at run time, with the list `forces` of the namelist `forcing` (null forcing, or a uniform forcing along x, see `src/force/force_velocity.f90`).
 
 Getting FC-Gram tables
 ----------------------

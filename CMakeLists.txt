@@ -239,7 +239,6 @@ target_compile_definitions(project_defs INTERFACE "${SOLVER_UP}_SOL")
 add_library(project_includes INTERFACE)
 target_include_directories(project_includes INTERFACE
     "${SRC_DIR}"
-    "${SRC_DIR}/include"               # Pasos de cada solver (hd/hd_*.f90)
     "${SRC_DIR}/utils"
     "${SRC_DIR}/pseudo"
     "${SRC_DIR}/boundary"

@@ -37,15 +37,6 @@
 
 !=================================================================
 
-  MODULE order
-!
-! ord: number of iterations in the Runge-Kutta method
-      INTEGER :: ord = ORD_
-      SAVE
-
-  END MODULE order
-!=================================================================
-
   MODULE filefmt
 !
 ! Change the length of the string 'ext' to change the number
