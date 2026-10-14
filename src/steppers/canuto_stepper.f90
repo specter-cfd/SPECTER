@@ -82,6 +82,7 @@ contains
   !! uout: at input, a copy of uin; at output, the new state
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine step_impl(this, time, uin, uf, dt, uout)
+    use gdevice, only: gdev_active
     implicit none
 
     class(CanutoStepper), intent(inout) :: this
@@ -100,10 +101,16 @@ contains
       eff_dt = dt/real(o,kind=GP)
       ! We assume that at input, uout has a copy of uin
       call this%solver_%dudt(time, uout, uf, eff_dt, uout)
+      ! The components are addressed through pointers: indexing
+      ! uout(ic)%ccomp inside a target region does not work with flang
       do ic = 1,this%traits_%nstate
         po => uout(ic)%ccomp
         pi => uin (ic)%ccomp
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
 !$omp parallel do collapse(2) private (k)
+#endif
         do i = ista,iend
           do j = 1,ny
             do k = 1,nz

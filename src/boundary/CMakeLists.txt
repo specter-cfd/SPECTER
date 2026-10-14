@@ -7,10 +7,11 @@ add_library(boundary_lib STATIC boundary_mod.f90)
 target_include_directories(boundary_lib PUBLIC
   ${CMAKE_SOURCE_DIR}/src/boundary
   ${CMAKE_BINARY_DIR}/src/boundary
+  ${CMAKE_BINARY_DIR}/src/memmgt
 )
 
 # Dependencias
-add_dependencies(boundary_lib fftp_lib pseudo_lib)
+add_dependencies(boundary_lib fftp_lib pseudo_lib memmgt_lib)
 
 # Bibliotecas
-target_link_libraries(boundary_lib PUBLIC project_mpi fftp_lib pseudo_lib)
+target_link_libraries(boundary_lib PUBLIC project_mpi fftp_lib pseudo_lib memmgt_lib)

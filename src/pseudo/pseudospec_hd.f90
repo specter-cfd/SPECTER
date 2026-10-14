@@ -41,7 +41,7 @@
       USE var
       USE grid
       USE mpivars
-!$    USE threads
+      USE gdevice, ONLY: gdev_active
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT (IN), DIMENSION(nz,ny,ista:iend) :: a
@@ -53,9 +53,12 @@
 ! Derivative in the x-direction
 !
       IF (dir.eq.1) THEN
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k = 1,nz
                   b(k,j,i) = im*kx(i)*a(k,j,i)
@@ -66,9 +69,12 @@
 ! Derivative in the y-direction
 !
       ELSE IF (dir.eq.2) THEN
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k = 1,nz
                   b(k,j,i) = im*ky(j)*a(k,j,i)
@@ -79,9 +85,12 @@
 ! Derivative in the z-direction
 !
       ELSE
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k = 1,nz
                   b(k,j,i) = im*kz(k)*a(k,j,i)
@@ -106,16 +115,19 @@
       USE kes
       USE grid
       USE mpivars
-!$    USE threads
+      USE gdevice, ONLY: gdev_active
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT (IN), DIMENSION(nz,ny,ista:iend) :: a
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend) :: b
       INTEGER :: i,j,k
 
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
       DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
          DO j = 1,ny
             DO k = 1,nz
                b(k,j,i) = -kk2(k,j,i)*a(k,j,i)
@@ -221,99 +233,122 @@
 !     e: product (A.grad)A_y in Fourier space [output]
 !     f: product (A.grad)A_z in Fourier space [output]
 !
+! Los temporarios salen del pool del workspace (gws), como en el
+! gradre3 de GHOST, para que existan en el dispositivo.
+!
       USE fprecision
       USE commtypes
       USE mpivars
       USE grid
       USE fft
-!$    USE threads
+      USE class_GWorkspace3D, ONLY: gws
+      USE gdevice, ONLY: gdev_active
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT (IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend) :: d,e,f
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: c1,c2
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: c3,c4
-      REAL(KIND=GP), DIMENSION(nx,ny,ksta:kend)    :: r1,r2
-      REAL(KIND=GP), DIMENSION(nx,ny,ksta:kend)    :: r3,r4
-      REAL(KIND=GP), DIMENSION(nx,ny,ksta:kend)    :: rx,ry,rz
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: c1,c2,c3,c4
+      REAL(KIND=GP), POINTER, DIMENSION(:,:,:)    :: r1,r2,r3,r4
+      REAL(KIND=GP), POINTER, DIMENSION(:,:,:)    :: rx,ry,rz
       REAL(KIND=GP)    :: tmp
-      INTEGER :: i,j,k
+      INTEGER :: i,j,k,dir
+      LOGICAL :: bret
 
-!
-! Computes (A_x.dx)A_dir
-!
-      c1 = a
-      CALL derivk(a,c2,1)
-      CALL derivk(b,c3,1)
-      CALL derivk(c,c4,1)
-      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(planfc,c3,r3,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(planfc,c4,r4,MPI_COMM_WORLD)
-
-!$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
-      DO k = ksta,pkend
-!$omp parallel do if (pkend-ksta.lt.nth) private (i)
-         DO j = 1,ny
-            DO i = 1,nx
-               rx(i,j,k) = r1(i,j,k)*r2(i,j,k)
-               ry(i,j,k) = r1(i,j,k)*r3(i,j,k)
-               rz(i,j,k) = r1(i,j,k)*r4(i,j,k)
-            END DO
-         END DO
-      END DO
-!
-! Computes (A_y.dy)A_dir
-!
-      c1 = b
-      CALL derivk(a,c2,2)
-      CALL derivk(b,c3,2)
-      CALL derivk(c,c4,2)
-      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(planfc,c3,r3,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(planfc,c4,r4,MPI_COMM_WORLD)
-
-!$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
-      DO k = ksta,pkend
-!$omp parallel do if (pkend-ksta.lt.nth) private (i)
-         DO j = 1,ny
-            DO i = 1,nx
-               rx(i,j,k) = rx(i,j,k)+r1(i,j,k)*r2(i,j,k)
-               ry(i,j,k) = ry(i,j,k)+r1(i,j,k)*r3(i,j,k)
-               rz(i,j,k) = rz(i,j,k)+r1(i,j,k)*r4(i,j,k)
-            END DO
-         END DO
-      END DO
-!
-! Computes (A_z.dz)A_dir
-!
-      c1 = c
-      CALL derivk(a,c2,3)
-      CALL derivk(b,c3,3)
-      CALL derivk(c,c4,3)
-      CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(planfc,c3,r3,MPI_COMM_WORLD)
-      CALL fftp3d_complex_to_real(planfc,c4,r4,MPI_COMM_WORLD)
-
+      CALL gws%get_complex_tmp(c1,bret)
+      CALL gws%get_complex_tmp(c2,bret)
+      CALL gws%get_complex_tmp(c3,bret)
+      CALL gws%get_complex_tmp(c4,bret)
+      CALL gws%get_real_tmp(r1,bret)
+      CALL gws%get_real_tmp(r2,bret)
+      CALL gws%get_real_tmp(r3,bret)
+      CALL gws%get_real_tmp(r4,bret)
+      CALL gws%get_real_tmp(rx,bret)
+      CALL gws%get_real_tmp(ry,bret)
+      CALL gws%get_real_tmp(rz,bret)
       tmp = 1.0_GP/ &
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
-!$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
-      DO k = ksta,pkend
-!$omp parallel do if (pkend-ksta.lt.nth) private (i)
-         DO j = 1,ny
-            DO i = 1,nx
-               rx(i,j,k) = (rx(i,j,k)+r1(i,j,k)*r2(i,j,k))*tmp
-               ry(i,j,k) = (ry(i,j,k)+r1(i,j,k)*r3(i,j,k))*tmp
-               rz(i,j,k) = (rz(i,j,k)+r1(i,j,k)*r4(i,j,k))*tmp
+!
+! Computes (A_x.dx)A_dir, (A_y.dy)A_dir and (A_z.dz)A_dir, and
+! accumulates them in rx, ry, rz (only in the physical domain,
+! up to pkend)
+!
+      DO dir = 1,3
+         IF (dir.eq.1) THEN
+            CALL copy(a,c1)
+         ELSE IF (dir.eq.2) THEN
+            CALL copy(b,c1)
+         ELSE
+            CALL copy(c,c1)
+         ENDIF
+         CALL derivk(a,c2,dir)
+         CALL derivk(b,c3,dir)
+         CALL derivk(c,c4,dir)
+         CALL fftp3d_complex_to_real(planfc,c1,r1,MPI_COMM_WORLD)
+         CALL fftp3d_complex_to_real(planfc,c2,r2,MPI_COMM_WORLD)
+         CALL fftp3d_complex_to_real(planfc,c3,r3,MPI_COMM_WORLD)
+         CALL fftp3d_complex_to_real(planfc,c4,r4,MPI_COMM_WORLD)
+         IF (dir.eq.1) THEN
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (i)
+#endif
+            DO k = ksta,pkend
+               DO j = 1,ny
+                  DO i = 1,nx
+                     rx(i,j,k) = r1(i,j,k)*r2(i,j,k)
+                     ry(i,j,k) = r1(i,j,k)*r3(i,j,k)
+                     rz(i,j,k) = r1(i,j,k)*r4(i,j,k)
+                  END DO
+               END DO
             END DO
-         END DO
+         ELSE IF (dir.eq.2) THEN
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (i)
+#endif
+            DO k = ksta,pkend
+               DO j = 1,ny
+                  DO i = 1,nx
+                     rx(i,j,k) = rx(i,j,k)+r1(i,j,k)*r2(i,j,k)
+                     ry(i,j,k) = ry(i,j,k)+r1(i,j,k)*r3(i,j,k)
+                     rz(i,j,k) = rz(i,j,k)+r1(i,j,k)*r4(i,j,k)
+                  END DO
+               END DO
+            END DO
+         ELSE
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (i)
+#endif
+            DO k = ksta,pkend
+               DO j = 1,ny
+                  DO i = 1,nx
+                     rx(i,j,k) = (rx(i,j,k)+r1(i,j,k)*r2(i,j,k))*tmp
+                     ry(i,j,k) = (ry(i,j,k)+r1(i,j,k)*r3(i,j,k))*tmp
+                     rz(i,j,k) = (rz(i,j,k)+r1(i,j,k)*r4(i,j,k))*tmp
+                  END DO
+               END DO
+            END DO
+         ENDIF
       END DO
 
       CALL fftp3d_real_to_complex(planfc,rx,d,MPI_COMM_WORLD)
       CALL fftp3d_real_to_complex(planfc,ry,e,MPI_COMM_WORLD)
       CALL fftp3d_real_to_complex(planfc,rz,f,MPI_COMM_WORLD)
+      CALL gws%free_complex_tmp(c1)
+      CALL gws%free_complex_tmp(c2)
+      CALL gws%free_complex_tmp(c3)
+      CALL gws%free_complex_tmp(c4)
+      CALL gws%free_real_tmp(r1)
+      CALL gws%free_real_tmp(r2)
+      CALL gws%free_real_tmp(r3)
+      CALL gws%free_real_tmp(r4)
+      CALL gws%free_real_tmp(rx)
+      CALL gws%free_real_tmp(ry)
+      CALL gws%free_real_tmp(rz)
 
       RETURN
       END SUBROUTINE gradre
@@ -1082,7 +1117,7 @@
       SUBROUTINE fc_filter(a)
 !-----------------------------------------------------------------
 !
-! Filters a field in Fourier space using a cube with exponential 
+! Filters a field in Fourier space using a cube with exponential
 ! tails using the formula a*exp(-alpha(2 k_i/ N_i)**2p).
 !
 ! Parameters
@@ -1093,16 +1128,19 @@
       USE mpivars
       USE grid
       USE boxsize
-!$    USE threads
+      USE gdevice, ONLY: gdev_active
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(nz,ny,ista:iend) :: a
       DOUBLE PRECISION, PARAMETER  :: alpha=16*log(10d0), p=50d0
       INTEGER :: i,j,k
 
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
       DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
       DO j = 1,ny
       DO k = 1,nz
          a(k,j,i) = a(k,j,i)*exp(-alpha*(2*kx(i)/nx/Dkx)**(2*p))* &
@@ -1114,6 +1152,65 @@
 
       RETURN
       END SUBROUTINE fc_filter
+
+!*****************************************************************
+      SUBROUTINE copy(a,b)
+!-----------------------------------------------------------------
+!
+! Copies the complex matrix 'a' into 'b', b = a (copy3 de GHOST)
+!
+      USE fprecision
+      USE grid
+      USE mpivars
+      USE gdevice, ONLY: gdev_active
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT (IN), DIMENSION(nz,ny,ista:iend) :: a
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend) :: b
+      INTEGER :: i,j,k
+
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
+      DO i = ista,iend
+         DO j = 1,ny
+            DO k = 1,nz
+               b(k,j,i) = a(k,j,i)
+            END DO
+         END DO
+      END DO
+      RETURN
+      END SUBROUTINE copy
+
+!*****************************************************************
+      SUBROUTINE setmode(a,k,j,i,val)
+!-----------------------------------------------------------------
+!
+! Sets one element of the matrix 'a', a(k,j,i) = val, in the
+! copy of the matrix being worked on (the device copy while
+! gdev_active is set) (setmode3 de GHOST)
+!
+      USE fprecision
+      USE grid
+      USE mpivars
+      USE gdevice, ONLY: gdev_active
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(nz,ny,ista:iend) :: a
+      COMPLEX(KIND=GP), INTENT(IN) :: val
+      INTEGER, INTENT(IN) :: k,j,i
+
+#if defined(GHOST_GPU)
+!$omp target if(target: gdev_active)
+      a(k,j,i) = val
+!$omp end target
+#else
+      a(k,j,i) = val
+#endif
+      RETURN
+      END SUBROUTINE setmode
 
 !*****************************************************************
       SUBROUTINE divergence(a,b,c,d)

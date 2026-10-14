@@ -43,24 +43,25 @@ src/mpiio/CMakeLists.txt
 - Enlaza fftp_lib, timer_lib y utils_lib, cuyos módulos usa. En GHOST llegan a través de pseudo_lib.
 
 src/pseudo/CMakeLists.txt
-- Una sola biblioteca, pseudo_lib, con los fuentes de SPECTER que usa HD: pseudospec_mod.f90 y pseudospec_hd.f90. GHOST separa pseudobase_lib (pseudospec3D_mod.f90) y pseudo_lib (los núcleos de todos los solvers).
+- Dos bibliotecas, como en GHOST: pseudobase_lib con pseudospec_mod.f90 (grilla, números de onda, caja y plan del FC-Gram; en GHOST, pseudospec3D_mod.f90) y pseudo_lib con pseudospec_hd.f90, los núcleos de HD (en GHOST, los de todos los solvers).
 - pseudospec_mod.f90 no recibe definiciones del preprocesador: el módulo grid tiene grid_init, como en GHOST, que lee de &grid nx, ny y nz y además las continuaciones (Cx, Cy, Cz) y los órdenes de borde (ox, oy, oz), que valen 0 (dirección periódica) si no se dan.
-- No depende de memmgt_lib ni de gmem_lib.
+- Como en GHOST, pseudobase_lib depende de gmem_lib (las grillas y los números de onda se reservan con galloc) y pseudo_lib de memmgt_lib (los núcleos toman sus temporarios del pool, gws); las dos agregan build/src/memmgt a sus directorios de inclusión.
 
 src/boundary/CMakeLists.txt
 - No existe en GHOST: las condiciones de borde son propias de SPECTER. boundary_mod.f90 incluye vboundary.f90; las del escalar y el campo magnético (sboundary.f90 y bboundary.f90), de otros solvers, ya no están.
+- Depende de pseudo_lib y de memmgt_lib (sol_project toma sus temporarios del pool) y agrega build/src/memmgt a sus directorios de inclusión.
 
 src/pdes/CMakeLists.txt
 - pdes_lib compila status_mod.f90, equation_base.f90, hd_solver.f90 y equation_factory.f90. Los otros solvers de GHOST no están.
-- equation_factory.f90 es el de GHOST solo con HD: lee &pdes y crea el solver, y fija el pool de temporarios en el pico medido en SPECTER con report_peaks (6 complejos y 3 reales). El pool solo-host queda en cero, porque SPECTER no lo usa.
+- equation_factory.f90 es el de GHOST solo con HD: lee &pdes y crea el solver, y fija el pool de temporarios en el pico medido en SPECTER con report_peaks (10 complejos y 7 reales, los de dudt con gradre). El pool solo-host queda en cero, porque SPECTER no lo usa.
 - status_mod.f90 es el de GHOST con tdir agregado, sin sstep ni los contadores de los espectros (sind, times) y sin USE grid, kes ni ali. Lee un único &status, así que el parameter.inp de SPECTER pasa a tener dt, step, tstep, cstep y seed adentro de &status.
-- equation_base.f90 es una versión reducida del de GHOST: solo EquationBase y VelocityBase (sin escalares pasivos), con un método end_stage que el integrador llama después de cada etapa. Los solvers con salidas propias (la presión en HD) redefinen write_states y llaman antes al write_states del módulo. No tiene el método spectra: SPECTER no escribe espectros, así que el main tampoco los llama.
-- hd_solver.f90 es el solver HD de SPECTER. Lee &HD como el de GHOST (nu, y los directorios fidir, fodir y todir), sin la rotación, los escalares pasivos ni spectlod, que SPECTER no tiene.
+- equation_base.f90 es una versión reducida del de GHOST: solo EquationBase y VelocityBase (sin escalares pasivos), con un método end_stage que el integrador llama después de cada etapa y un método sync_host, la contraparte de sync_device, que el main llama antes de las salidas para traer al host los arreglos auxiliares que el solver cambia en el dispositivo. Los solvers con salidas propias (la presión en HD) redefinen write_states y llaman antes al write_states del módulo. No tiene el método spectra: SPECTER no escribe espectros, así que el main tampoco los llama.
+- hd_solver.f90 es el solver HD de SPECTER. Lee &HD como el de GHOST (nu, y los directorios fidir, fodir y todir), sin la rotación, los escalares pasivos ni spectlod, que SPECTER no tiene. sync_device y sync_host mueven la presión entre el host y el dispositivo.
 - pdes_lib depende de fftp_lib, pseudo_lib, mpiio_lib, memmgt_lib y boundary_lib (el solver usa el plan de bordes) y los enlaza (GHOST enlaza pseudo_lib y utils_lib). Agrega a mano build/src/memmgt a sus directorios de inclusión, como GHOST.
 - El ejecutable enlaza pdes_lib directamente; en GHOST no figura en la lista del ejecutable.
 
 src/memmgt/CMakeLists.txt
-- memmgt_lib depende de pseudo_lib (donde está el módulo grid en SPECTER) en vez de pseudobase_lib.
+- Como en GHOST, memmgt_lib depende de pseudobase_lib.
 - Como en GHOST, memmgt_lib no publica build/src/memmgt, donde quedan sus módulos: quien los usa agrega esa carpeta a mano (project_includes y pdes_lib).
 - El ejecutable lo enlaza directamente; el main usa gstate_mod (estados de los campos y del forzado) y arma el pool de class_GWorkspace3D con el tamaño que fija la fábrica de solvers, como GHOST. La presión es un arreglo auxiliar del solver HD, reservado con galloc.
 

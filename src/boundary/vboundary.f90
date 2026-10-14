@@ -171,9 +171,6 @@
       USE mpivars
       USE commtypes
       USE fcgram
-      USE kes
-      USE var
-!$    USE threads
 
       IMPLICIT NONE
 
@@ -185,7 +182,6 @@
 
       REAL(KIND=GP) :: tmp
       INTEGER       :: ind
-      INTEGER       :: i,j
 
       IF (pos .eq. 0) THEN
          ind = 1
@@ -196,18 +192,13 @@
       tmp = 1/real(o, kind=GP)
       IF (o .ne. ord) tmp = real(o+1, kind=GP)*tmp
 
- !$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
- !$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,planfc%y%n
-            vx(ind,j,i) = im*kx(i)*pr(ind,j,i)*tmp
-            vy(ind,j,i) = im*ky(j)*pr(ind,j,i)*tmp
-         ENDDO
-      ENDDO
+      CALL noslip_wall(vx,vy,pr,ind,tmp)
 
       ! Add velocity of the boundary
-      IF ( ista .eq. 1 ) vx(ind,1,1) = planfc%x%n * planfc%y%n * vbound(1)
-      IF ( ista .eq. 1 ) vy(ind,1,1) = planfc%x%n * planfc%y%n * vbound(2)
+      IF ( ista .eq. 1 ) CALL setmode(vx,ind,1,1, &
+          CMPLX(planfc%x%n * planfc%y%n * vbound(1),0.0_GP,KIND=GP))
+      IF ( ista .eq. 1 ) CALL setmode(vy,ind,1,1, &
+          CMPLX(planfc%x%n * planfc%y%n * vbound(2),0.0_GP,KIND=GP))
 
       END SUBROUTINE noslip_z
 

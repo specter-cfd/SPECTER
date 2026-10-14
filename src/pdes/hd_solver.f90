@@ -17,7 +17,8 @@
 ! derecho sin la presión y end_stage impone las paredes y proyecta
 ! después de cada etapa del RK (las llama el integrador,
 ! src/steppers/canuto_stepper.f90); global y write_states escriben las
-! salidas. De &HD faltan la rotación, los escalares pasivos y spectlod
+! salidas, y sync_device y sync_host mueven la presión entre el host y
+! el dispositivo en las compilaciones para GPU. De &HD faltan la rotación, los escalares pasivos y spectlod
 ! de GHOST, que SPECTER no tiene.
 !
 ! La presión pr_ (p' = p.dt, en el dominio (z,ky,kx)) es un arreglo
@@ -70,6 +71,8 @@ module hd_mod
     procedure, public :: end_stage     =>     end_stage_impl ! RK stage correction
     procedure, public :: global        =>        global_impl ! Writes global qtys
     procedure, public :: write_states  =>  write_states_impl ! Binary output
+    procedure, public :: sync_device   =>   sync_device_impl ! pr_ to the device
+    procedure, public :: sync_host     =>     sync_host_impl ! pr_ to the host
     procedure, public :: state_size    =>    state_size_impl ! state size
     procedure, public :: get_sstate    =>    get_sstate_impl ! get state name list
     procedure, public :: Solver_ctor   =>      HDSolver_ctor ! constructor
@@ -202,6 +205,7 @@ CONTAINS
   subroutine dudt_impl(this, time, uin, uf, dt, dudt)
     use grid
     use mpivars
+    use gdevice, only: gdev_active
     implicit none
 
     class (HDSolver), intent(inout)             :: this
@@ -246,7 +250,11 @@ CONTAINS
     call laplak(vy,C2)
     call laplak(vz,C3)
 
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
 !$omp parallel do collapse(2) private (k)
+#endif
     do i = ista,iend
        do j = 1,ny
           do k = 1,nz
@@ -355,6 +363,28 @@ CONTAINS
     call this%workspace_%free_complex_tmp(C1)
     call this%workspace_%free_real_tmp   (R1)
   end subroutine write_states_impl
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Copia la presión pr_ al dispositivo, después de
+  !! inicializarla (init_pressure lo hace en el host)
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine sync_device_impl(this)
+    use gmem
+    class (HDSolver), intent(inout) :: this
+    call gupdate_to(this%pr_)
+  end subroutine sync_device_impl
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Copia al host la presión pr_, que end_stage actualiza en
+  !! el dispositivo, antes de escribirla
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine sync_host_impl(this)
+    use gmem
+    class (HDSolver), intent(inout) :: this
+    call gupdate_from(this%pr_)
+  end subroutine sync_host_impl
 
 
   ! ===================================================================

@@ -18,6 +18,13 @@ MODULE boundary
          INTEGER  :: bcxsta,bcxend,bcysta,bcyend,bczsta,bczend
       ENDTYPE BCPLAN
 
+      ! Condiciones de borde y coeficientes de la solución de Laplace
+      ! en z=0 y z=Lz (2,ny,ista:iend), que sol_project y laplace_z
+      ! usan en sus kernels: se reservan con galloc la primera vez que
+      ! se usan, para que existan en el dispositivo
+      COMPLEX(KIND=GP), ALLOCATABLE, TARGET, DIMENSION(:,:,:) :: bczbuf
+      COMPLEX(KIND=GP), ALLOCATABLE, TARGET, DIMENSION(:,:,:) :: coefbuf
+
       CONTAINS
 
       INCLUDE 'vboundary.f90'
@@ -59,25 +66,23 @@ MODULE boundary
 !  ARGUMENTS:
 !    planbc  : Plan for the BC of the target field. [IN]
 !    planfc  : FCPLAN to use. [IN]
-!         a  : target array. [IN] 
-!         b  : target array. (OPTIONAL) [IN] 
-!         c  : target array. (OPTIONAL) [IN] 
+!         a  : target array. [IN]
+!         b  : target array. (OPTIONAL) [IN]
+!         c  : target array. (OPTIONAL) [IN]
 !----------------------------------------------------------------------
       USE fprecision
       USE mpivars
       USE commtypes
       USE fcgram
-!$    USE threads
       IMPLICIT NONE
 
       TYPE(BCPLAN), INTENT(IN)  :: planbc
       TYPE(FCPLAN), INTENT(IN)  :: planfc
-      
+
       COMPLEX(kind=GP),INTENT(INOUT),DIMENSION(planfc%z%n,planfc%y%n,ista:iend)          :: a
       COMPLEX(kind=GP),OPTIONAL,INTENT(INOUT),DIMENSION(planfc%z%n,planfc%y%n,ista:iend) :: b,c
 
       REAL(KIND=GP)  :: tmp
-      INTEGER        :: i,j,k
 
       ! Note: borders don't require normalization as they will be overwritten
       ! however normalizing them anyway helps vectorization.
@@ -88,48 +93,92 @@ MODULE boundary
       ELSEIF ( planbc%bczsta .gt. -1 .AND. planbc%bczend .gt. -1 ) THEN
          tmp = 1.0_GP/real(planfc%z%n, kind=GP)
          CALL fftp1d_complex_to_real_z(planfc,a,MPI_COMM_WORLD)
-         ! Normalize
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,planfc%y%n
-               DO k = 1,planfc%z%n-planfc%z%C
-                  a(k,j,i) = a(k,j,i)*tmp
-               ENDDO
-            ENDDO
-         ENDDO
+         CALL normalize_z(a,tmp)
 
          IF ( PRESENT(b) ) THEN
             CALL fftp1d_complex_to_real_z(planfc,b,MPI_COMM_WORLD)
-            ! Normalize
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-            DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-               DO j = 1,planfc%y%n
-                  DO k = 1,planfc%z%n-planfc%z%C
-                     b(k,j,i) = b(k,j,i)*tmp
-                  ENDDO
-               ENDDO
-            ENDDO
+            CALL normalize_z(b,tmp)
          ENDIF
 
          IF ( PRESENT(c) ) THEN
             CALL fftp1d_complex_to_real_z(planfc,c,MPI_COMM_WORLD)
-            ! Normalize
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-            DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-               DO j = 1,planfc%y%n
-                  DO k = 1,planfc%z%n-planfc%z%C
-                     c(k,j,i) = c(k,j,i)*tmp
-                  ENDDO
-               ENDDO
-            ENDDO
+            CALL normalize_z(c,tmp)
          ENDIF
       ENDIF
 
       RETURN
-      END SUBROUTINE goto_domain_w_boundaries 
+      END SUBROUTINE goto_domain_w_boundaries
+
+!**********************************************************************
+      SUBROUTINE normalize_z(a,tmp)
+!----------------------------------------------------------------------
+!  Multiplica por tmp los puntos físicos en z (1 a nz-Cz) de a, en el
+! dominio (z,ky,kx). Es el lazo de normalización de
+! goto_domain_w_boundaries, aparte para que el kernel reciba un
+! arreglo de forma explícita y no un argumento opcional.
+!----------------------------------------------------------------------
+      USE fprecision
+      USE grid
+      USE mpivars
+      USE gdevice, ONLY: gdev_active
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(nz,ny,ista:iend) :: a
+      REAL(KIND=GP), INTENT(IN) :: tmp
+      INTEGER :: i,j,k
+
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
+      DO i = ista,iend
+         DO j = 1,ny
+            DO k = 1,nz-Cz
+               a(k,j,i) = a(k,j,i)*tmp
+            ENDDO
+         ENDDO
+      ENDDO
+
+      RETURN
+      END SUBROUTINE normalize_z
+
+!**********************************************************************
+      SUBROUTINE noslip_wall(vx,vy,pr,ind,tmp)
+!----------------------------------------------------------------------
+!  Velocidad tangencial en la pared del plano z = ind a partir de la
+! presión p' (el lazo de noslip_z, en vboundary.f90): va acá porque
+! vboundary.f90 entra con INCLUDE, que no pasa por el preprocesador,
+! y GHOST no pone directivas de lazos en archivos incluidos.
+!----------------------------------------------------------------------
+      USE fprecision
+      USE grid
+      USE mpivars
+      USE kes
+      USE var
+      USE gdevice, ONLY: gdev_active
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(nz,ny,ista:iend) :: vx,vy
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(nz,ny,ista:iend)    :: pr
+      INTEGER, INTENT(IN)       :: ind
+      REAL(KIND=GP), INTENT(IN) :: tmp
+      INTEGER :: i,j
+
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) if(target: gdev_active)
+#else
+!$omp parallel do private (j)
+#endif
+      DO i = ista,iend
+         DO j = 1,ny
+            vx(ind,j,i) = im*kx(i)*pr(ind,j,i)*tmp
+            vy(ind,j,i) = im*ky(j)*pr(ind,j,i)*tmp
+         ENDDO
+      ENDDO
+
+      RETURN
+      END SUBROUTINE noslip_wall
 
 !**********************************************************************
       SUBROUTINE goto_3d_fourier(planbc,planfc,a,b,c)
@@ -178,10 +227,10 @@ MODULE boundary
 !***********************************************************************
       SUBROUTINE sol_project(a,b,c,d,bctarget,bczsta,bczend)
 !-----------------------------------------------------------------------
-!    Projects a given vector field onto a solenoidal space. For this it 
+!    Projects a given vector field onto a solenoidal space. For this it
 !   solves the Poisson equation laplacian(d) = div(v) with a,b,c being
 !   the x,y,z components of the vector field v. It allows for different
-!   combinations of homogeneous boundary conditions for the potential 
+!   combinations of homogeneous boundary conditions for the potential
 !   and also Dirichlet boundary conditions for the normal component
 !   of the projected field.
 !   After the computation the potential solution is applied to project
@@ -204,13 +253,19 @@ MODULE boundary
 !              * =0 for homogeneous Dirichlet BC
 !              * =2 for homogeneous Robin BC
 !
+! Los temporarios C1, C2, C3 salen del pool del workspace (gws) y
+! las condiciones de borde van en bczbuf, para que existan en el
+! dispositivo.
+!
       USE grid
       USE var
       USE kes
       USE fft
       USE commtypes
       USE mpivars
-!$    USE threads
+      USE gmem
+      USE class_GWorkspace3D, ONLY: gws
+      USE gdevice, ONLY: gdev_active
 
       IMPLICIT NONE
 
@@ -218,19 +273,27 @@ MODULE boundary
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend)   :: d
       INTEGER, INTENT(IN) :: bctarget,bczsta,bczend
 
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend)                :: C1,C2,C3
-      COMPLEX(KIND=GP), DIMENSION(2,ny,ista:iend)                 :: bc
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: C1,C2,C3
 
       REAL(KIND=GP)    :: tmp
       INTEGER          :: i,j,k
+      LOGICAL          :: bret
+
+      IF (.NOT.ALLOCATED(bczbuf)) CALL galloc(bczbuf,2,ny,ista,iend)
+      CALL gws%get_complex_tmp(C1,bret)
+      CALL gws%get_complex_tmp(C2,bret)
+      CALL gws%get_complex_tmp(C3,bret)
 
       ! Get inhomogeneous solution and apply it
       ! ---------------------------------------
       CALL poisson_inhomogeneous(a,b,c,d)
 
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
       DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
          DO j=1,ny
             DO k=1,nz
                a(k,j,i) = a(k,j,i) - im*kx(i)*d(k,j,i)
@@ -244,9 +307,12 @@ MODULE boundary
       ! ------------------------------
       tmp = 1.0_GP/nz
       IF (bctarget .eq. 0) THEN
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                DO k=1,nz
                   C1(k,j,i) = d(k,j,i)*tmp
@@ -254,9 +320,12 @@ MODULE boundary
             ENDDO
          ENDDO
       ELSEIF (bctarget .eq. 1) THEN
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                DO k=1,nz
                   C1(k,j,i) = c(k,j,i)*tmp
@@ -273,27 +342,39 @@ MODULE boundary
 
       IF (bczsta .eq. 0) THEN
          IF (bctarget .eq. 0) THEN
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) if(target: gdev_active)
+#else
 !$omp parallel do private (j)
+#endif
             DO i=ista,iend
                DO j=1,ny
-                  bc(1,j,i) = -C1(1,j,i)
+                  bczbuf(1,j,i) = -C1(1,j,i)
                ENDDO
             ENDDO
          ELSEIF (bctarget .eq. 1) THEN
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) if(target: gdev_active)
+#else
 !$omp parallel do private (j)
+#endif
             DO i=ista,iend
                DO j=1,ny
-                  bc(1,j,i) = C1(1,j,i)
+                  bczbuf(1,j,i) = C1(1,j,i)
                ENDDO
             ENDDO
          ENDIF
       ELSEIF (bczsta .eq. 2) THEN
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) if(target: gdev_active)
+#else
 !$omp parallel do private (j)
+#endif
          DO i=ista,iend
             DO j=1,ny
                ! C2 positive because external solution for z<0 goes like
                ! exp(khom*z) instead of exp(-khom*z)
-               bc(1,j,i) = C2(1,j,i) - khom(j,i)*C1(1,j,i)
+               bczbuf(1,j,i) = C2(1,j,i) - khom(j,i)*C1(1,j,i)
             ENDDO
          ENDDO
       ELSE
@@ -305,25 +386,37 @@ MODULE boundary
 
       IF (bczend .eq. 0) THEN
          IF (bctarget .eq. 0) THEN
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) if(target: gdev_active)
+#else
 !$omp parallel do private (j)
+#endif
             DO i=ista,iend
                DO j=1,ny
-                  bc(2,j,i) = -C1(nz-Cz,j,i)
+                  bczbuf(2,j,i) = -C1(nz-Cz,j,i)
                ENDDO
             ENDDO
          ELSEIF (bctarget .eq. 1) THEN
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) if(target: gdev_active)
+#else
 !$omp parallel do private (j)
+#endif
             DO i=ista,iend
                DO j=1,ny
-                  bc(2,j,i) = C1(nz-Cz,j,i)
+                  bczbuf(2,j,i) = C1(nz-Cz,j,i)
                ENDDO
             ENDDO
          ENDIF
       ELSEIF (bczend .eq. 2) THEN
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) if(target: gdev_active)
+#else
 !$omp parallel do private (j)
+#endif
          DO i=ista,iend
             DO j=1,ny
-               bc(2,j,i) = -(C2(nz-Cz,j,i) + khom(j,i)*C1(nz-Cz,j,i))
+               bczbuf(2,j,i) = -(C2(nz-Cz,j,i) + khom(j,i)*C1(nz-Cz,j,i))
             ENDDO
          ENDDO
       ELSE
@@ -336,13 +429,16 @@ MODULE boundary
       ! Solve Laplace equation and construct d_hom(z,ky,kx)
       ! --------------------------------------------------
       ! Dirichlet in field means Neumann condition on potential
-      CALL laplace_z(bc,C2,C3,bczsta+bctarget,bczend+bctarget)
+      CALL laplace_z(bczbuf,C2,C3,bczsta+bctarget,bczend+bctarget)
 
       ! Get d = d_inh + d_hom in (z,ky,kx) domain
       IF (bctarget .eq. 0) THEN
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                DO k=1,nz
                   d(k,j,i) = C1(k,j,i) + C2(k,j,i)
@@ -351,9 +447,12 @@ MODULE boundary
          ENDDO
       ELSEIF (bctarget .eq. 1) THEN
          CALL fftp1d_complex_to_real_z(planfc,d,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                DO k=1,nz
                   d(k,j,i) = d(k,j,i)*tmp + C2(k,j,i)
@@ -368,9 +467,12 @@ MODULE boundary
       CALL fftp1d_real_to_complex_z(planfc,C3,MPI_COMM_WORLD)
 
       ! Apply homogeneous solution
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
       DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
          DO j=1,ny
             DO k=1,nz
                a(k,j,i) = a(k,j,i) - im*kx(i)*C2(k,j,i)
@@ -380,6 +482,10 @@ MODULE boundary
          ENDDO
       ENDDO
 
+      CALL gws%free_complex_tmp(C1)
+      CALL gws%free_complex_tmp(C2)
+      CALL gws%free_complex_tmp(C3)
+
       RETURN
       END SUBROUTINE sol_project
 
@@ -388,7 +494,7 @@ MODULE boundary
 !-----------------------------------------------------------------
 !   Solves the inhomogeneous part of the Poisson equation
 !   laplacian(d') = div(v), with a,b,c the x,y,z components of v.
-!   It takes the components of v as input matrices and returns 
+!   It takes the components of v as input matrices and returns
 !   d'_inhom in Fourier space. Note that the boundary
 !   conditions must be enforced via the homogeneous solution a
 !   a posteriori.
@@ -405,7 +511,7 @@ MODULE boundary
       USE grid
       USE mpivars
       USE commtypes
-!$    USE threads
+      USE gdevice, ONLY: gdev_active
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT (IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
@@ -414,9 +520,12 @@ MODULE boundary
 
 !NOTE: This generates a NaN, but shouldn't propagate to relevant
 !variables. Written this way is easier for the compiler to vectorize
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
       DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
          DO j = 1,ny
             DO k = 1,nz
                d(k,j,i) = -im*(kx(i)*a(k,j,i) + ky(j)*b(k,j,i) + &
@@ -424,7 +533,7 @@ MODULE boundary
             END DO
           END DO
       END DO
-      IF (ista.eq.1) d(1,1,1) = 0.0_GP 
+      IF (ista.eq.1) CALL setmode(d,1,1,1,(0.0_GP,0.0_GP))
 
       RETURN
       END SUBROUTINE poisson_inhomogeneous
@@ -454,6 +563,9 @@ MODULE boundary
 !             * =1 for homogeneous Neumann BC
 !             * =2 for homogeneous Robin BC
 !
+! Los coeficientes van en coefbuf, para que existan en el
+! dispositivo.
+!
 
       USE kes
       USE var
@@ -462,50 +574,66 @@ MODULE boundary
       USE fft
       USE mpivars
       USE commtypes
-!$    USE threads
+      USE gmem
+      USE gdevice, ONLY: gdev_active
 
 
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(2,ny,ista:iend)    :: bc
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend)  :: a,b
       INTEGER, INTENT(IN) :: bczsta,bczend
 
-      COMPLEX(KIND=GP), DIMENSION(2,ny,ista:iend)    :: coef
-
       REAL(KIND=GP)                :: tmp
 
       INTEGER                      :: i,j,k
 
+      IF (.NOT.ALLOCATED(coefbuf)) CALL galloc(coefbuf,2,ny,ista,iend)
 
       ! Get coefficients
       ! ----------------
       ! Pure Dirichlet
       IF ( bczsta .eq. bczend .AND. bczsta .eq. 0 ) THEN
       IF (ista.eq.1) THEN
-            coef(1,1,1) = (bc(2,1,1)-bc(1,1,1))/Lz
-            coef(2,1,1) = bc(1,1,1)
-!$omp parallel do private (k,tmp)
+#if defined(GHOST_GPU)
+!$omp target if(target: gdev_active)
+#endif
+            coefbuf(1,1,1) = (bc(2,1,1)-bc(1,1,1))/Lz
+            coefbuf(2,1,1) = bc(1,1,1)
+#if defined(GHOST_GPU)
+!$omp end target
+#endif
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (tmp)
+#endif
          DO j = 2,ny
             tmp   = 1.0_GP/(1 - exp(-2*khom(j,1)*Lz))
-            coef(1,j,1) = (bc(2,j,1) - bc(1,j,1)*exp(-khom(j,1)*Lz))*tmp
-            coef(2,j,1) = (bc(1,j,1) - bc(2,j,1)*exp(-khom(j,1)*Lz))*tmp
+            coefbuf(1,j,1) = (bc(2,j,1) - bc(1,j,1)*exp(-khom(j,1)*Lz))*tmp
+            coefbuf(2,j,1) = (bc(1,j,1) - bc(2,j,1)*exp(-khom(j,1)*Lz))*tmp
          END DO
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (j,tmp)
+#endif
          DO i = 2,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
             DO j = 1,ny
                tmp   = 1.0_GP/(1 - exp(-2*khom(j,i)*Lz))
-               coef(1,j,i) = (bc(2,j,i) - bc(1,j,i)*exp(-khom(j,i)*Lz))*tmp
-               coef(2,j,i) = (bc(1,j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
+               coefbuf(1,j,i) = (bc(2,j,i) - bc(1,j,i)*exp(-khom(j,i)*Lz))*tmp
+               coefbuf(2,j,i) = (bc(1,j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
             END DO
          END DO
-      ELSE 
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+      ELSE
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (j,tmp)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
             DO j = 1,ny
-                 tmp   = 1.0_GP/(1 - exp(-2*khom(j,i)*Lz))
-                 coef(1,j,i) = (bc(2,j,i) - bc(1,j,i)*exp(-khom(j,i)*Lz))*tmp
-                 coef(2,j,i) = (bc(1,j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
+               tmp   = 1.0_GP/(1 - exp(-2*khom(j,i)*Lz))
+               coefbuf(1,j,i) = (bc(2,j,i) - bc(1,j,i)*exp(-khom(j,i)*Lz))*tmp
+               coefbuf(2,j,i) = (bc(1,j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
             END DO
          END DO
       ENDIF  !End Dirichlet
@@ -513,31 +641,47 @@ MODULE boundary
       ! Pure Neumann
       ELSEIF ( bczsta .eq. bczend .AND. bczsta .eq. 1 ) THEN
       IF (ista.eq.1) THEN
-         coef(1,1,1) = bc(1,1,1)
-         coef(2,1,1) = 0.0_GP
-!$omp parallel do private (k,tmp)
+#if defined(GHOST_GPU)
+!$omp target if(target: gdev_active)
+#endif
+            coefbuf(1,1,1) = bc(1,1,1)
+            coefbuf(2,1,1) = 0.0_GP
+#if defined(GHOST_GPU)
+!$omp end target
+#endif
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (tmp)
+#endif
          DO j = 2,ny
             tmp   = 1.0_GP/(khom(j,1)*(1-exp(-2*khom(j,1)*Lz)))
-            coef(1,j,1) = ( bc(2,j,1) - bc(1,j,1)*exp(-khom(j,1)*Lz))*tmp
-            coef(2,j,1) = (-bc(1,j,1) + bc(2,j,1)*exp(-khom(j,1)*Lz))*tmp
-         ENDDO
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+            coefbuf(1,j,1) = ( bc(2,j,1) - bc(1,j,1)*exp(-khom(j,1)*Lz))*tmp
+            coefbuf(2,j,1) = (-bc(1,j,1) + bc(2,j,1)*exp(-khom(j,1)*Lz))*tmp
+         END DO
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (j,tmp)
+#endif
          DO i = 2,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
             DO j = 1,ny
                tmp   = 1.0_GP/(khom(j,i)*(1-exp(-2*khom(j,i)*Lz)))
-               coef(1,j,i) = ( bc(2,j,i) - bc(1,j,i)*exp(-khom(j,i)*Lz) )*tmp
-               coef(2,j,i) = (-bc(1,j,i) + bc(2,j,i)*exp(-khom(j,i)*Lz) )*tmp
+               coefbuf(1,j,i) = ( bc(2,j,i) - bc(1,j,i)*exp(-khom(j,i)*Lz) )*tmp
+               coefbuf(2,j,i) = (-bc(1,j,i) + bc(2,j,i)*exp(-khom(j,i)*Lz) )*tmp
             END DO
          END DO
-      ELSE 
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+      ELSE
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (j,tmp)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
             DO j = 1,ny
                tmp   = 1.0_GP/(khom(j,i)*(1-exp(-2*khom(j,i)*Lz)))
-               coef(1,j,i) = ( bc(2,j,i) - bc(1,j,i)*exp(-khom(j,i)*Lz) )*tmp
-               coef(2,j,i) = (-bc(1,j,i) + bc(2,j,i)*exp(-khom(j,i)*Lz) )*tmp
+               coefbuf(1,j,i) = ( bc(2,j,i) - bc(1,j,i)*exp(-khom(j,i)*Lz) )*tmp
+               coefbuf(2,j,i) = (-bc(1,j,i) + bc(2,j,i)*exp(-khom(j,i)*Lz) )*tmp
             END DO
          END DO
       ENDIF  ! End Neumann
@@ -545,64 +689,96 @@ MODULE boundary
       ! Pure Robin
       ELSEIF ( bczsta .eq. bczend .AND. bczsta .eq. 2 ) THEN
       IF (ista.eq.1) THEN
-         coef(1,1,1) = bc(1,1,1)
-         coef(2,1,1) = 0.0_GP
-!$omp parallel do private (k,tmp)
+#if defined(GHOST_GPU)
+!$omp target if(target: gdev_active)
+#endif
+            coefbuf(1,1,1) = bc(1,1,1)
+            coefbuf(2,1,1) = 0.0_GP
+#if defined(GHOST_GPU)
+!$omp end target
+#endif
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (tmp)
+#endif
          DO j = 2,ny
             tmp   = 1.0_GP/(2*khom(j,1))
-            coef(1,j,1) = bc(2,j,1)*tmp
-            coef(2,j,1) = bc(1,j,1)*tmp
+            coefbuf(1,j,1) = bc(2,j,1)*tmp
+            coefbuf(2,j,1) = bc(1,j,1)*tmp
          END DO
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (j,tmp)
+#endif
          DO i = 2,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
             DO j = 1,ny
                tmp   = 1.0_GP/(2*khom(j,i))
-               coef(1,j,i) = bc(2,j,i)*tmp
-               coef(2,j,i) = bc(1,j,i)*tmp
+               coefbuf(1,j,i) = bc(2,j,i)*tmp
+               coefbuf(2,j,i) = bc(1,j,i)*tmp
             END DO
          END DO
-      ELSE 
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+      ELSE
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (j,tmp)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
             DO j = 1,ny
                tmp   = 1.0_GP/(2*khom(j,i))
-               coef(1,j,i) = bc(2,j,i)*tmp
-               coef(2,j,i) = bc(1,j,i)*tmp
-           END DO
+               coefbuf(1,j,i) = bc(2,j,i)*tmp
+               coefbuf(2,j,i) = bc(1,j,i)*tmp
+            END DO
          END DO
       ENDIF  !End Robin
 
       ! Dirichlet bottom - Robin top
       ELSEIF ( bczsta .eq. 0 .AND. bczend .eq. 2 ) THEN
       IF (ista.eq.1) THEN
-         coef(1,1,1) = bc(2,1,1)
-         coef(2,1,1) = bc(1,1,1)
-!$omp parallel do private (k,tmp)
+#if defined(GHOST_GPU)
+!$omp target if(target: gdev_active)
+#endif
+            coefbuf(1,1,1) = bc(2,1,1)
+            coefbuf(2,1,1) = bc(1,1,1)
+#if defined(GHOST_GPU)
+!$omp end target
+#endif
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (tmp)
+#endif
          DO j = 2,ny
             tmp   = 1.0_GP/(2*khom(j,1))
-            coef(1,j,1) = bc(2,j,1)*tmp
-            coef(2,j,1) = (bc(1,j,1)*2*khom(j,1) - bc(2,j,1)*exp(-khom(j,1)*Lz))*tmp
+            coefbuf(1,j,1) = bc(2,j,1)*tmp
+            coefbuf(2,j,1) = (bc(1,j,1)*2*khom(j,1) - bc(2,j,1)*exp(-khom(j,1)*Lz))*tmp
          END DO
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (j,tmp)
+#endif
          DO i = 2,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
             DO j = 1,ny
                tmp   = 1.0_GP/(2*khom(j,i))
-               coef(1,j,i) = bc(2,j,i)*tmp
-               coef(2,j,i) = (bc(1,j,i)*2*khom(j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
+               coefbuf(1,j,i) = bc(2,j,i)*tmp
+               coefbuf(2,j,i) = (bc(1,j,i)*2*khom(j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
             END DO
          END DO
       ELSE
-!$omp parallel do if (iend-ista.ge.nth) private (j,k,tmp)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) private(tmp) if(target: gdev_active)
+#else
+!$omp parallel do private (j,tmp)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
             DO j = 1,ny
                tmp   = 1.0_GP/(2*khom(j,i))
-               coef(1,j,i) = bc(2,j,i)*tmp
-               coef(2,j,i) = (bc(1,j,i)*2*khom(j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
-           END DO
+               coefbuf(1,j,i) = bc(2,j,i)*tmp
+               coefbuf(2,j,i) = (bc(1,j,i)*2*khom(j,i) - bc(2,j,i)*exp(-khom(j,i)*Lz))*tmp
+            END DO
          END DO
       ENDIF  !End Dirichlet bottom - Robin top
 
@@ -616,42 +792,56 @@ MODULE boundary
       ! Construct solution and normal derivative
       ! ----------------------------------------
       IF (ista.eq.1) THEN
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do if(target: gdev_active)
+#else
 !$omp parallel do
+#endif
          DO k=1,nz
-            a(k,1,1) = real(coef(1,1,1), kind=GP)*z(k) + real(coef(2,1,1), kind=GP)
-            b(k,1,1) = real(coef(1,1,1), kind=GP)
+            a(k,1,1) = real(coefbuf(1,1,1), kind=GP)*z(k) + real(coefbuf(2,1,1), kind=GP)
+            b(k,1,1) = real(coefbuf(1,1,1), kind=GP)
          ENDDO
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(2) if(target: gdev_active)
+#else
 !$omp parallel do private (k)
+#endif
          DO j = 2,ny
             DO k=1,nz
-               a(k,j,1) = coef(1,j,1)*exp(khom(j,1)*(z(k)-Lz)) + &
-                          coef(2,j,1)*exp(-khom(j,1)*z(k))
-               b(k,j,1) = khom(j,1)*(coef(1,j,1)*exp(khom(j,1)*(z(k)-Lz)) - &
-                          coef(2,j,1)*exp(-khom(j,1)*z(k)))
+               a(k,j,1) = coefbuf(1,j,1)*exp(khom(j,1)*(z(k)-Lz)) + &
+                          coefbuf(2,j,1)*exp(-khom(j,1)*z(k))
+               b(k,j,1) = khom(j,1)*(coefbuf(1,j,1)*exp(khom(j,1)*(z(k)-Lz)) - &
+                          coefbuf(2,j,1)*exp(-khom(j,1)*z(k)))
             END DO
          END DO
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i = 2,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k=1,nz
-                  a(k,j,i) = coef(1,j,i)*exp(khom(j,i)*(z(k)-Lz)) + &
-                             coef(2,j,i)*exp(-khom(j,i)*z(k))
-                  b(k,j,i) = khom(j,i)*(coef(1,j,i)*exp(khom(j,i)*(z(k)-Lz)) - &
-                             coef(2,j,i)*exp(-khom(j,i)*z(k)))
+                  a(k,j,i) = coefbuf(1,j,i)*exp(khom(j,i)*(z(k)-Lz)) + &
+                             coefbuf(2,j,i)*exp(-khom(j,i)*z(k))
+                  b(k,j,i) = khom(j,i)*(coefbuf(1,j,i)*exp(khom(j,i)*(z(k)-Lz)) - &
+                             coefbuf(2,j,i)*exp(-khom(j,i)*z(k)))
                END DO
             END DO
          END DO
-      ELSE 
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+      ELSE
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k=1,nz
-                  a(k,j,i) = coef(1,j,i)*exp(khom(j,i)*(z(k)-Lz)) + &
-                             coef(2,j,i)*exp(-khom(j,i)*z(k))
-                  b(k,j,i) = khom(j,i)*(coef(1,j,i)*exp(khom(j,i)*(z(k)-Lz)) - &
-                             coef(2,j,i)*exp(-khom(j,i)*z(k)))
+                  a(k,j,i) = coefbuf(1,j,i)*exp(khom(j,i)*(z(k)-Lz)) + &
+                             coefbuf(2,j,i)*exp(-khom(j,i)*z(k))
+                  b(k,j,i) = khom(j,i)*(coefbuf(1,j,i)*exp(khom(j,i)*(z(k)-Lz)) - &
+                             coefbuf(2,j,i)*exp(-khom(j,i)*z(k)))
                END DO
             END DO
          END DO
@@ -751,13 +941,13 @@ MODULE boundary
 
       ! Get mean value
       IF (ista.eq.1) THEN
-!$omp parallel do reduction(+:dloc,eloc,floc,gloc)
+!$omp parallel do reduction(+:botloc,toploc)
          DO j = 1,ny
                botloc = botloc + R1(j,1)*tmp
                toploc = toploc + R2(j,1)*tmp
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j) &
-!$omp& reduction(+:dloc,eloc,floc,gloc)
+!$omp& reduction(+:botloc,toploc)
          DO i = 2,iend
             DO j = 1,ny
                   botloc = botloc + 2*R1(j,i)*tmp
@@ -766,7 +956,7 @@ MODULE boundary
          END DO
       ELSE
 !$omp parallel do if (iend-ista.ge.nth) private (j) &
-!$omp& reduction(+:dloc,eloc,floc,gloc)
+!$omp& reduction(+:botloc,toploc)
          DO i = ista,iend
            DO j = 1,ny
                botloc = botloc + 2*R1(j,i)*tmp

@@ -8,9 +8,9 @@
 !
 ! Versión de SPECTER del equation_factory.f90 de GHOST (rama
 ! new_paradigm, afaf9ea), solo con el solver HD. El pool de
-! temporarios es el pico de SPECTER (6 complejos y 3 reales, los de
-! write_states, medidos con report_peaks), y el pool solo-host no se
-! usa.
+! temporarios es el pico de SPECTER (10 complejos y 7 reales, los de
+! dudt con gradre, medidos con report_peaks), y el pool solo-host no
+! se usa.
 !
 ! DATE : 03/29/26 (PDM)
 ! ===================================================================
@@ -59,7 +59,7 @@ CONTAINS
     select case (trim(adjustl(solver)))
       case ('HD')
         allocate(HDsolver    :: new_object)
-        NUMTMPCOMP =  6; NUMTMPREAL = 3
+        NUMTMPCOMP = 10; NUMTMPREAL = 7
       case default
         stop 'Equation factory :: init_pdes_from_file : Unknown solver name'
     end select

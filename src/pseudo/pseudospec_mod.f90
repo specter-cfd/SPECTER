@@ -99,7 +99,7 @@
       USE fprecision
       REAL(KIND=GP), ALLOCATABLE, DIMENSION (:)     :: kx,ky,kz
       REAL(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: kk2
-      REAL(KIND=GP), ALLOCATABLE, DIMENSION (:,:)   :: khom
+      REAL(KIND=GP), ALLOCATABLE, TARGET, DIMENSION (:,:) :: khom
       SAVE
   END MODULE kes
 !=================================================================
@@ -133,6 +133,7 @@
       USE grid
       USE kes
       USE var
+      USE gmem
 !$    USE threads
       IMPLICIT NONE
 
@@ -150,9 +151,19 @@
       CALL MPI_BCAST(Ly,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(Lz,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
 
-      ALLOCATE( x(nx), y(ny), z(nz) )
-      ALLOCATE( kx(nx), ky(ny), kz(nz) )
-      ALLOCATE( kk2(nz,ny,ista:iend), khom(ny,ista:iend) )
+      ! Grillas y números de onda, con su copia en el dispositivo en
+      ! las compilaciones para GPU (los kernels los leen de ahí), como
+      ! en GHOST. galloc no tiene la forma (ny,ista:iend) de khom, así
+      ! que su copia se registra directamente
+      CALL galloc( x, nx )
+      CALL galloc( y, ny )
+      CALL galloc( z, nz )
+      CALL galloc( kx, nx )
+      CALL galloc( ky, ny )
+      CALL galloc( kz, nz )
+      CALL galloc( kk2, nz, ny, ista, iend )
+      ALLOCATE( khom(ny,ista:iend) )
+      CALL gdev_alloc(C_LOC(khom),INT(SIZE(khom),C_SIZE_T)*INT(STORAGE_SIZE(khom)/8,C_SIZE_T))
 
 ! Construct grids
       IF ( Cx .eq. 0 ) THEN
@@ -244,6 +255,17 @@
             khom(j,i) = SQRT(kk2(1,j,i))
          END DO
       END DO
+
+      ! Copias en el dispositivo (no hacen nada en las compilaciones
+      ! para CPU)
+      CALL gupdate_to( x )
+      CALL gupdate_to( y )
+      CALL gupdate_to( z )
+      CALL gupdate_to( kx )
+      CALL gupdate_to( ky )
+      CALL gupdate_to( kz )
+      CALL gupdate_to( kk2 )
+      CALL gdev_update_to(C_LOC(khom),INT(SIZE(khom),C_SIZE_T)*INT(STORAGE_SIZE(khom)/8,C_SIZE_T))
       END SUBROUTINE box_init
 
   END MODULE boxsize

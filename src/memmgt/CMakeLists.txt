@@ -30,8 +30,8 @@ target_include_directories(memmgt_lib PUBLIC
 add_dependencies(memmgt_lib
   fftp_lib
   gmem_lib
-  pseudo_lib
+  pseudobase_lib
   )
 
 # Link libraries
-target_link_libraries(memmgt_lib PUBLIC project_mpi gmem_lib pseudo_lib)
+target_link_libraries(memmgt_lib PUBLIC project_mpi gmem_lib pseudobase_lib)

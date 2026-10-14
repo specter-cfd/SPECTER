@@ -7,6 +7,9 @@
 ! pasivos), que es lo que usa HD. Se agrega end_stage, que el integrador
 ! llama después de actualizar cada etapa; por defecto no hace nada, y
 ! los solvers con paredes lo usan para imponer los bordes y proyectar.
+! También se agrega sync_host, la contraparte de sync_device: copia al
+! host, antes de las salidas, los arreglos auxiliares que el solver
+! cambia en el dispositivo durante el paso (en HD, la presión).
 ! Los solvers con salidas propias (como la presión en HD) redefinen
 ! write_states y llaman antes al procedimiento write_states de este
 ! módulo, que escribe los estados y la vorticidad.
@@ -44,6 +47,7 @@ module equationbase_mod
       procedure, public                          :: end_stage   ! After each RK stage
       procedure, public                          :: write_states
       procedure, public                          :: sync_device ! Aux. arrays to the device
+      procedure, public                          :: sync_host   ! Aux. arrays to the host
   end type EquationBase
 
   type, abstract, extends(EquationBase) :: VelocityBase
@@ -122,6 +126,18 @@ CONTAINS
     class (EquationBase), intent(inout) :: this
     return
   end subroutine sync_device
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Copia al host los arreglos auxiliares del solver que
+  !! cambian en el dispositivo durante el paso, antes de las
+  !! salidas (propio de SPECTER). Por defecto el solver no
+  !! tiene arreglos auxiliares.
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine sync_host(this)
+    class (EquationBase), intent(inout) :: this
+    return
+  end subroutine sync_host
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

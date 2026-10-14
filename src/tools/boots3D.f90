@@ -53,6 +53,7 @@
       USE fftplans
       USE threads
       USE gutils
+      USE gdevice, ONLY: device_init
       IMPLICIT NONE
 
 !
@@ -101,6 +102,9 @@
       CALL MPI_INIT(ierr)
       CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nprocs,ierr)
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myrank,ierr)
+! In offload builds the FFT plans register their buffers on the
+! device, so the task must be bound to a GPU (no-op otherwise)
+      CALL device_init(myrank)
 ! Initializes the grid. This must be done early to have nx, ny, nz.
 ! The new (prolongated) grid is read from &grid in boots.inp
       CALL grid_init('boots.inp')

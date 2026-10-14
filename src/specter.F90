@@ -20,7 +20,10 @@
 ! Organizado como el main de GHOST (rama new_paradigm, afaf9ea): el
 ! solver (&pdes), las condiciones iniciales (&initial_conditions), el
 ! forzado (&forcing) y el integrador (&stepper) se eligen al correr,
-! con sus fábricas. Por ahora el único solver es HD.
+! con sus fábricas. Por ahora el único solver es HD. En las
+! compilaciones para GPU, como en GHOST, los campos se trabajan en el
+! dispositivo dentro del paso (gdev_active) y en sus copias del host
+! para las salidas y los diagnósticos.
 !
 ! 2019 Mauro Fontana
 !      Department of Physics,
@@ -54,6 +57,8 @@
       USE force_factory
       USE equation_factory
       USE stepper_factory
+      USE gdevice
+      USE gmem
 
       IMPLICIT NONE
 
@@ -78,6 +83,7 @@
       TYPE(IOPLAN), TARGET :: planio
 
       LOGICAL               :: bbenchexist
+      LOGICAL               :: fstatic
 
 ! Initializes the MPI and I/O libraries
       CALL MPI_INIT_THREAD(MPI_THREAD_FUNNELED,provided,ierr)
@@ -87,6 +93,11 @@
 ! Initializes the grid and the FC-Gram continuation (&grid, see
 ! pseudo/pseudospec_mod.f90). This must be done early to have nx, ny, nz.
       CALL grid_init('parameter.inp')
+
+! Binds this MPI task to a GPU in offload builds (no-op otherwise).
+! SPECTER assumes the number of MPI tasks per node is a multiple of the
+! number of GPUs per node; the user must ensure this condition.
+      CALL device_init(myrank)
 
 ! Create partitions across tasks
      CALL range(1,nx/2+1,nprocs,myrank,ista,iend)
@@ -171,17 +182,25 @@
 ! Initial conditions for the fields (iclist in &initial_conditions);
 ! field_nxt is the state that is advanced and written
       CALL init_allstates(iclist,fluid,field)
+      CALL GState_update_to(field)        ! Device copies (no-op in host builds).
       CALL GState_copy(field_nxt,field)
 
       CALL init_forcing(forcemethod,fluid,force)
+      CALL GState_update_to(force)
+      CALL fluid%sync_device()            ! Auxiliary arrays of the solver (if any).
+      fstatic = forcing_is_static(forcemethod)
 
 ! Sets up the time stepper (&stepper, see steppers/stepper_factory.f90)
       CALL build_stepper_from_file('parameter.inp',stepper,workspace,fluid)
 
 !
-! Time integration scheme starts here. If
-! we are doing a benchmark, we measure
-! cputime before starting.
+! Time integration scheme starts here. In offload builds the fields are
+! worked on the device inside the time step (gdev_active set) and on
+! their host copies elsewhere (for I/O and diagnostics): the host copies
+! of the fields and of the auxiliary arrays of the solver are refreshed
+! before any output, and the forcing, which is computed on the host, is
+! copied to the device in the steps in which it changes. If we are doing
+! a benchmark, we measure cputime before starting.
 
       IF (bench.eq.1) THEN
          CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
@@ -196,6 +215,12 @@
 
 
  RK : DO t = ini,step
+! Refreshes the host copies if any output is due
+         IF (((timet.eq.tstep).or.(timec.eq.cstep)).and.(bench.eq.0)) THEN
+            CALL GState_update_from(field_nxt)
+            CALL fluid%sync_host()
+         ENDIF
+
 ! Every 'tstep' steps, stores the fields 
 ! in binary files
  BIN:    IF ((timet.eq.tstep).and.(bench.eq.0)) THEN
@@ -209,16 +234,20 @@
 
          IF ((timec.eq.cstep).and.(bench.eq.0)) THEN
             timec = 0
+            IF (.not.fstatic) CALL GState_update_from(force)
             CALL fluid%global(field_nxt,force,t)
          ENDIF
 
 ! Forcing update (nothing to do for a constant forcing)
          CALL update_forcing(forcemethod,fluid,force)
+         IF (forcing_changed(forcemethod)) CALL GState_update_to(force)
 
 ! Time step (GHOST Canuto stepper): field keeps the state at the
 ! beginning of the step and field_nxt is advanced
+         gdev_active = .TRUE.
          CALL GState_copy(field,field_nxt)
          CALL stepper%gstep((t-1)*dt,field,force,dt,field_nxt)
+         gdev_active = .FALSE.
 
          timet = timet+1
          timec = timec+1
@@ -276,8 +305,14 @@
       CALL GState_dealloc(field_nxt)
       CALL GState_dealloc(force)
 
-      DEALLOCATE( x,y,z )
-      DEALLOCATE( kx,ky,kz )
-      DEALLOCATE( kk2,khom )
+      CALL gfree( x )
+      CALL gfree( y )
+      CALL gfree( z )
+      CALL gfree( kx )
+      CALL gfree( ky )
+      CALL gfree( kz )
+      CALL gfree( kk2 )
+      CALL gdev_free(C_LOC(khom))
+      DEALLOCATE( khom )
 
       END PROGRAM SPECTER
