@@ -84,6 +84,10 @@
       CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nprocs,ierr)
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myrank,ierr)
 
+! Initializes the grid and the FC-Gram continuation (&grid, see
+! pseudo/pseudospec_mod.fpp). This must be done early to have nx, ny, nz.
+      CALL grid_init('parameter.inp')
+
 ! Create partitions across tasks
      CALL range(1,nx/2+1,nprocs,myrank,ista,iend)
      CALL range(1,nz,nprocs,myrank,ksta,kend)

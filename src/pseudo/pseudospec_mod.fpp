@@ -12,26 +12,55 @@
 
   MODULE grid
       USE fprecision
-
 !
-! Number of points in the spatial grid in each direction
-      INTEGER, PARAMETER :: nx = NX_
-      INTEGER, PARAMETER :: ny = NY_
-      INTEGER, PARAMETER :: nz = NZ_
-
+! ni: number of points in the spatial grid in each direction,
+! including the continuation points
+      INTEGER :: nx
+      INTEGER :: ny
+      INTEGER :: nz
 !
-! Global number of continuation points and derivative order.
-      INTEGER, PARAMETER :: Cx = CX_
-      INTEGER, PARAMETER :: Cy = CY_
-      INTEGER, PARAMETER :: Cz = CZ_
-      INTEGER, PARAMETER :: ox = OX_
-      INTEGER, PARAMETER :: oy = OY_
-      INTEGER, PARAMETER :: oz = OZ_
-
-
+! Ci: number of continuation points, and oi: order at the
+! boundaries, in each direction (Ci=0 in periodic directions)
+      INTEGER :: Cx
+      INTEGER :: Cy
+      INTEGER :: Cz
+      INTEGER :: ox
+      INTEGER :: oy
+      INTEGER :: oz
+!
 ! Unidimensional grids
       REAL(KIND=GP), ALLOCATABLE, DIMENSION(:) :: x,y,z
       SAVE
+    CONTAINS
+!-----------------------------------------------------------------
+      SUBROUTINE grid_init(infile_)
+!
+! Initializes the grid spatial resolution and the FC-Gram
+! continuation. Ci and oi are zero (periodic direction) if
+! they are not in the namelist.
+      USE commtypes
+      USE mpivars
+      IMPLICIT NONE
+
+      CHARACTER(len=*), INTENT(IN) :: infile_
+      NAMELIST/ grid / nx,ny,nz,Cx,Cy,Cz,ox,oy,oz
+      Cx = 0; Cy = 0; Cz = 0
+      ox = 0; oy = 0; oz = 0
+      IF ( myrank .EQ. 0 ) THEN
+         OPEN(1,file=infile_,status='unknown',form="formatted")
+         READ(1,NML=grid)
+         CLOSE(1)
+      ENDIF
+      CALL MPI_BCAST(nx,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(ny,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(nz,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(Cx,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(Cy,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(Cz,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(ox,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(oy,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      CALL MPI_BCAST(oz,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+      END SUBROUTINE grid_init
 
   END MODULE grid
 

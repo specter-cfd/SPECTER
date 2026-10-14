@@ -3,7 +3,7 @@
 # Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt
 #
 # Cada valor se puede cambiar al configurar, sin editar este archivo,
-# por ejemplo desde build/: "cmake .. -DNZ=128 -DPRECISION=SINGLE"
+# por ejemplo desde build/: "cmake .. -DPRECISION=SINGLE"
 # Si las bibliotecas no están en el path, usar -DCMAKE_PREFIX_PATH
 # y -DFFTW3_ROOT, por ejemplo
 # "cmake .. -DCMAKE_PREFIX_PATH=/opt/openmpi-5.0.8 -DFFTW3_ROOT=/opt/fftw-3.3.10"
@@ -32,20 +32,3 @@ set(NSTRIP 1  CACHE STRING "Strip mining")
 # ----------------------- Solver (SPECTER) ---------------------------
 # Solo HD está soportado
 set(SOLVER "HD" CACHE STRING "Solver (HD)")
-
-# ----------------------- Grilla y FC-Gram (SPECTER) -----------------
-# En SPECTER la grilla se fija al compilar: cambiarla requiere volver
-# a configurar y compilar (conviene un directorio de build por grilla).
-# Puntos de la grilla en x, y, z
-set(NX 256 CACHE STRING "Grid points in x")
-set(NY 128 CACHE STRING "Grid points in y")
-set(NZ 512 CACHE STRING "Grid points in z")
-# Puntos de continuación periódica en cada dirección: el dominio físico
-# tiene N-C puntos, y C=0 es una dirección periódica
-set(CX 0  CACHE STRING "Continuation points in x")
-set(CY 0  CACHE STRING "Continuation points in y")
-set(CZ 25 CACHE STRING "Continuation points in z")
-# Orden en cada borde (0 en las direcciones periódicas)
-set(OX 0 CACHE STRING "Boundary order in x")
-set(OY 0 CACHE STRING "Boundary order in y")
-set(OZ 5 CACHE STRING "Boundary order in z")

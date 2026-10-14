@@ -10,12 +10,6 @@ add_library(pseudo_lib STATIC
 set_source_files_properties(pseudospec_mod.fpp
   PROPERTIES Fortran_PREPROCESS ON Fortran_FORMAT FREE)
 
-# Grilla y FC-Gram, que el Makefile viejo pasaba a cpp en "make edit"
-target_compile_definitions(pseudo_lib PRIVATE
-  NX_=${NX} NY_=${NY} NZ_=${NZ}
-  CX_=${CX} CY_=${CY} CZ_=${CZ}
-  OX_=${OX} OY_=${OY} OZ_=${OZ})
-
 # Directorios de inclusión
 target_include_directories(pseudo_lib PUBLIC
   ${CMAKE_SOURCE_DIR}/src/pseudo

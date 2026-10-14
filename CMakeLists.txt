@@ -15,8 +15,6 @@
 # -DP_HYBRID=ON (multithreaded, default: OFF)
 # -DP_GPU=ON -DGPU_VENDOR=NVIDIA|AMD -DGPU_ARCH=<arch> (OpenMP offload,
 #    default: OFF; needs nvfortran, flang, or amdflang, see src/README)
-# En SPECTER la grilla y el FC-Gram se fijan al compilar: -DNX=... -DNY=...
-# -DNZ=... -DCX=... -DCZ=... -DOZ=... etc. (ver UserConfig.cmake).
 # P_HYBRID, P_GPU y GPU_* todavía no tienen efecto en SPECTER.
 # -------------------------------------------------------------------
 

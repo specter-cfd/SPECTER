@@ -29,12 +29,13 @@ Prequisites
 
 Compiling
 ---------
-**SPECTER** is compiled with CMake, out of the source tree. The grid, the FC-Gram continuation and the floating-point precision are set at compile time, in `UserConfig.cmake` or with `-D` options; for instance
+**SPECTER** is compiled with CMake, out of the source tree. The floating-point precision is set at compile time, in `UserConfig.cmake` or with `-D` options; for instance
 ```
 mkdir build && cd build
-cmake .. -DFFTW3_ROOT=/path/to/fftw -DNZ=128 -DPRECISION=SINGLE
+cmake .. -DFFTW3_ROOT=/path/to/fftw -DPRECISION=SINGLE
 make
 ```
+The grid and the FC-Gram continuation are read at run time, from the `grid` namelist in `parameter.inp`, so the same binary works for any resolution.
 The output binary is placed in the `bin/` directory, and named like the solver (`HD`, the only one available). See `src/README.md` for all the options.
 
 Running SPECTER

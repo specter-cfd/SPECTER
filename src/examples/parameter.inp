@@ -1,3 +1,12 @@
+! Grid and FC-Gram continuation
+&grid
+nx = 256             ! grid points in x (including continuation points)
+ny = 128             ! grid points in y
+nz = 512             ! grid points in z
+Cz = 25              ! continuation points in z (0 in periodic directions)
+oz = 5               ! order at the boundaries in z
+/
+
 ! General configuration flags
 &status
 idir = "in/"         ! location of binary input

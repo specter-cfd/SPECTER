@@ -2,7 +2,7 @@ Cambios de los archivos de CMake de SPECTER respecto de los de GHOST (rama new_p
 
 CMakeLists.txt (raíz)
 - Parte de una copia literal del de GHOST y conserva todas sus secciones.
-- El proyecto se llama SPECTER. El encabezado aclara que PRECISION vale DOUBLE por defecto, que la grilla y el FC-Gram se pasan con -DNX=... (ver UserConfig.cmake) y que P_HYBRID, P_GPU y GPU_* todavía no tienen efecto.
+- El proyecto se llama SPECTER. El encabezado aclara que PRECISION vale DOUBLE por defecto y que P_HYBRID, P_GPU y GPU_* todavía no tienen efecto.
 - Flags de gfortran: las de Makefile.in salvo -mfpmath=both (-O3 -funroll-loops -mtune=native) en vez de -O4 -funroll-loops. Con -mfpmath=both gfortran usa registros x87 de 80 bits según cómo quede compilado cada archivo, y dos versiones del código que hacen las mismas cuentas dejan de dar idénticas byte a byte; sin ella sí (probado el 2026-10-09 al pasar &status a un módulo). La flag queda comentada. Desde GCC 10 se agrega -w -fallow-argument-mismatch, necesario porque SPECTER usa mpif.h (GHOST usa mpi_f08).
 - add_compile_definitions suma IKIND_, que usa fftp_mod.fpp.
 - FFT: la biblioteca con FFTW se llama fftp (en GHOST, fftp-3).
@@ -18,7 +18,7 @@ UserConfig.cmake
 - PRECISION vale DOUBLE por defecto (en GHOST, SINGLE), como en Makefile.in.
 - FFTP vale fftp (en GHOST, fftp-3).
 - IKIND, CSIZE y NSTRIP se toman de Makefile.in: IKIND=8 no existe en GHOST, CSIZE=32 en vez de 8 y NSTRIP=1 igual.
-- Se agregan los parámetros que SPECTER fija al compilar y GHOST lee al correr: SOLVER (HD), la grilla (NX, NY, NZ), las continuaciones (CX, CY, CZ) y los órdenes de borde (OX, OY, OZ). El orden del Runge-Kutta, que SPECTER también fijaba al compilar (ORD), se lee de &stepper.
+- Se agrega SOLVER (HD), que da el nombre del ejecutable. La grilla, las continuaciones y los órdenes de borde, que SPECTER fijaba al compilar (NX, ..., OZ), se leen al correr de &grid, como la grilla en GHOST; el orden del Runge-Kutta (ORD) se lee de &stepper.
 
 FindFFTW3.cmake
 - Sin cambios.
@@ -31,7 +31,7 @@ src/utils/CMakeLists.txt
 src/fftp/CMakeLists.txt (en GHOST, src/fftp-3)
 - Los fuentes son los de SPECTER: fprecision_mod.fpp, fftp_mod.fpp, fcgram_mod.f90 y fftp.fpp (en GHOST: fprecision_mod.F90, fftp_mod.F90, fftp3D.F90 y fftp.f90).
 - Los .fpp se marcan en formato libre (Fortran_FORMAT FREE), porque gfortran los toma como formato fijo.
-- No depende de gdevice_lib, porque memmgt todavía no se usa.
+- No depende de gdevice_lib: las transformadas de SPECTER no tienen código para GPU.
 - Publica build/src/fftp. La carpeta de FFTW llega a través de project_fft.
 
 src/mpiio/CMakeLists.txt
@@ -40,7 +40,7 @@ src/mpiio/CMakeLists.txt
 
 src/pseudo/CMakeLists.txt
 - Una sola biblioteca, pseudo_lib, con los fuentes de SPECTER que usa HD: pseudospec_mod.fpp, module_dns.f90 y pseudospec_hd.f90. GHOST separa pseudobase_lib (pseudospec3D_mod.f90) y pseudo_lib (los núcleos de todos los solvers).
-- pseudospec_mod.fpp recibe la grilla y el FC-Gram (NX_, ..., OZ_), que en GHOST se leen al correr.
+- pseudospec_mod.fpp ya no recibe definiciones del preprocesador: el módulo grid tiene grid_init, como en GHOST, que lee de &grid nx, ny y nz y además las continuaciones (Cx, Cy, Cz) y los órdenes de borde (ox, oy, oz), que valen 0 (dirección periódica) si no se dan.
 - No depende de memmgt_lib ni de gmem_lib.
 
 src/boundary/CMakeLists.txt
@@ -51,7 +51,7 @@ src/pdes/CMakeLists.txt
 - equation_factory.f90 es el de GHOST solo con HD: lee &pdes y crea el solver, y fija el pool de temporarios en el pico medido en SPECTER con report_peaks (6 complejos y 3 reales). El pool solo-host queda en cero, porque SPECTER no lo usa.
 - status_mod.f90 es el de GHOST con tdir agregado, sin sstep ni los contadores de los espectros (sind, times) y sin USE grid, kes ni ali. Lee un único &status, así que el parameter.inp de SPECTER pasa a tener dt, step, tstep, cstep y seed adentro de &status.
 - equation_base.f90 es una versión reducida del de GHOST: solo EquationBase y VelocityBase (sin escalares pasivos), con un método end_stage que el integrador llama después de cada etapa. Los solvers con salidas propias (la presión en HD) redefinen write_states y llaman antes al write_states del módulo. No tiene el método spectra: SPECTER no escribe espectros, así que el main tampoco los llama.
-- hd_solver.f90 es el solver HD de SPECTER, que se arma de a un método por vez. Lee &HD como el de GHOST (nu, y los directorios fidir, fodir y todir), sin la rotación, los escalares pasivos ni spectlod, que SPECTER no tiene.
+- hd_solver.f90 es el solver HD de SPECTER. Lee &HD como el de GHOST (nu, y los directorios fidir, fodir y todir), sin la rotación, los escalares pasivos ni spectlod, que SPECTER no tiene.
 - pdes_lib depende de fftp_lib, pseudo_lib, mpiio_lib, memmgt_lib y boundary_lib (el solver usa el plan de bordes) y los enlaza (GHOST enlaza pseudo_lib y utils_lib). Agrega a mano build/src/memmgt a sus directorios de inclusión, como GHOST.
 - El ejecutable enlaza pdes_lib directamente; en GHOST no figura en la lista del ejecutable.
 

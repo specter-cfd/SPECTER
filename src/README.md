@@ -48,7 +48,7 @@ directory). From the root of the repository:
 
 ```
 mkdir build && cd build
-cmake .. -DFFTW3_ROOT=/path/to/fftw -DNZ=128 -DPRECISION=SINGLE
+cmake .. -DFFTW3_ROOT=/path/to/fftw -DPRECISION=SINGLE
 make
 ```
 
@@ -56,40 +56,13 @@ The binary is placed in `bin/` and named like the solver (`HD`).
 
 ### 2.1. Code options:
 
-The variables
+The variable `PRECISION` (`SINGLE` or `DOUBLE`) sets the precision
+of the floating point numbers, and `FFTW3_ROOT` points to the
+installation of FFTW.
 
-```
-NX = 256
-NY = 128
-NZ = 128
-```
-
-set the number of grid points (including continuation regions) in
-each direction. Then
-
-```
-CX = 0
-CY = 0
-CZ = 25
-```
-
-set the number of continuation points to use in each direction.
-For periodic directions the desired variable should be set to zero
-(i.e. CX=0 implies that X is periodic). Similarly,
-
-```
-OX = 0
-OY = 0
-OZ = 5
-```
-
-define the order of approximation in each non-periodic direction,
-and should be set to zero for periodic directions. The variable
-`PRECISION` (`SINGLE` or `DOUBLE`) sets the precision of the floating
-point numbers, and `FFTW3_ROOT` points to the installation of FFTW.
-
-The solver, the initial conditions, the forcing and the order of the
-Runge-Kutta method are chosen at run time (see section 3.1).
+The grid, the FC-Gram continuation, the solver, the initial
+conditions, the forcing and the order of the Runge-Kutta method are
+chosen at run time (see section 3.1).
 
 The remaining options are optional and the defaults give good
 performance in most computers (don't change the values if you are
@@ -173,7 +146,31 @@ the list of all variables for all the solvers is given in the
 directory `examples`. Note all variables are not needed for all the
 solvers. The order of the lists in the file `parameter.inp`, and
 the order of the variables inside each list, are not important. All
-solvers need at least a list 'status' with variables
+solvers need a list 'grid' with the grid and the FC-Gram
+continuation, as in `GHOST`:
+
+```
+&grid
+nx = 256             ! grid points in x
+ny = 128             ! grid points in y
+nz = 128             ! grid points in z
+Cz = 25              ! continuation points in z
+oz = 5               ! order at the boundaries in z
+/
+```
+
+The variables in this list are
+- `nx`, `ny`, `nz`: number of grid points in each direction,
+    including the continuation points.
+- `Cx`, `Cy`, `Cz`: number of continuation points in each
+    direction. The physical domain has `nx-Cx` points in x, and
+    `Cx = 0` (the default) makes x a periodic direction.
+- `ox`, `oy`, `oz`: order of the approximation at the boundaries in
+    each non-periodic direction (0, the default, in periodic
+    directions).
+
+The FC-Gram tables for the chosen `C` and `o` must exist in `tdir`
+(see section 4). All solvers also need a list 'status' with variables
 
 ```
 &status
@@ -360,9 +357,8 @@ a periodic extension of any given data and remove Gibbs ringing in the
 Fourier transform. These tables (and, hence, the continuation itself)
 depend on two parameters, the length of the extension in number of
 points (`C`) and the order of approximation at the boudary (`O`). The
-values of `C` and `O` for each direction are defined at compilation
-time as described above in section 2. At runtime, the appropriate
-tables must exist in the tdir directory, named `AC-O.dat` and `QO.dat`,
+values of `C` and `O` for each direction are read at run time from
+the list 'grid' (section 3.1), and the appropriate tables must exist in the tdir directory, named `AC-O.dat` and `QO.dat`,
 with `C` and `O` having the meaning stated above. A set of frequently
 used tables can be found in the tables directory, together with a
 `README.info` file for more information. Note that for boundary

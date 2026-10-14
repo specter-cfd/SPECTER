@@ -11,14 +11,14 @@
 !                VELOCITY (VELOCITY+1, VELOCITY+2)
 !
 ! Versión de SPECTER del hd_solver.f90 de GHOST (rama new_paradigm,
-! afaf9ea), que se arma de a un método por vez. init lee &HD y
-! &velbound, arma el plan de bordes, y reserva e inicializa la presión
-! (init_pressure: cero en una corrida nueva, leída del archivo pr al
-! continuar una); dudt calcula el lado derecho sin la presión y
-! end_stage impone las paredes y proyecta después de cada etapa del RK
-! (las llama el integrador, src/steppers/canuto_stepper.f90); global y
-! write_states escriben las salidas. De &HD faltan la rotación, los
-! escalares pasivos y spectlod de GHOST, que SPECTER no tiene.
+! afaf9ea). init lee &HD y &velbound, arma el plan de bordes, y
+! reserva e inicializa la presión (init_pressure: cero en una corrida
+! nueva, leída del archivo pr al continuar una); dudt calcula el lado
+! derecho sin la presión y end_stage impone las paredes y proyecta
+! después de cada etapa del RK (las llama el integrador,
+! src/steppers/canuto_stepper.f90); global y write_states escriben las
+! salidas. De &HD faltan la rotación, los escalares pasivos y spectlod
+! de GHOST, que SPECTER no tiene.
 !
 ! La presión pr_ (p' = p.dt, en el dominio (z,ky,kx)) es un arreglo
 ! auxiliar del solver, como los de los solvers cuánticos de GHOST: no
