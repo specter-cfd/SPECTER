@@ -52,7 +52,8 @@ cmake .. -DFFTW3_ROOT=/path/to/fftw -DPRECISION=SINGLE
 make
 ```
 
-The binary is placed in `bin/` and named like the solver (`HD`).
+The binary is placed in `bin/` and named like the solver (`HD`),
+together with `BOOTS` (section 5).
 
 ### 2.1. Code options:
 
@@ -358,15 +359,34 @@ Fourier transform. These tables (and, hence, the continuation itself)
 depend on two parameters, the length of the extension in number of
 points (`C`) and the order of approximation at the boudary (`O`). The
 values of `C` and `O` for each direction are read at run time from
-the list 'grid' (section 3.1), and the appropriate tables must exist in the tdir directory, named `AC-O.dat` and `QO.dat`,
-with `C` and `O` having the meaning stated above. A set of frequently
+the list 'grid' (section 3.1), and the appropriate tables must exist
+in the tdir directory, named `AC-O.dat` and `QO.dat`, with `C` and
+`O` having the meaning stated above. A set of frequently
 used tables can be found in the tables directory, together with a
 `README.info` file for more information. Note that for boundary
 conditions which involve the i-th derivative the tables `QinO.dat` are
 required.
 
 
-5 - References
+5 - Regridding (BOOTS)
+----------------------
+Together with the solver, the build generates `BOOTS`, the 'bootstrap
+regridding' procedure of `GHOST`. It reads fields in physical space
+on an old grid and writes them on a larger grid, prolongating them
+in Fourier space; the output files are the input files with the new
+size appended (`_PNNNNN-NNNNN-NNNNN`, with the physical points). The
+new grid is read from the list 'grid' of `boots.inp` (section 3.1),
+and the old grid and the files to process from the list 'regrid'.
+In the non-periodic direction the old data is extended with an
+FC-Gram continuation of `Czt` points, chosen so that the extended
+periods of both grids match, and of the order `ozt` given in the
+list 'order' (if zero, the order of the new grid). The tables for
+that continuation must exist in `tdir`; the set in `tables/boots`
+covers some common cases. If the grid changes in x, the number of
+MPI tasks must be 1 or of the form 2^i nx_new/nx_old with i > 0. An
+example input file can be found in `examples/boots.inp`.
+
+6 - References
 --------------
 1. The Navier-Stokes solver is explained in:  Fontana, M., Bruno, O. P.,
 Mininni P. D. & Dmitruk P.; Fourier continuation method for

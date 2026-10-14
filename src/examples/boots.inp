@@ -1,0 +1,36 @@
+! Example of boots.inp
+! Input file for BOOTS, the 'boostrap regridding' procedure.
+! Reads dataset, and computes dataset that is prolongated in
+! wavenumber space, and outputs to real space. The files to
+! be read are specified on input, as is the linear size of the
+! old grid; the output files are the originial files appended
+! with the prolongation size 'PXXX-XXX-XXX'. To use this example
+! file, place it in the same directory as the BOOTS executable.
+
+! New grid (the prolongated one) and its FC-Gram continuation
+&grid
+nx = 256             ! grid points in x
+ny = 128             ! grid points in y
+nz = 226             ! grid points in z (201 physical + Cz)
+Cz = 25              ! continuation points in z
+oz = 5               ! order at the boundaries in z
+/
+
+! Old grid and files to prolongate
+&regrid
+idir   = "./"               ! location of input binary files
+odir   = "./"               ! destination of output binary files
+tdir   = "../tables/boots"  ! FC-Gram tables for the old grid
+fnlist = "vx.0001.out;vy.0001.out;vz.0001.out;pr.0001.out"
+! fnlist is a ';' delimited list of files to process
+nxt    = 256                ! x resolution of the old grid
+nyt    = 128                ! y resolution of the old grid
+nzt    = 103                ! z resolution of the old (physical) grid
+/
+
+! FC-Gram order for the continuation of the old grid
+! (if 0, the order of the new grid, oz, is used)
+&order
+ozt    = 5
+/
+

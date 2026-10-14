@@ -273,7 +273,7 @@ add_subdirectory("${SRC_DIR}/ic")
 add_subdirectory("${SRC_DIR}/force")
 # add_subdirectory("${SRC_DIR}/icpart")
 add_subdirectory("${SRC_DIR}/steppers")
-# add_subdirectory("${SRC_DIR}/tools")
+add_subdirectory("${SRC_DIR}/tools")
 
 # ---------------------- Main executable ------------------------------
 # El main es specter.fpp, en formato libre porque gfortran toma los .fpp
@@ -305,7 +305,7 @@ set_target_properties(${SOLVER} PROPERTIES
 # ---------------------- Installer ------------------------------------
 include(GNUInstallDirs)
 install(
-    TARGETS ${SOLVER}
+    TARGETS ${SOLVER} BOOTS
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

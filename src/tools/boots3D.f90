@@ -26,6 +26,10 @@
 !              error checking for number of tasks (M. Fontana)
 ! 17 Mar 2019: Added support for zeropaddding interpolation of
 !              non periodic signals (only in Z-direction). (M. Fontana)
+! 14 Oct 2026: The new grid is read at run time from the &grid
+!              namelist in boots.inp (grid_init), as in GHOST, and
+!              tasks outside the truncated communicator no longer
+!              copy unset data (as fixed in GHOST).
 !======================================================================
 
 
@@ -54,7 +58,7 @@
 !
 ! Arrays for the fields and structure functions
 
-      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C1t,C1t2
+      COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: C1t
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: B1
 
 
@@ -94,6 +98,9 @@
       CALL MPI_INIT(ierr)
       CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nprocs,ierr)
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myrank,ierr)
+! Initializes the grid. This must be done early to have nx, ny, nz.
+! The new (prolongated) grid is read from &grid in boots.inp
+      CALL grid_init('boots.inp')
       idir   = '.'
       odir   = '.'
       tdir   = '.'
@@ -148,8 +155,8 @@
       CALL MPI_BCAST(ozt  ,1   ,MPI_INTEGER  ,0,MPI_COMM_WORLD,ierr)
 
       IF (oxt .eq. 0 .AND. ox .ne. 0) oxt = ox
-      IF (oxt .eq. 0 .AND. ox .ne. 0) oyt = oy
-      IF (oxt .eq. 0 .AND. ox .ne. 0) ozt = oz
+      IF (oyt .eq. 0 .AND. oy .ne. 0) oyt = oy
+      IF (ozt .eq. 0 .AND. oz .ne. 0) ozt = oz
 
       !
       ! Check input
@@ -228,7 +235,6 @@
 
       ALLOCATE( vvt(nxt,nyt,ktsta:ktend) )
       ALLOCATE( C1t(nzt+Czt,nyt,itsta:itend) )
-      ALLOCATE( C1t2(nzt+Czt,nyt,itsta:itend) )
       ALLOCATE( B1(nz-Cz+Czn,ny,ista:iend) )
       ALLOCATE( br(nx,ny,ksta:kend) )
 
@@ -256,7 +262,7 @@
 !
 ! Read the external binary files in real space:
       bmangle = 0
-      CALL io_read(10,idir,fname,100,planiot,vvt)
+      CALL io_read(10,idir,fname,'',planiot,vvt)
 
 !
 ! Create plan for real to complex
@@ -293,9 +299,15 @@
 
 !
 ! Prolongate in Fourier space:
-         fact = 1.0_GP/\
+         fact = 1.0_GP/ &
             (real(nxt,kind=GP)*real(nyt,kind=GP)*real(nzt+Czt,kind=GP))
          B1 = 0.0
+         ! Only the tasks of the truncated communicator hold modes of
+         ! the old grid (their x range itsta:itend is contained in
+         ! ista:iend, see the constraint on the number of tasks); for
+         ! the other tasks 'range' still returns a nonempty interval
+         ! and C1t was never filled, so they must not copy anything
+         IF ( myrank .LT. ntprocs ) THEN
          DO i = itsta,itend
             DO j = 1,nyt/2+1
                DO k = 1,(nzt+Czt)/2+1
@@ -314,6 +326,7 @@
                END DO
             END DO
          END DO
+         ENDIF
 
 ! Compute inverse FT of prolongated variable:
          CALL fftp3d_complex_to_real(planfc,B1,br,MPI_COMM_WORLD)

@@ -54,6 +54,10 @@ Getting FC-Gram tables
 ----------------------
 For non-periodic directions, **SPECTER** uses tables to compute appropriate periodic extensions. A collection of commonly employed tables can be found in the `tables/` directory. However, a supplementary **Fortran** program to generate these tables is available at [https://github.com/mfontanaar/fctables](https://github.com/mfontanaar/fctables).
 
+Regridding
+----------
+The build also generates `BOOTS`, the 'bootstrap regridding' procedure inherited from **GHOST**, which prolongates fields computed on a grid to a larger one (in the non-periodic direction, using FC-Gram continuations). See `src/README.md` and the example input file `src/examples/boots.inp`.
+
 More information
 ----------------
 To get the best out of **SPECTER** we recommend reading the information provided in `src/README.md` for a detailed explanation of each compilation and runtime parameter.

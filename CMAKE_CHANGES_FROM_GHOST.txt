@@ -1,4 +1,4 @@
-Cambios de los archivos de CMake de SPECTER respecto de los de GHOST (rama new_paradigm, commit afaf9ea). Por ahora se compila solo HD, en CPU. CMake es el único build: el Makefile viejo de SPECTER (src/Makefile, src/Makefile.in y los de cada carpeta) ya no está, y las menciones a Makefile.in de abajo dicen de dónde salió cada valor. Del SPECTER original quedó solo lo que usa HD: no están los otros solvers, el código para CUDA (fftp-cu) ni las pruebas. boots (src/tools y tables/boots) está, pero todavía no se compila.
+Cambios de los archivos de CMake de SPECTER respecto de los de GHOST (rama new_paradigm, commit afaf9ea). Por ahora se compila solo HD, en CPU. CMake es el único build: el Makefile viejo de SPECTER (src/Makefile, src/Makefile.in y los de cada carpeta) ya no está, y las menciones a Makefile.in de abajo dicen de dónde salió cada valor. Del SPECTER original quedó solo lo que usa HD, más boots: no están los otros solvers, el código para CUDA (fftp-cu) ni las pruebas.
 
 CMakeLists.txt (raíz)
 - Parte de una copia literal del de GHOST y conserva todas sus secciones.
@@ -9,9 +9,9 @@ CMakeLists.txt (raíz)
 - IO: el mensaje de error dice SPECTER en vez de GHOST.
 - SOLVER no se define acá sino en UserConfig.cmake (HD), y da el nombre del ejecutable. project_defs queda igual y define HD_SOL, aunque en SPECTER ya no lo usa nadie: el solver se elige al correr, con &pdes.
 - project_includes suma src/boundary y build/src/boundary.
-- Subdirectorios: se suman boundary, memmgt, pdes, ic, force y steppers. particles, icpart y tools quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable.
+- Subdirectorios: se suman boundary, memmgt, pdes, ic, force y steppers. particles e icpart quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable. tools se compila, solo con BOOTS.
 - Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib, pdes_lib, memmgt_lib, ic_lib, force_lib y stepper_lib.
-- Instalador: instala solo el ejecutable, porque BOOTS y ghost_python no existen en SPECTER.
+- Instalador: instala el ejecutable y BOOTS; ghost_python no existe en SPECTER.
 
 UserConfig.cmake
 - Conserva las opciones de GHOST. Salvo PRECISION, todavía no tienen efecto. P_HYBRID está bloqueada: se declara con set(... CACHE BOOL ... FORCE) en vez de option(), para que quede en OFF aunque se pase -DP_HYBRID=ON.
@@ -75,3 +75,8 @@ src/steppers/CMakeLists.txt
 - stepper_lib compila gstepper_base.f90, canuto_stepper.f90 y stepper_factory.f90, versiones de SPECTER de los de GHOST sin partículas (solo step, y el genérico gstep agrupa solo step). El de Canuto llama a solver%end_stage después de actualizar cada etapa.
 - stepper_factory.f90 lee &stepper como el de GHOST y arma el integrador, solo el de Canuto (GEXRK no está en SPECTER). El orden se lee al correr y llega a las paredes (noslip_z, en boundary/vboundary.f90) como argumento desde end_stage.
 - stepper_lib depende de pdes_lib y la enlaza; a través de ella le llegan memmgt, pseudo, fftp y boundary.
+
+src/tools/CMakeLists.txt
+- Solo arma BOOTS (boots3D.f90); no está la biblioteca para Python de GHOST (ghost_python, gpython_lib.f90).
+- BOOTS enlaza además pseudo_lib, porque en SPECTER no le llega por utils_lib ni por mpiio_lib como en GHOST, y con ella fftp_lib.
+- boots3D.f90 es el boots de SPECTER, no el de GHOST: en la dirección no periódica continúa la grilla vieja con FC-Gram (Czt puntos, tablas en tables/boots y orden en &order) y no tiene iswap, oswap ni el truncamiento esférico de GHOST. Como en GHOST, la grilla nueva se lee de &grid en boots.inp (grid_init) y las tareas fuera del comunicador truncado no copian datos.
