@@ -30,8 +30,13 @@ src/utils/CMakeLists.txt
 
 src/fftp/CMakeLists.txt (en GHOST, src/fftp-3)
 - Los fuentes son los de SPECTER: fprecision_mod.F90, fftp_mod.F90, fcgram_mod.f90 (el FC-Gram) y fftp.F90, que junta lo que en GHOST está en fftp3D.F90 y fftp.f90. fftw_wrappers.h es el de GHOST.
-- No depende de gdevice_lib: las transformadas de SPECTER no tienen código para GPU.
+- No depende de gdevice_lib: este fftp no tiene código para GPU (el de GPU es src/fftp-gpu).
 - Publica build/src/fftp. La carpeta de FFTW llega a través de project_fft.
+
+src/fftp-gpu/CMakeLists.txt (en GHOST, src/fftp-gpu)
+- Es el FFTP que se usa con P_GPU, como en GHOST. Todavía no se compiló: falta llevar a la GPU el resto del código.
+- fftw_wrappers.h, gfft_defs.h, gfft_bindings.F90 y fprecision_mod.F90 son los de GHOST. fftp_mod.F90 es el de src/fftp más los planes del dispositivo (dplanrxy y dplancz) y los buffers compartidos de GHOST. fcgram_mod.f90 es el de src/fftp. fftp.F90 junta lo que en GHOST está en fftp3D.F90 y fftp.f90: el camino del dispositivo de GHOST partido en las dos mitades de SPECTER (fftp2d_*_xy y fftp1d_*_z), más un kernel para la continuación del FC-Gram en z.
+- Como el de src/fftp, publica src/fftp-gpu y build/src/fftp-gpu, y además build/src/memmgt, donde queda gdevice.mod (GHOST lo agrega igual). Depende de gdevice_lib, como en GHOST. Las bibliotecas de FFTW y de cuFFT o hipFFT llegan a través de project_fft.
 
 src/mpiio/CMakeLists.txt
 - No depende de pseudo_lib: el binary_io de SPECTER toma mpivars de fftp y no usa módulos de pseudo.

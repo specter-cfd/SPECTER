@@ -1,0 +1,1389 @@
+!=================================================================
+! FFTP3D for GPUs
+! Parallel Fast Fourier Transform in 3D
+!
+! Performs parallel real-to-complex and complex-to-real FFTs using
+! MPI and, in each task, cuFFT or hipFFT on the device resident
+! arrays while the fields are being worked on the device
+! (gdev_active set, see src/memmgt/gdevice_mod.f90), or the FFTW
+! library on the host copies otherwise. The host path is the one of
+! fftp: a 2D transform of the (x,y) planes, a slab exchange with
+! MPI derived data types, a cache-blocked transposition and a 1D
+! transform along z. The device path follows the same steps with
+! the exchange done by packing the blocks on the device into
+! contiguous messages that are handed to a GPU-aware MPI (or staged
+! through the host copies, see gexchange in fftp_mod.F90). The
+! transforms are unnormalized and the layout of the output is the
+! one of fftp with FFTW, so both backends are interchangeable.
+!
+! When dealing with non-periodic data, an FC-Gram scheme
+! is utilized to eliminate Gibbs phenomenon.
+!
+! Versión de SPECTER del fftp3D.F90 de fftp-gpu de GHOST. Como en
+! src/fftp, solo la dirección z puede ser no periódica, y cada
+! transformada se parte en dos mitades que también se usan por
+! separado, para trabajar en el dominio mixto (z,ky,kx):
+! fftp2d_*_xy, con la FFT 2D en (x,y), el intercambio y la
+! transposición, y fftp1d_*_z, con la FFT en z y, en la directa, la
+! continuación del FC-Gram. Cada mitad elige su camino con
+! gdev_active. El camino del dispositivo es el de GHOST partido en
+! el mismo lugar, más el kernel de continuación fftp3d_cont_z_dev.
+!
+! 2007 Pablo D. Mininni.
+!      National Center for Atmospheric Research.
+!      e-mail: mininni@ucar.uba.ar 
+!
+! 16 Feb 2004: Performs complex FFTs in place.
+!  8 Jul 2004: itype pointers only used to store datatypes of 
+!              blocks in the row and column each processor is.
+!  9 Jul 2004: Transposition uses data cache blocking.
+! 13 Feb 2007: Transposition uses strip mining (rreddy@psc.edu)
+! 25 Aug 2009: Hybrid MPI/OpenMP support (D. Rosenberg & P. Mininni)
+! 30 Aug 2009: SINGLE/DOUBLE precision (D. Rosenberg & P. Mininni)
+!  3 Jan 2017: Anisotropic boxes (P. Mininni)
+! 29 Aug 2019: FC-Gram (M. Fontana)
+!    Dec 2020: Updated calls to MPI3 and MPI4 practices. (P. Mininni)
+! 30 Jan 2020: First GPU version with cuFFT (D. Rosenberg)
+!  2 Sep 2026: Full GPU version with cuFFT/hipFFT and OpenMP offload
+!
+! References:
+! Lyon, M.; SIAM J. Sci. Comp., 33(6) (2011). DOI:10.1137/11082436X
+! Mininni PD, Gomez DO, Mahajan SM; Astrophys. J. 619, 1019 (2005)
+! Gomez DO, Mininni PD, Dmitruk P; Phys. Scripta T116, 123 (2005)
+! Gomez DO, Mininni PD, Dmitruk P; Adv. Sp. Res. 35, 899 (2005)
+! Rosenberg DL, Mininni PD, Reddy R, Pouquet A.: Atmosph.11, 178 (2020)
+!=================================================================
+#include "fftw_wrappers.h"
+#include "gfft_defs.h"
+
+!=================================================================
+! MODULE fftp3d_gpu
+!
+! Device path helpers of FFTP-GPU: execution of the device FFTs,
+! transpositions, packing of the exchange blocks and the exchanges
+! between tasks. The array dummies are explicit-shape with TARGET:
+! inside a "target data use_device_addr" region they refer to the
+! device copies of the arrays, so C_LOC yields device addresses for
+! the FFT library and for MPI.
+!=================================================================
+      MODULE fftp3d_gpu
+      IMPLICIT NONE
+      CONTAINS
+
+!*****************************************************************
+      SUBROUTINE fftp3d_exec_r2c_dev(plan,in,out)
+!-----------------------------------------------------------------
+!
+! 2D real-to-complex transform of the (x,y) planes on the device
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE fftplans
+      USE gfft
+      USE gdevice
+      IMPLICIT NONE
+      TYPE(FFTPLAN)   , INTENT(IN)          :: plan
+      REAL(KIND=GP)   , INTENT(IN) , TARGET :: in (plan%nx,plan%ny,ksta:kend)
+      COMPLEX(KIND=GP), INTENT(OUT), TARGET :: out(plan%nx/2+1,plan%ny,ksta:kend)
+      INTEGER(C_INT) :: ier
+!$omp target data use_device_addr(in,out)
+      ier = gfft_exec_r2c(plan%dplanrxy,C_LOC(in),C_LOC(out))
+!$omp end target data
+      IF (ier.ne.0) PRINT *,'fftp3d_exec_r2c_dev: error ',ier
+      CALL device_sync()
+      END SUBROUTINE fftp3d_exec_r2c_dev
+
+!*****************************************************************
+      SUBROUTINE fftp3d_exec_c2r_dev(plan,in,out)
+!-----------------------------------------------------------------
+!
+! 2D complex-to-real transform of the (x,y) planes on the device
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE fftplans
+      USE gfft
+      USE gdevice
+      IMPLICIT NONE
+      TYPE(FFTPLAN)   , INTENT(IN)          :: plan
+      COMPLEX(KIND=GP), INTENT(IN) , TARGET :: in (plan%nx/2+1,plan%ny,ksta:kend)
+      REAL(KIND=GP)   , INTENT(OUT), TARGET :: out(plan%nx,plan%ny,ksta:kend)
+      INTEGER(C_INT) :: ier
+!$omp target data use_device_addr(in,out)
+      ier = gfft_exec_c2r(plan%dplanrxy,C_LOC(in),C_LOC(out))
+!$omp end target data
+      IF (ier.ne.0) PRINT *,'fftp3d_exec_c2r_dev: error ',ier
+      CALL device_sync()
+      END SUBROUTINE fftp3d_exec_c2r_dev
+
+!*****************************************************************
+      SUBROUTINE fftp3d_exec_c2c_dev(plan,a,dir)
+!-----------------------------------------------------------------
+!
+! 1D complex transform along z, in place, on the device
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE fftplans
+      USE gfft
+      USE gdevice
+      IMPLICIT NONE
+      TYPE(FFTPLAN)   , INTENT(IN)            :: plan
+      COMPLEX(KIND=GP), INTENT(INOUT), TARGET :: a(plan%nz,plan%ny,ista:iend)
+      INTEGER, INTENT(IN) :: dir
+      INTEGER(C_INT) :: ier
+!$omp target data use_device_addr(a)
+      ier = gfft_exec_c2c(plan%dplancz,C_LOC(a),C_LOC(a),INT(dir,C_INT))
+!$omp end target data
+      IF (ier.ne.0) PRINT *,'fftp3d_exec_c2c_dev: error ',ier
+      CALL device_sync()
+      END SUBROUTINE fftp3d_exec_c2c_dev
+
+!*****************************************************************
+      SUBROUTINE fftp3d_tra_fwd_dev(plan,c1,out)
+!-----------------------------------------------------------------
+!
+! Transposition c1(i,j,k) -> out(k,j,i) on the device (see
+! fftp3d_tr13_dev)
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE fftplans
+      IMPLICIT NONE
+      TYPE(FFTPLAN)   , INTENT(IN)  :: plan
+      COMPLEX(KIND=GP), INTENT(IN)  :: c1 (ista:iend,plan%ny,plan%nz)
+      COMPLEX(KIND=GP), INTENT(OUT) :: out(plan%nz,plan%ny,ista:iend)
+
+      CALL fftp3d_tr13_dev(iend-ista+1,plan%ny,plan%nz,c1,out)
+      END SUBROUTINE fftp3d_tra_fwd_dev
+
+!*****************************************************************
+      SUBROUTINE fftp3d_tra_bwd_dev(plan,in,c1)
+!-----------------------------------------------------------------
+!
+! Transposition in(k,j,i) -> c1(i,j,k) on the device (see
+! fftp3d_tr13_dev)
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE fftplans
+      IMPLICIT NONE
+      TYPE(FFTPLAN)   , INTENT(IN)  :: plan
+      COMPLEX(KIND=GP), INTENT(IN)  :: in(plan%nz,plan%ny,ista:iend)
+      COMPLEX(KIND=GP), INTENT(OUT) :: c1(ista:iend,plan%ny,plan%nz)
+
+      CALL fftp3d_tr13_dev(plan%nz,plan%ny,iend-ista+1,in,c1)
+      END SUBROUTINE fftp3d_tra_bwd_dev
+
+!*****************************************************************
+      SUBROUTINE fftp3d_tr13_dev(n1,n2,n3,a,b)
+!-----------------------------------------------------------------
+!
+! Transposition of the first and third indices on the device:
+! b(k,j,i) = a(i,j,k). Register-tile kernel: each thread
+! transposes a T1 x T3 block of one j plane through registers, so
+! that it reads T1 and writes T3 consecutive elements at a time
+! (whole cache lines) instead of one element per thread, whose
+! partial line accesses multiply the traffic; consecutive threads
+! take consecutive i blocks (contiguous reads across a wavefront).
+! Keep the inner loops free of bounds tests (they prevent the
+! vector loads of a block row): the strips of incomplete blocks
+! are handled by separate kernels. Measured on an MI210 for a
+! 129x256x256 array: 0.39 ms against 0.87 ms for one element per
+! thread in single precision (8x4 tiles), 0.51 ms against 1.11 ms
+! in double precision (4x8 tiles; 8x8 tiles spill registers).
+! Team-private tiles in local memory are slower and wrong with
+! amdflang 22. The strips left by incomplete blocks are done one
+! element per thread.
+!
+! Parameters
+!     n1,n2,n3 : dimensions of a
+!     a        : input array a(n1,n2,n3)
+!     b        : output array b(n3,n2,n1)
+!-----------------------------------------------------------------
+      USE fprecision
+      IMPLICIT NONE
+      INTEGER         , INTENT(IN)  :: n1,n2,n3
+      COMPLEX(KIND=GP), INTENT(IN)  :: a(n1,n2,n3)
+      COMPLEX(KIND=GP), INTENT(OUT) :: b(n3,n2,n1)
+#if defined(GDOUBLE_PRECISION)
+      INTEGER, PARAMETER :: T1 = 4, T3 = 8
+#else
+      INTEGER, PARAMETER :: T1 = 8, T3 = 4
+#endif
+      COMPLEX(KIND=GP) :: blk(T1,T3)
+      INTEGER :: i,j,k,ib,kb,ii,kk,nb1,nb3
+
+      nb1 = n1/T1
+      nb3 = n3/T3
+!$omp target teams distribute parallel do collapse(3) private(blk,ii,kk)
+      DO j = 1,n2
+         DO kb = 0,nb3-1
+            DO ib = 0,nb1-1
+               DO kk = 1,T3
+                  DO ii = 1,T1
+                     blk(ii,kk) = a(ib*T1+ii,j,kb*T3+kk)
+                  END DO
+               END DO
+               DO ii = 1,T1
+                  DO kk = 1,T3
+                     b(kb*T3+kk,j,ib*T1+ii) = blk(ii,kk)
+                  END DO
+               END DO
+            END DO
+         END DO
+      END DO
+      IF (nb1*T1.lt.n1) THEN         ! strip of incomplete i blocks
+!$omp target teams distribute parallel do collapse(3)
+         DO i = nb1*T1+1,n1
+            DO j = 1,n2
+               DO k = 1,n3
+                  b(k,j,i) = a(i,j,k)
+               END DO
+            END DO
+         END DO
+      ENDIF
+      IF (nb3*T3.lt.n3) THEN         ! strip of incomplete k blocks
+!$omp target teams distribute parallel do collapse(3)
+         DO i = 1,nb1*T1
+            DO j = 1,n2
+               DO k = nb3*T3+1,n3
+                  b(k,j,i) = a(i,j,k)
+               END DO
+            END DO
+         END DO
+      ENDIF
+      END SUBROUTINE fftp3d_tr13_dev
+
+!*****************************************************************
+      SUBROUTINE fftp3d_pack_dev(carr,sbuf,nxh,ny,ntot,i0,lr,o)
+!-----------------------------------------------------------------
+!
+! Packs the block of carr with kx in [i0,i0+lr-1] contiguously at
+! sbuf(o+1:), on the device
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      IMPLICIT NONE
+      INTEGER         , INTENT(IN)    :: nxh,ny,ntot,i0,lr,o
+      COMPLEX(KIND=GP), INTENT(IN)    :: carr(nxh,ny,ksta:kend)
+      COMPLEX(KIND=GP), INTENT(INOUT) :: sbuf(ntot)
+      INTEGER :: i,j,k
+!$omp target teams distribute parallel do collapse(3)
+      DO k = ksta,kend
+         DO j = 1,ny
+            DO i = 1,lr
+               sbuf(o+i+lr*((j-1)+ny*(k-ksta))) = carr(i0+i-1,j,k)
+            END DO
+         END DO
+      END DO
+      END SUBROUTINE fftp3d_pack_dev
+
+!*****************************************************************
+      SUBROUTINE fftp3d_unpack_dev(sbuf,carr,nxh,ny,ntot,i0,lr,o)
+!-----------------------------------------------------------------
+!
+! Unpacks the block at sbuf(o+1:) into carr, kx in [i0,i0+lr-1]
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      IMPLICIT NONE
+      INTEGER         , INTENT(IN)    :: nxh,ny,ntot,i0,lr,o
+      COMPLEX(KIND=GP), INTENT(IN)    :: sbuf(ntot)
+      COMPLEX(KIND=GP), INTENT(INOUT) :: carr(nxh,ny,ksta:kend)
+      INTEGER :: i,j,k
+!$omp target teams distribute parallel do collapse(3)
+      DO k = ksta,kend
+         DO j = 1,ny
+            DO i = 1,lr
+               carr(i0+i-1,j,k) = sbuf(o+i+lr*((j-1)+ny*(k-ksta)))
+            END DO
+         END DO
+      END DO
+      END SUBROUTINE fftp3d_unpack_dev
+
+!*****************************************************************
+      SUBROUTINE fftp3d_copy_dev(dst,src,n)
+!-----------------------------------------------------------------
+!
+! Contiguous copy of n complex numbers on the device (the block a
+! task exchanges with itself never goes through MPI)
+!-----------------------------------------------------------------
+      USE fprecision
+      IMPLICIT NONE
+      INTEGER         , INTENT(IN)  :: n
+      COMPLEX(KIND=GP), INTENT(OUT) :: dst(n)
+      COMPLEX(KIND=GP), INTENT(IN)  :: src(n)
+      INTEGER :: i
+!$omp target teams distribute parallel do
+      DO i = 1,n
+         dst(i) = src(i)
+      END DO
+      END SUBROUTINE fftp3d_copy_dev
+
+!*****************************************************************
+      SUBROUTINE fftp3d_exch_contig(sendbuf,nsend,recvbuf,nrecv,so,sc,ro,rc,comm)
+!-----------------------------------------------------------------
+!
+! Exchange of contiguous blocks between tasks with device buffers:
+! the block for task r starts at sendbuf(so(r)+1) with sc(r)
+! elements, the block from task r is received at recvbuf(ro(r)+1)
+! with rc(r) elements. The diagonal block is copied on the device.
+! The buffers are entered in a use_device_addr region and handed to
+! MPI, which must be GPU-aware.
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      IMPLICIT NONE
+      INTEGER         , INTENT(IN)          :: nsend,nrecv
+      COMPLEX(KIND=GP), INTENT(IN) , TARGET :: sendbuf(nsend)
+      COMPLEX(KIND=GP), INTENT(OUT), TARGET :: recvbuf(nrecv)
+      INTEGER, INTENT(IN) :: so(0:nprocs-1),sc(0:nprocs-1)
+      INTEGER, INTENT(IN) :: ro(0:nprocs-1),rc(0:nprocs-1)
+      TYPE(MPI_Comm)  , INTENT(IN)          :: comm
+
+      CALL fftp3d_copy_dev(recvbuf(ro(myrank)+1),sendbuf(so(myrank)+1),sc(myrank))
+!$omp target data use_device_addr(sendbuf,recvbuf)
+      CALL fftp3d_exch_contig_do(sendbuf,recvbuf,so,sc,ro,rc,comm)
+!$omp end target data
+      END SUBROUTINE fftp3d_exch_contig
+
+!*****************************************************************
+      SUBROUTINE fftp3d_exch_contig_do(sendbuf,recvbuf,so,sc,ro,rc,comm)
+!-----------------------------------------------------------------
+!
+! The MPI calls of fftp3d_exch_contig, receiving device addresses
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      IMPLICIT NONE
+      COMPLEX(KIND=GP), INTENT(IN)  :: sendbuf(*)
+      COMPLEX(KIND=GP), INTENT(OUT) :: recvbuf(*)
+      INTEGER, INTENT(IN) :: so(0:nprocs-1),sc(0:nprocs-1)
+      INTEGER, INTENT(IN) :: ro(0:nprocs-1),rc(0:nprocs-1)
+      TYPE(MPI_Comm)  , INTENT(IN)  :: comm
+      TYPE(MPI_Request) :: ireq(2*nprocs)
+      INTEGER :: irank,isendTo,igetFrom
+
+! All receives and sends are posted before waiting, so that the
+! transfers to and from the different tasks proceed at the same time
+      DO irank = 1,nprocs-1
+         igetFrom = myrank - irank
+         IF (igetFrom.lt.0) igetFrom = igetFrom + nprocs
+         CALL fftp3d_irecv(recvbuf(ro(igetFrom)+1),rc(igetFrom),igetFrom,comm,ireq(irank))
+      END DO
+      DO irank = 1,nprocs-1
+         isendTo = myrank + irank
+         IF (isendTo.ge.nprocs) isendTo = isendTo - nprocs
+         CALL fftp3d_isend(sendbuf(so(isendTo)+1),sc(isendTo),isendTo,comm,ireq(nprocs-1+irank))
+      END DO
+      IF (nprocs.gt.1) CALL MPI_WAITALL(2*(nprocs-1),ireq(1:2*(nprocs-1)),MPI_STATUSES_IGNORE,ierr)
+      END SUBROUTINE fftp3d_exch_contig_do
+
+!*****************************************************************
+      SUBROUTINE fftp3d_irecv(buf,n,src,comm,req)
+!-----------------------------------------------------------------
+!
+! Receives n complex numbers starting at buf (sequence association)
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: n,src
+      COMPLEX(KIND=GP) , INTENT(OUT) :: buf(n)
+      TYPE(MPI_Comm)   , INTENT(IN)  :: comm
+      TYPE(MPI_Request), INTENT(OUT) :: req
+      CALL MPI_IRECV(buf,n,GC_COMPLEX,src,1,comm,req,ierr)
+      END SUBROUTINE fftp3d_irecv
+
+!*****************************************************************
+      SUBROUTINE fftp3d_isend(buf,n,dst,comm,req)
+!-----------------------------------------------------------------
+!
+! Sends n complex numbers starting at buf
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: n,dst
+      COMPLEX(KIND=GP) , INTENT(IN)  :: buf(n)
+      TYPE(MPI_Comm)   , INTENT(IN)  :: comm
+      TYPE(MPI_Request), INTENT(OUT) :: req
+      CALL MPI_ISEND(buf,n,GC_COMPLEX,dst,1,comm,req,ierr)
+      END SUBROUTINE fftp3d_isend
+
+!*****************************************************************
+      SUBROUTINE fftp3d_exch_types_host(sendbuf,nsend,recvbuf,nrecv,stype,rtype,comm)
+!-----------------------------------------------------------------
+!
+! Exchange with derived data types on the host copies (staged mode)
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: nsend,nrecv
+      COMPLEX(KIND=GP)  , INTENT(IN)  :: sendbuf(nsend)
+      COMPLEX(KIND=GP)  , INTENT(OUT) :: recvbuf(nrecv)
+      TYPE(MPI_Datatype), INTENT(IN)  :: stype(0:nprocs-1),rtype(0:nprocs-1)
+      TYPE(MPI_Comm)    , INTENT(IN)  :: comm
+      TYPE(MPI_Request) :: ireq1,ireq2
+      TYPE(MPI_Status)  :: istatus
+      INTEGER :: irank,isendTo,igetFrom
+
+      DO irank = 0,nprocs-1
+         isendTo = myrank + irank
+         IF (isendTo.ge.nprocs) isendTo = isendTo - nprocs
+         igetFrom = myrank - irank
+         IF (igetFrom.lt.0) igetFrom = igetFrom + nprocs
+         CALL MPI_IRECV(recvbuf,1,rtype(igetFrom),igetFrom,1,comm,ireq2,ierr)
+         CALL MPI_ISEND(sendbuf,1,stype(isendTo) ,isendTo ,1,comm,ireq1,ierr)
+         CALL MPI_WAIT(ireq1,istatus,ierr)
+         CALL MPI_WAIT(ireq2,istatus,ierr)
+      END DO
+      END SUBROUTINE fftp3d_exch_types_host
+
+!*****************************************************************
+      SUBROUTINE fftp3d_exchange_fwd(plan,comm)
+!-----------------------------------------------------------------
+!
+! Slab exchange gcarr -> gc1 of the device path
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      USE fftplans
+      USE gdevice
+      IMPLICIT NONE
+      TYPE(FFTPLAN) , INTENT(IN) :: plan
+      TYPE(MPI_Comm), INTENT(IN) :: comm
+      INTEGER :: r,nxh,ntot
+
+      nxh  = plan%nx/2+1
+      ntot = SIZE(gsbuf)
+      IF (gexchange.eq.1) THEN
+         DO r = 0,nprocs-1
+            CALL fftp3d_pack_dev(gcarr,gsbuf,nxh,plan%ny,ntot,gioff(r),gilen(r),gsoff(r))
+         END DO
+         CALL fftp3d_exch_contig(gsbuf,ntot,gc1,SIZE(gc1),gsoff,gscnt,groff,grcnt,comm)
+      ELSE
+         CALL gdev_update_from(C_LOC(gcarr),INT(SIZE(gcarr),C_SIZE_T)*INT(STORAGE_SIZE(gcarr)/8,C_SIZE_T))
+         CALL fftp3d_exch_types_host(gcarr,SIZE(gcarr),gc1,SIZE(gc1),plan%itype1,plan%itype2,comm)
+         CALL gdev_update_to(C_LOC(gc1),INT(SIZE(gc1),C_SIZE_T)*INT(STORAGE_SIZE(gc1)/8,C_SIZE_T))
+      ENDIF
+      END SUBROUTINE fftp3d_exchange_fwd
+
+!*****************************************************************
+      SUBROUTINE fftp3d_exchange_bwd(plan,comm)
+!-----------------------------------------------------------------
+!
+! Slab exchange gc1 -> gcarr of the device path
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      USE fftplans
+      USE gdevice
+      IMPLICIT NONE
+      TYPE(FFTPLAN) , INTENT(IN) :: plan
+      TYPE(MPI_Comm), INTENT(IN) :: comm
+      INTEGER :: r,nxh,ntot
+
+      nxh  = plan%nx/2+1
+      ntot = SIZE(gsbuf)
+      IF (gexchange.eq.1) THEN
+         CALL fftp3d_exch_contig(gc1,SIZE(gc1),gsbuf,ntot,groff,grcnt,gsoff,gscnt,comm)
+         DO r = 0,nprocs-1
+            CALL fftp3d_unpack_dev(gsbuf,gcarr,nxh,plan%ny,ntot,gioff(r),gilen(r),gsoff(r))
+         END DO
+      ELSE
+         CALL gdev_update_from(C_LOC(gc1),INT(SIZE(gc1),C_SIZE_T)*INT(STORAGE_SIZE(gc1)/8,C_SIZE_T))
+         CALL fftp3d_exch_types_host(gc1,SIZE(gc1),gcarr,SIZE(gcarr),plan%itype2,plan%itype1,comm)
+         CALL gdev_update_to(C_LOC(gcarr),INT(SIZE(gcarr),C_SIZE_T)*INT(STORAGE_SIZE(gcarr)/8,C_SIZE_T))
+      ENDIF
+      END SUBROUTINE fftp3d_exchange_bwd
+
+!*****************************************************************
+      SUBROUTINE fftp3d_cont_z_dev(nz,ny,C,d,dir,a)
+!-----------------------------------------------------------------
+!
+! Continuación del FC-Gram en z en el dispositivo (propio de
+! SPECTER): llena los últimos C puntos de cada línea en z de a a
+! partir de sus primeros y últimos d puntos, con las mismas cuentas
+! y en el mismo orden que el lazo del host en
+! fftp1d_real_to_complex_z. La tabla dir (C x d, chica) se copia al
+! dispositivo en cada lanzamiento.
+!-----------------------------------------------------------------
+      USE fprecision
+      USE mpivars
+      IMPLICIT NONE
+      INTEGER         , INTENT(IN)    :: nz,ny,C,d
+      DOUBLE PRECISION, INTENT(IN)    :: dir(C,d)
+      COMPLEX(KIND=GP), INTENT(INOUT) :: a(nz,ny,ista:iend)
+      INTEGER :: i,j,ii,jj
+!$omp target teams distribute parallel do collapse(3) map(to:dir)
+      DO i = ista,iend
+         DO j = 1,ny
+            DO ii = 1,C
+               a(nz-C+ii,j,i) = dir(ii,1)*a(nz-C-d+1,j,i) +        &
+                                dir(C-ii+1,1)*a(d,j,i)
+               DO jj = 2,d
+                  a(nz-C+ii,j,i) = a(nz-C+ii,j,i) +                &
+                                   dir(ii,jj)*a(nz-C-d+jj,j,i) +   &
+                                   dir(C-ii+1,jj)*a(d-jj+1,j,i)
+               END DO
+            END DO
+         END DO
+      END DO
+      END SUBROUTINE fftp3d_cont_z_dev
+
+      END MODULE fftp3d_gpu
+
+!=================================================================
+! General FFTP-GPU routines
+!
+! Initialization, plan creator, destructor, block creator,
+! complex-to-real and real-to-complex parallel FFT subroutines
+! for host and device paths.
+!=================================================================
+
+!*****************************************************************
+      SUBROUTINE fftp3d_init_threads(err)
+!-----------------------------------------------------------------
+! Initializes FFTW threads (used by the host path).
+!
+! Parameters
+!     err : if zero, the initialization failed
+!-----------------------------------------------------------------
+
+!$    USE threads
+      IMPLICIT NONE
+
+      INTEGER, INTENT(INOUT) :: err
+
+!$    CALL GFFTW_INIT_THREADS(err)
+      IF (err.eq.0) PRINT *,'FFTP threads initialization failed!'
+
+      RETURN
+      END SUBROUTINE fftp3d_init_threads
+
+!*****************************************************************
+      SUBROUTINE fftp3d_create_plan(plan,n,fftdir,flags)
+!-----------------------------------------------------------------
+! Creates the host (FFTW) and device (cuFFT/hipFFT) plans in each
+! task, the shared device-resident buffers of the exchange, and the
+! derived data types used by the host path.
+!
+! Parameters
+!     plan   : contains the parallel 3D plan [OUT]
+!     n      : the size of the dimensions of the input array [IN]
+!     fftdir : the direction of the Fourier transform [IN]
+!              FFTW_FORWARD or FFTW_REAL_TO_COMPLEX (-1)
+!              FFTW_BACKWARD or FFTW_COMPLEX_TO_REAL (+1)
+!     flags  : flags for the FFTW [IN], kept for compatibility with
+!              fftp and ignored: the host plans are always created
+!              with FFTW_ESTIMATE. In offload builds they are used
+!              only outside the time step (output, initialization,
+!              host-generated forcing), so their speed hardly matters,
+!              while measured plans (FFTW_MEASURE and up) depend on
+!              timings and can change from run to run, giving outputs
+!              that differ at roundoff level between identical runs
+!              (e.g. 2-3e-7 with two tasks sharing a GPU at single
+!              precision). The device plans take no flags.
+!-----------------------------------------------------------------
+
+      USE mpivars
+      USE fftplans
+      USE gfft
+      USE gdevice
+!$    USE threads
+      USE gtimer
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: n(3)
+      INTEGER, INTENT(IN) :: fftdir
+      INTEGER, INTENT(IN) :: flags
+      TYPE(FFTPLAN), INTENT(OUT) :: plan
+      INTEGER(C_INT)   :: nn(2),inemb(2),onemb(2),n1(1),nk,nb,ier
+      INTEGER          :: r,is,ie,ks,ke,nxh
+      CHARACTER(len=16):: senv
+
+! Host plans, as in fftp but always with FFTW_ESTIMATE (see above)
+      ALLOCATE ( plan%ccarr(n(3),n(2),ista:iend)    )
+      ALLOCATE ( plan%carr(n(1)/2+1,n(2),ksta:kend) )
+      ALLOCATE ( plan%rarr(n(1),n(2),ksta:kend)     )
+!$    CALL GFFTW_PLAN_WITH_NTHREADS(nth)
+
+      IF (fftdir.eq.FFTW_REAL_TO_COMPLEX) THEN
+      CALL GFFTW_PLAN_MANY_DFT_R2C(plan%planrxy,2,(/n(1),n(2)/),      &
+                         kend-ksta+1,plan%rarr,                       &
+                         (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),     &
+                         plan%carr,(/n(1)/2+1,n(2)*(kend-ksta+1)/),1, &
+                         (n(1)/2+1)*n(2),FFTW_ESTIMATE)
+      ELSE
+      CALL GFFTW_PLAN_MANY_DFT_C2R(plan%planrxy,2,(/n(1),n(2)/),      &
+                         kend-ksta+1,plan%carr,                       &
+                         (/n(1)/2+1,n(2)*(kend-ksta+1)/),1,           &
+                         (n(1)/2+1)*n(2),plan%rarr,                   &
+                         (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),     &
+                         FFTW_ESTIMATE)
+      ENDIF
+      CALL GFFTW_PLAN_MANY_DFT(plan%plancz,1,n(3),n(2)*(iend-ista+1), &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),   &
+                         plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),   &
+                         fftdir,FFTW_ESTIMATE)
+      plan%nx = n(1)
+      plan%ny = n(2)
+      plan%nz = n(3)
+      plan%fftdir = fftdir
+      ALLOCATE( plan%itype1(0:nprocs-1) )
+      ALLOCATE( plan%itype2(0:nprocs-1) )
+      CALL fftp3d_create_block(n,nprocs,myrank,plan%itype1,plan%itype2)
+
+! Device plans. cuFFT and hipFFT take the dimensions in C order, the
+! last one being the fastest: the 2D plan transforms the (x,y)
+! planes of rarr(nx,ny,ksta:kend) into carr(nx/2+1,ny,ksta:kend),
+! and the 1D plan transforms along z, the first dimension of
+! ccarr(nz,ny,ista:iend), in place.
+      nxh   = n(1)/2+1
+      nk    = kend-ksta+1
+      nb    = n(2)*(iend-ista+1)
+      nn    = [INT(n(2),C_INT),INT(n(1),C_INT)]
+      inemb = [INT(n(2),C_INT),INT(n(1),C_INT)]
+      onemb = [INT(n(2),C_INT),INT(nxh ,C_INT)]
+      n1    = [INT(n(3),C_INT)]
+      IF (fftdir.eq.FFTW_REAL_TO_COMPLEX) THEN
+         ier = gfft_plan_many(plan%dplanrxy,2_C_INT,nn,inemb,1_C_INT,   &
+               INT(n(1)*n(2),C_INT),onemb,1_C_INT,INT(nxh*n(2),C_INT),  &
+               INT(GFFT_TYPE_R2C,C_INT),nk)
+      ELSE
+         ier = gfft_plan_many(plan%dplanrxy,2_C_INT,nn,onemb,1_C_INT,   &
+               INT(nxh*n(2),C_INT),inemb,1_C_INT,INT(n(1)*n(2),C_INT),  &
+               INT(GFFT_TYPE_C2R,C_INT),nk)
+      ENDIF
+      IF (ier.ne.0) THEN
+         PRINT *,'fftp3d_create_plan: 2D device plan failed, error ',ier
+         STOP
+      ENDIF
+      ier = gfft_plan_many(plan%dplancz,1_C_INT,n1,n1,1_C_INT,n1(1),    &
+            n1,1_C_INT,n1(1),INT(GFFT_TYPE_C2C,C_INT),nb)
+      IF (ier.ne.0) THEN
+         PRINT *,'fftp3d_create_plan: 1D device plan failed, error ',ier
+         STOP
+      ENDIF
+
+! Shared exchange buffers and block tables (once)
+      IF (.not.gbuffers_ready) THEN
+         ALLOCATE( gcarr(nxh,n(2),ksta:kend) )
+         ALLOCATE( gc1(ista:iend,n(2),n(3))  )
+         ALLOCATE( gsbuf(nxh*n(2)*nk)        )
+         gcarr = 0.0_GP; gc1 = 0.0_GP; gsbuf = 0.0_GP
+         CALL gdev_alloc(C_LOC(gcarr),INT(SIZE(gcarr),C_SIZE_T)*INT(STORAGE_SIZE(gcarr)/8,C_SIZE_T))
+         CALL gdev_alloc(C_LOC(gc1)  ,INT(SIZE(gc1)  ,C_SIZE_T)*INT(STORAGE_SIZE(gc1)/8  ,C_SIZE_T))
+         CALL gdev_alloc(C_LOC(gsbuf),INT(SIZE(gsbuf),C_SIZE_T)*INT(STORAGE_SIZE(gsbuf)/8,C_SIZE_T))
+         ALLOCATE( gioff(0:nprocs-1), gilen(0:nprocs-1) )
+         ALLOCATE( gkoff(0:nprocs-1), gklen(0:nprocs-1) )
+         ALLOCATE( gsoff(0:nprocs-1), gscnt(0:nprocs-1) )
+         ALLOCATE( groff(0:nprocs-1), grcnt(0:nprocs-1) )
+         DO r = 0,nprocs-1
+            CALL range(1,nxh ,nprocs,r,is,ie)
+            CALL range(1,n(3),nprocs,r,ks,ke)
+            gioff(r) = is; gilen(r) = ie-is+1
+            gkoff(r) = ks; gklen(r) = ke-ks+1
+            gscnt(r) = gilen(r)*n(2)*nk
+            grcnt(r) = (iend-ista+1)*n(2)*gklen(r)
+            groff(r) = (iend-ista+1)*n(2)*(ks-1)
+            IF (r.eq.0) THEN
+               gsoff(r) = 0
+            ELSE
+               gsoff(r) = gsoff(r-1)+gscnt(r-1)
+            ENDIF
+         END DO
+         CALL GET_ENVIRONMENT_VARIABLE('GHOST_GPU_EXCHANGE',senv)
+         IF (senv(1:6).eq.'staged') THEN
+            gexchange = 2
+            IF (myrank.eq.0) PRINT *,'FFTP-GPU: exchange staged through the host'
+         ELSE
+            gexchange = 1
+         ENDIF
+         gbuffers_ready = .TRUE.
+      ENDIF
+! Host exchange buffer of this plan: the shared gc1 if the plan has
+! its layout (the usual case, one grid), otherwise a buffer of its
+! own. The device path (exchange tables, device buffers) is set up
+! for the first layout only, so such a plan works only on the host.
+      IF ( LBOUND(gc1,1).eq.ista .AND. UBOUND(gc1,1).eq.iend .AND.    &
+           SIZE(gc1,2).eq.n(2) .AND. SIZE(gc1,3).eq.n(3) ) THEN
+         plan%c1 => gc1
+         plan%ownc1 = .FALSE.
+      ELSE
+         ALLOCATE( plan%c1(ista:iend,n(2),n(3)) )
+         plan%ownc1 = .TRUE.
+      ENDIF
+
+      CALL GTStart(hcom,GT_WTIME)
+      CALL GTStart(hfft,GT_WTIME)
+      CALL GTStart(htra,GT_WTIME)
+      CALL GTStart(hcont,GT_WTIME)
+      CALL GTStart(htot,GT_WTIME)
+
+      RETURN
+      END SUBROUTINE fftp3d_create_plan
+
+!*****************************************************************
+      SUBROUTINE fftp3d_destroy_plan(plan)
+!-----------------------------------------------------------------
+! Destroys the plans in each task.
+!
+! Parameters
+!     plan : the parallel 3D plan [INOUT]
+!-----------------------------------------------------------------
+
+      USE fftplans
+      USE gfft
+      USE gdevice
+      USE gtimer
+      IMPLICIT NONE
+
+      TYPE(FFTPLAN), INTENT(INOUT) :: plan
+      INTEGER(C_INT) :: ier
+
+      CALL GFFTW_DESTROY_PLAN(plan%planrxy)
+      CALL GFFTW_DESTROY_PLAN(plan%plancz)
+      ier = gfft_destroy(plan%dplanrxy)
+      ier = gfft_destroy(plan%dplancz)
+      DEALLOCATE( plan%ccarr  )
+      DEALLOCATE( plan%carr   )
+      DEALLOCATE( plan%rarr   )
+      DEALLOCATE( plan%itype1 )
+      DEALLOCATE( plan%itype2 )
+      IF (plan%ownc1) THEN
+         DEALLOCATE( plan%c1 )
+      ELSE
+         NULLIFY( plan%c1 )
+      ENDIF
+      IF (gbuffers_ready) THEN
+         CALL gdev_free(C_LOC(gcarr))
+         CALL gdev_free(C_LOC(gc1))
+         CALL gdev_free(C_LOC(gsbuf))
+         DEALLOCATE( gcarr, gc1, gsbuf )
+         DEALLOCATE( gioff, gilen, gkoff, gklen, gsoff, gscnt, groff, grcnt )
+         gbuffers_ready = .FALSE.
+      ENDIF
+
+      CALL GTFree(hcom)
+      CALL GTFree(hfft)
+      CALL GTFree(htra)
+      CALL GTFree(hcont)
+      CALL GTFree(htot)
+
+      RETURN
+      END SUBROUTINE fftp3d_destroy_plan
+
+!*****************************************************************
+      SUBROUTINE fftp3d_create_block(n,nprocs,myrank,itype1,itype2)
+!-----------------------------------------------------------------
+! Defines derived data types for sending and receiving 
+! blocks of the 3D matrix between processors. The data 
+! types are used to transpose the matrix during the FFT
+! on the host path.
+!
+! Parameters
+!     n      : the size of the dimensions of the input array [IN]
+!     nprocs : the number of processors [IN]
+!     myrank : the rank of the processor [IN]
+!     itype1 : contains a derived data type for sending [OUT]
+!     itype2 : contains a derived data type for receiving [OUT]
+!-----------------------------------------------------------------
+
+      USE commtypes
+      IMPLICIT NONE
+
+      TYPE(MPI_Datatype), INTENT(OUT), DIMENSION(0:nprocs-1) :: itype1,itype2
+      INTEGER, INTENT(IN) :: n(3),nprocs
+      INTEGER, INTENT(IN) :: myrank
+
+      INTEGER :: ista,iend
+      INTEGER :: ksta,kend
+      INTEGER :: irank,krank
+      TYPE(MPI_Datatype) :: itemp1,itemp2
+
+      CALL range(1,n(3),nprocs,myrank,ksta,kend)
+      DO irank = 0,nprocs-1
+         CALL range(1,n(1)/2+1,nprocs,irank,ista,iend)
+         CALL block3d(1,n(1)/2+1,1,n(2),ksta,ista,iend,1,n(2), &
+                     ksta,kend,GC_COMPLEX,itemp1)
+         itype1(irank) = itemp1
+      END DO
+      CALL range(1,n(1)/2+1,nprocs,myrank,ista,iend)
+      DO krank = 0,nprocs-1
+         CALL range(1,n(3),nprocs,krank,ksta,kend)
+         CALL block3d(ista,iend,1,n(2),1,ista,iend,1,n(2),     &
+                     ksta,kend,GC_COMPLEX,itemp2)
+         itype2(krank) = itemp2
+      END DO
+
+      RETURN
+      END SUBROUTINE fftp3d_create_block
+
+!*****************************************************************
+      SUBROUTINE fftp3d_real_to_complex(plan,in,out,comm)
+!-----------------------------------------------------------------
+! Computes the 3D real-to-complex FFT in parallel. The
+! complex output has the same structure than the output
+! of the 3D FFTW, but the output is transposed. If the input
+! is non-periodic FC-Gram periodic extensions are appropriately
+! computed.
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
+!     in   : real input array [IN]
+!     out  : complex output array [OUT]
+!     comm : the MPI communicator (handle) [IN]
+!-----------------------------------------------------------------
+
+      USE commtypes
+      USE fprecision
+      USE mpivars
+      USE fcgram
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: out
+      REAL(KIND=GP), INTENT(IN), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: in
+
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
+
+      CALL fftp2d_real_to_complex_xy(plan,in,out,comm)
+      CALL fftp1d_real_to_complex_z(plan,out,comm)
+
+      RETURN
+      END SUBROUTINE fftp3d_real_to_complex
+
+!*****************************************************************
+      SUBROUTINE fftp2d_real_to_complex_xy(plan,in,out,comm)
+!-----------------------------------------------------------------
+! Computes a local 2D real-to-complex FFT in the first two indices
+! and transposes the result. If the input has shape (nx,ny,nz) the
+! output's shape is (nz,ny,nx/2+1). On the device path (gdev_active)
+! the FFT, the exchange and the transposition run on the device.
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
+!     in   : real input array [IN]
+!     out  : complex output array [OUT]
+!     comm : the MPI communicator (handle) [IN]
+!-----------------------------------------------------------------
+
+      USE commtypes
+      USE fprecision
+      USE mpivars
+      USE fftplans
+      USE fcgram
+      USE gtimer
+      USE gdevice
+      USE fftp3d_gpu
+!$    USE threads
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+
+      COMPLEX(KIND=GP), INTENT(OUT), TARGET, DIMENSION(plan%z%n,plan%y%n,ista:iend) :: out
+      REAL(KIND=GP), INTENT(IN), TARGET, DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: IN
+
+      TYPE(MPI_Request), DIMENSION(0:nprocs-1) :: ireq1,ireq2
+      TYPE(MPI_Status)                         :: istatus
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
+      INTEGER :: i,j,k
+      INTEGER :: ii,jj,kk
+      INTEGER :: irank
+      INTEGER :: isendTo,igetFrom
+      INTEGER :: istrip,iproc
+
+      CALL GTStart(htot)
+
+      IF (gdev_active) THEN
+      IF (plan%planrc%ownc1) &
+         STOP 'fftp3d: the device path supports only plans with the layout of the first plan created'
+!
+! Device path: 2D FFT of the (x,y) planes on the device
+!
+         CALL GTStart(hfft)
+         CALL fftp3d_exec_r2c_dev(plan%planrc,in,gcarr)
+         CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
+!
+! Exchange between tasks, with the blocks packed on the device
+!
+         CALL GTStart(hcom)
+         CALL fftp3d_exchange_fwd(plan%planrc,comm)
+         CALL GTStop(hcom); comtime = comtime + GTGetTime(hcom)
+!
+! Transposition on the device
+!
+         CALL GTStart(htra)
+         CALL fftp3d_tra_fwd_dev(plan%planrc,gc1,out)
+         CALL GTStop(htra); tratime = tratime + GTGetTime(htra)
+
+      ELSE
+!
+! Host path (fftp): 2D FFT in each node using the FFTW library
+!
+      CALL GTStart(hfft)
+      CALL GFFTW_EXECUTE_DFT_R2C(plan%planrc%planrxy,in,plan%planrc%carr)
+      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft); 
+!
+! Transposes the result between nodes using 
+! strip mining when nstrip>1 (rreddy@psc.edu)
+!
+      CALL GTStart(hcom)
+      do iproc = 0, nprocs-1, nstrip
+         do istrip=0, nstrip-1
+            irank = iproc + istrip
+
+            isendTo = myrank + irank
+            if ( isendTo .ge. nprocs ) isendTo = isendTo - nprocs
+
+            igetFrom = myrank - irank
+            if ( igetFrom .lt. 0 ) igetFrom = igetFrom + nprocs
+            CALL MPI_IRECV(plan%planrc%c1,1,plan%planrc%itype2(igetFrom),igetFrom, & 
+                          1,comm,ireq2(irank),ierr)
+
+            CALL MPI_ISEND(plan%planrc%carr,1,plan%planrc%itype1(isendTo),isendTo, &
+                          1,comm,ireq1(irank),ierr)
+         enddo
+
+         do istrip=0, nstrip-1
+            irank = iproc + istrip
+            CALL MPI_WAIT(ireq1(irank),istatus,ierr)
+            CALL MPI_WAIT(ireq2(irank),istatus,ierr)
+         enddo
+      enddo
+      CALL GTStop(hcom); comtime = comtime + GTGetTime(hcom)
+!
+! Cache friendly transposition
+!
+      CALL GTStart(htra)
+!$omp parallel do if ((iend-ista)/csize.ge.nth) private (jj,kk,i,j,k)
+      DO ii = ista,iend,csize
+!$omp parallel do if ((iend-ista)/csize.lt.nth) private (kk,i,j,k)
+         DO jj = 1,plan%y%n,csize
+            DO kk = 1,plan%z%n,csize
+               DO i = ii,min(iend,ii+csize-1)
+               DO j = jj,min(plan%y%n,jj+csize-1)
+               DO k = kk,min(plan%z%n,kk+csize-1)
+                  out(k,j,i) = plan%planrc%c1(i,j,k)
+               END DO
+               END DO
+               END DO
+            END DO
+         END DO
+      END DO
+      CALL GTStop(htra); tratime = tratime + GTGetTime(htra)
+
+      ENDIF
+
+      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
+
+      RETURN
+      END SUBROUTINE fftp2d_real_to_complex_xy
+
+!*****************************************************************
+      SUBROUTINE fftp1d_real_to_complex_z(plan,inout,comm)
+!-----------------------------------------------------------------
+! Computes the 1D forward FFT along the first index of the input
+! array. In the case the input array is non-periodic, a suitable 
+! FC-Gram periodic extension is computed. The operation is
+! performed inplace. On the device path (gdev_active) the
+! continuation and the FFT run on the device.
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
+!     in   : contains f(z,ky,kx) as input and returns f(kz,ky,kx) [INOUT]
+!     comm : the MPI communicator (handle) [IN]
+!-----------------------------------------------------------------
+
+      USE commtypes
+      USE fprecision
+      USE mpivars
+      USE gtimer
+      USE fcgram
+      USE gdevice
+      USE fftp3d_gpu
+!$    USE threads
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+      COMPLEX(KIND=GP), INTENT(INOUT), TARGET, DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
+
+      INTEGER :: n,C,d
+      INTEGER :: i,j,ii,jj
+
+      n = plan%z%n
+      C = plan%z%C
+      d = plan%z%d
+
+      CALL GTStart(htot)
+
+      IF (gdev_active) THEN
+!
+! Device path: FC-Gram continuation and 1D FFT along z on the device
+!
+         CALL GTStart(hcont)
+         IF (C .gt. 0) CALL fftp3d_cont_z_dev(n,plan%y%n,C,d,plan%z%dir,inout)
+         CALL GTStop(hcont); conttime = conttime + GTGetTime(hcont)
+         CALL GTStart(hfft)
+         CALL fftp3d_exec_c2c_dev(plan%planrc,inout,GFFT_FORWARD)
+         CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
+
+      ELSE
+!
+! Host path (fftp): FC-Gram continuation
+!
+      CALL GTStart(hcont)
+
+      IF (plan%z%C .ge. 0) THEN
+!$omp paralleldo if ((iend-ista)/csize.ge.nth) private (j,ii,jj)
+      DO i= ista,iend
+!$omp parallel do if ((iend-ista)/csize.lt.nth) private (ii,jj)
+      DO j =1,plan%y%n
+         DO ii=1,C
+            inout(n-C+ii,j,i) = plan%z%dir(ii,1)*inout(n-C-d+1,j,i) +&
+                                plan%z%dir(C-ii+1,1)*inout(d,j,i)
+         ENDDO
+         DO jj=2,d
+            DO ii=1,C
+               inout(n-C+ii,j,i) = inout(n-C+ii,j,i) +&
+                                   plan%z%dir(ii,jj)*inout(n-C-d+jj,j,i) +&
+                                   plan%z%dir(C-ii+1,jj)*inout(d-jj+1,j,i)
+            ENDDO
+         ENDDO
+      ENDDO
+      ENDDO
+      ENDIF
+      CALL GTStop(hcont); conttime = conttime + GTGetTime(hcont)
+
+!
+! 1D FFT in each node using the FFTW library
+!
+      CALL GTStart(hfft)
+      CALL GFFTW_EXECUTE_DFT(plan%planrc%plancz,inout,inout)
+      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
+
+      ENDIF
+
+      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
+
+      RETURN
+      END SUBROUTINE fftp1d_real_to_complex_z
+
+!*****************************************************************
+      SUBROUTINE fftp3d_complex_to_real(plan,in,out,comm)
+!-----------------------------------------------------------------
+! Computes the 3D complex-to-real FFT in parallel. The 
+! complex input has the same structure than the input 
+! of the 3D FFTW, but should be transposed. The real 
+! output has the same order than the output of the FFTW.
+! The input data is destroyed during the computation.
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
+!     in   : complex input array [IN]
+!     out  : real output array [OUT]
+!     comm : the MPI communicator (handle) [IN]
+!
+!-----------------------------------------------------------------
+
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      USE fcgram
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: in 
+      REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
+
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
+
+      CALL fftp1d_complex_to_real_z(plan,in,comm)
+      CALL fftp2d_complex_to_real_xy(plan,in,out,comm)
+     
+      RETURN
+      END SUBROUTINE fftp3d_complex_to_real
+
+!*****************************************************************
+      SUBROUTINE fftp2d_complex_to_real_xy(plan,in,out,comm)
+!-----------------------------------------------------------------
+! Computes the 2D real-to-complex FFT along the last couple of
+! indices of the input array and transposes the result.
+! If the input has shape (nz,ny,nx/2+1) the output's shape is
+! (nx,ny,nz). The input data is destroyed during the computation.
+! On the device path (gdev_active) the transposition, the exchange
+! and the FFT run on the device.
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
+!     in   : complex input array f*(z,ky,kx) [IN]
+!     out  : real output array f(x,y,z) [OUT]
+!     comm : the MPI communicator (handle) [IN]
+!-----------------------------------------------------------------
+
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      USE fftplans
+      USE fcgram
+      USE gtimer
+      USE gdevice
+      USE fftp3d_gpu
+!$    USE threads
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+
+      COMPLEX(KIND=GP), INTENT(IN), TARGET, DIMENSION(plan%z%n,plan%y%n,ista:iend) :: in 
+      REAL(KIND=GP), INTENT(OUT), TARGET, DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
+
+      TYPE(MPI_Request), DIMENSION(0:nprocs-1) :: ireq1,ireq2
+      TYPE(MPI_Status)                         :: istatus
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
+      INTEGER :: i,j,k
+      INTEGER :: ii,jj,kk
+      INTEGER :: irank
+      INTEGER :: isendTo, igetFrom
+      INTEGER :: istrip,iproc
+
+      CALL GTStart(htot)
+
+      IF (gdev_active) THEN
+      IF (plan%plancr%ownc1) &
+         STOP 'fftp3d: the device path supports only plans with the layout of the first plan created'
+!
+! Device path: transposition on the device
+!
+         CALL GTStart(htra)
+         CALL fftp3d_tra_bwd_dev(plan%plancr,in,gc1)
+         CALL GTStop(htra); tratime = tratime + GTGetTime(htra)
+!
+! Exchange between tasks
+!
+         CALL GTStart(hcom)
+         CALL fftp3d_exchange_bwd(plan%plancr,comm)
+         CALL GTStop(hcom); comtime = comtime + GTGetTime(hcom)
+!
+! 2D FFT of the (x,y) planes on the device
+!
+         CALL GTStart(hfft)
+         CALL fftp3d_exec_c2r_dev(plan%plancr,gcarr,out)
+         CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
+
+      ELSE
+!
+! Host path (fftp): cache friendly transposition
+!
+      CALL GTStart(htra)
+!$omp parallel do if ((iend-ista)/csize.ge.nth) private (jj,kk,i,j,k)
+      DO ii = ista,iend,csize
+!$omp parallel do if ((iend-ista)/csize.lt.nth) private (kk,i,j,k)
+         DO jj = 1,plan%y%n,csize
+            DO kk = 1,plan%z%n,csize
+               DO i = ii,min(iend,ii+csize-1)
+               DO j = jj,min(plan%y%n,jj+csize-1)
+               DO k = kk,min(plan%z%n,kk+csize-1)
+                  plan%plancr%c1(i,j,k) = in(k,j,i)
+               END DO
+               END DO
+               END DO
+            END DO
+         END DO
+      END DO
+      CALL GTStop(htra); tratime = tratime + GTGetTime(htra)
+!
+! Transposes the result between nodes using 
+! strip mining when nstrip>1 (rreddy@psc.edu)
+!
+      CALL GTStart(hcom)
+      do iproc = 0, nprocs-1, nstrip
+         do istrip=0, nstrip-1
+            irank = iproc + istrip
+
+            isendTo = myrank + irank
+            if ( isendTo .ge. nprocs ) isendTo = isendTo - nprocs
+
+            igetFrom = myrank - irank
+            if ( igetFrom .lt. 0 ) igetFrom = igetFrom + nprocs
+            CALL MPI_IRECV(plan%plancr%carr,1,plan%plancr%itype1(igetFrom),igetFrom, & 
+                          1,comm,ireq2(irank),ierr)
+            CALL MPI_ISEND(plan%plancr%c1,1,plan%plancr%itype2(isendTo),isendTo, &
+                          1,comm,ireq1(irank),ierr)
+         enddo
+
+         do istrip=0, nstrip-1
+            irank = iproc + istrip
+            CALL MPI_WAIT(ireq1(irank),istatus,ierr)
+            CALL MPI_WAIT(ireq2(irank),istatus,ierr)
+         enddo
+      enddo
+      CALL GTStop(hcom); comtime = comtime + GTGetTime(hcom)
+!
+! 2D FFT in each node using the FFTW library
+!
+      CALL GTStart(hfft)
+      CALL GFFTW_EXECUTE_DFT_C2R(plan%plancr%planrxy,plan%plancr%carr,out)
+      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
+
+      ENDIF
+      
+      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
+
+      RETURN
+      END SUBROUTINE fftp2d_complex_to_real_xy
+
+!*****************************************************************
+      SUBROUTINE fftp1d_complex_to_real_z(plan,inout,comm)
+!-----------------------------------------------------------------
+! Computes the 1D backward FFT along the first index of the input
+! array. The operation is performed inplace. On the device path
+! (gdev_active) the FFT runs on the device.
+!
+! Parameters
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
+!     in   : f*(kz,ky,kx) at input, f(z,ky,kx) at output [INOUT]
+!     comm : the MPI communicator (handle) [IN]
+!-----------------------------------------------------------------
+
+      USE fprecision
+      USE mpivars
+      USE commtypes
+      USE fcgram
+      USE gtimer
+      USE gdevice
+      USE fftp3d_gpu
+!$    USE threads
+      IMPLICIT NONE
+
+      TYPE(FCPLAN), INTENT(IN) :: plan
+      COMPLEX(KIND=GP), INTENT(INOUT), TARGET, DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout 
+      TYPE(MPI_Comm)   , INTENT(IN)            :: comm
+
+      CALL GTStart(htot)
+      CALL GTStart(hfft)
+      IF (gdev_active) THEN
+!
+! Device path: 1D FFT along z on the device
+!
+         CALL fftp3d_exec_c2c_dev(plan%plancr,inout,GFFT_INVERSE)
+      ELSE
+!
+! Host path (fftp): 1D FFT in each node using the FFTW library
+!
+         CALL GFFTW_EXECUTE_DFT(plan%plancr%plancz,inout,inout)
+      ENDIF
+      CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
+      CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
+
+      RETURN
+      END SUBROUTINE fftp1d_complex_to_real_z
+
+!*****************************************************************
+      SUBROUTINE block3d(imin,imax,jmin,jmax,kmin,ista,iend, &
+                        jsta,jend,ksta,kend,ioldtype,inewtype)
+!-----------------------------------------------------------------
+!
+! Soubroutine for defining derived data types in 3D.
+!
+! Parameters
+!     imin : the minimum value in the first dimension [IN]
+!     imax : the maximum value in the first dimension [IN]
+!     jmin : the minimum value in the second dimension [IN]
+!     jmax : the maximum value in the second dimension [IN]
+!     kmin : the minimum value in the third dimension [IN]
+!     ista : start value of the block in the first dimension [IN]
+!     iend : end value of the block in the first dimension [IN]
+!     jsta : start value of the block in the second dimension [IN]
+!     jend : end value of the block in the second dimension [IN]
+!     ksta : start value of the block in the third dimension [IN]
+!     kend : end value of the block in the third dimension [IN]
+!     ioldtype: data type of the elements in the block [IN]
+!     inewtype: the derived data type for the block [OUT]
+!-----------------------------------------------------------------
+
+      USE commtypes
+      USE fftplans
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN)  :: ista,iend
+      INTEGER, INTENT(IN)  :: jsta,jend
+      INTEGER, INTENT(IN)  :: ksta,kend
+      INTEGER, INTENT(IN)  :: imin,imax
+      INTEGER, INTENT(IN)  :: jmin,jmax,kmin
+      TYPE(MPI_Datatype), INTENT(IN)  :: ioldtype
+      TYPE(MPI_Datatype), INTENT(OUT) :: inewtype
+
+      INTEGER(MPI_ADDRESS_KIND) :: ilb,isize,idist
+      TYPE(MPI_Datatype)        :: itemp,itemp2
+      INTEGER :: ilen,jlen,klen
+      INTEGER :: ierr
+      INTEGER :: blocklengths(1)
+      INTEGER(MPI_ADDRESS_KIND) :: displs(1)
+      TYPE(MPI_Datatype) :: types(1)
+
+      CALL MPI_TYPE_GET_EXTENT(ioldtype,ilb,isize,ierr)
+      ilen = iend-ista+1
+      jlen = jend-jsta+1
+      klen = kend-ksta+1
+      CALL MPI_TYPE_VECTOR(jlen,ilen,imax-imin+1,ioldtype,itemp,ierr)
+      idist = (imax-imin+1)*(jmax-jmin+1)*isize
+      CALL MPI_TYPE_CREATE_HVECTOR(klen,1,idist,itemp,itemp2,ierr)
+      CALL MPI_TYPE_FREE(itemp,ierr)
+      idist = ((imax-imin+1)*(jmax-jmin+1)*(ksta-kmin) &
+              +(imax-imin+1)*(jsta-jmin)+(ista-imin))*isize
+      blocklengths(1) = 1
+      displs(1) = idist
+      types(1) = itemp2
+      CALL MPI_TYPE_CREATE_STRUCT(1,blocklengths,displs,types,inewtype,ierr)
+      CALL MPI_TYPE_FREE(itemp2,ierr)
+      CALL MPI_TYPE_COMMIT(inewtype,ierr)
+
+      RETURN
+      END SUBROUTINE block3d
+
+!*****************************************************************
+      SUBROUTINE range(n1,n2,nprocs,irank,ista,iend)
+!-----------------------------------------------------------------
+! Soubroutine for computing the local coordinate range 
+! when splitting the original array into the nodes
+!
+! Parameters
+!     n1     : the minimum value in the splitted dimension [IN]
+!     n2     : the maximum value in the splitted dimension [IN]
+!     nprocs : the number of processors [IN]
+!     irank  : the rank of the processor [IN]
+!     ista   : start value for the local coordinate [OUT]
+!     iend   : end value for the local coordinate [OUT]
+!-----------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN)  :: n1,n2
+      INTEGER, INTENT(IN)  :: nprocs,irank
+      INTEGER, INTENT(OUT) :: ista,iend
+
+      INTEGER :: myrank
+      INTEGER :: iwork1,iwork2
+
+      iwork1 = (n2-n1+1)/nprocs
+      iwork2 = MOD(n2-n1+1,nprocs)
+      ista = irank*iwork1+n1+MIN(irank,iwork2)
+      iend = ista+iwork1-1
+      IF (iwork2.gt.irank) iend = iend+1
+
+      RETURN
+      END SUBROUTINE range
