@@ -164,11 +164,10 @@ The variables in this list are
 - `nx`, `ny`, `nz`: number of grid points in each direction,
     including the continuation points.
 - `Cx`, `Cy`, `Cz`: number of continuation points in each
-    direction. The physical domain has `nx-Cx` points in x, and
-    `Cx = 0` (the default) makes x a periodic direction.
-- `ox`, `oy`, `oz`: order of the approximation at the boundaries in
-    each non-periodic direction (0, the default, in periodic
-    directions).
+    direction. Only z can be non-periodic: `Cx` and `Cy` must be 0
+    (the default), and the physical domain has `nz-Cz` points in z.
+- `ox`, `oy`, `oz`: order of the approximation at the boundaries;
+    only `oz` can be nonzero.
 
 The FC-Gram tables for the chosen `C` and `o` must exist in `tdir`
 (see section 4). All solvers also need a list 'status' with variables

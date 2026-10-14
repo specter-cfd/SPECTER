@@ -47,11 +47,6 @@ if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     #      -finit-real=snan -finit-integer=-999999 -finit-logical=true \
     #      -finit-character=0 -Wall -Wextra")
     # Apply version-specific flags
-    # Las llamadas a FFTW del caso con continuación en y (fftp.F90) pasan
-    # argumentos de distinto rango, que desde GCC 10 no compilan sin esto
-    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
-        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -w -fallow-argument-mismatch")
-    endif()
 elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 \
            -fp-model fast=2 -align -heap-arrays")

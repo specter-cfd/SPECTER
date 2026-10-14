@@ -42,7 +42,6 @@
          REAL(KIND=GP),    DIMENSION (:,:,:), POINTER  :: rarr
          TYPE(MPI_Datatype), DIMENSION (:), POINTER :: itype1, itype2
          INTEGER(kind=ikind) :: planrxy,plancz
-         INTEGER(kind=ikind) :: planrx,plancyz
          INTEGER :: nx,ny,nz
       END TYPE FFTPLAN
       SAVE

@@ -3,7 +3,7 @@ Cambios de los archivos de CMake de SPECTER respecto de los de GHOST (rama new_p
 CMakeLists.txt (raíz)
 - Parte de una copia literal del de GHOST y conserva todas sus secciones.
 - El proyecto se llama SPECTER. El encabezado aclara que PRECISION vale DOUBLE por defecto y que P_HYBRID, P_GPU y GPU_* todavía no tienen efecto.
-- Flags de gfortran: las de Makefile.in salvo -mfpmath=both (-O3 -funroll-loops -mtune=native) en vez de -O4 -funroll-loops. Con -mfpmath=both gfortran usa registros x87 de 80 bits según cómo quede compilado cada archivo, y dos versiones del código que hacen las mismas cuentas dejan de dar idénticas byte a byte; sin ella sí (probado el 2026-10-09 al pasar &status a un módulo). La flag queda comentada. Desde GCC 10 se agrega -w -fallow-argument-mismatch, que GHOST no tiene. Hacía falta por mpif.h; desde que SPECTER usa mpi_f08, como GHOST, queda por las llamadas a FFTW de fftp.F90 en el caso con continuación en y, que pasan n como arreglo y como escalar.
+- Flags de gfortran: las de Makefile.in salvo -mfpmath=both (-O3 -funroll-loops -mtune=native) en vez de -O4 -funroll-loops. Con -mfpmath=both gfortran usa registros x87 de 80 bits según cómo quede compilado cada archivo, y dos versiones del código que hacen las mismas cuentas dejan de dar idénticas byte a byte; sin ella sí (probado el 2026-10-09 al pasar &status a un módulo). La flag queda comentada. Como en GHOST, no se usa -fallow-argument-mismatch: hacía falta por mpif.h y por las llamadas a FFTW de la continuación en y, y ya no están.
 - add_compile_definitions suma IKIND_, que usa fftp_mod.F90.
 - FFT: la biblioteca con FFTW se llama fftp (en GHOST, fftp-3).
 - IO: el mensaje de error dice SPECTER en vez de GHOST.

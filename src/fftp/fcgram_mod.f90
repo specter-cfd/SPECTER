@@ -10,6 +10,10 @@
 !      require interfaces to subroutines that operate on real arrays.
 !      (Continuation in x should result in real array)
 !
+! Versión de SPECTER: por ahora solo la dirección z puede ser no
+! periódica (paredes en z). Con continuación u orden distintos de
+! cero en x o en y, fcgram_create_plan para con un mensaje.
+!
 ! 2020 Mauro Fontana. DF-UBA.
 !======================================================================
 
@@ -54,9 +58,9 @@ MODULE fcgram
 !    N        : A 3-tuple containing the total number of points (i.e. 
 !             the array size) in each direction. [IN]
 !    C        : A 3-tuple containing the number of continuation points.
-!             (Cx,Cy,Cz). [IN]
+!             (Cx,Cy,Cz). Only Cz can be nonzero. [IN]
 !    o        : A 3-tuple containing the accuracy order desired in each
-!             direction (ox,oy,oz). [IN]
+!             direction (ox,oy,oz). Only oz can be nonzero. [IN]
 !    dx       : A 3-tuple containing the spacings (dx,dy,dz). [IN]
 !    tdir     : Directory containing the FC-Gram tables. [IN]
 !    fftflags : Flags for FFT plans creation (see fftp/fftp.F90)
@@ -89,13 +93,17 @@ MODULE fcgram
       this%y%d  = o(2)
       this%z%d  = o(3)
 
-      IF (this%y%C .le. 0) THEN
-         CALL fftp3d_create_plan(this%planrc,N,-1,fftflags,0)
-         CALL fftp3d_create_plan(this%plancr,N,1,fftflags,0)
-      ELSE
-         CALL fftp3d_create_plan(this%planrc,N,-1,fftflags,1)
-         CALL fftp3d_create_plan(this%plancr,N,1,fftflags,1)
+      ! Only the z direction can be non-periodic
+      IF (this%x%C .ne. 0 .OR. this%x%d .ne. 0 .OR. &
+          this%y%C .ne. 0 .OR. this%y%d .ne. 0) THEN
+         IF (myrank .eq. 0) PRINT*, "[ERROR] FC-Gram continuation is only ",&
+            "supported in z (Cx = Cy = 0 and ox = oy = 0). Aborting..."
+         CALL MPI_FINALIZE(ierr)
+         STOP
       ENDIF
+
+      CALL fftp3d_create_plan(this%planrc,N,FFTW_REAL_TO_COMPLEX,fftflags)
+      CALL fftp3d_create_plan(this%plancr,N,FFTW_COMPLEX_TO_REAL,fftflags)
 
 
       this%tdir = tdir

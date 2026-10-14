@@ -4,7 +4,7 @@ SPECTER
 =======
 **SPECTER** (**S**pecial **Pe**riodic **C**ontinuation **T**urbulence Solv**er**) is a **Fortran** program (with some **C** bindings) that performs numerical integration in 3D space for a set of PDEs usually found in fluid dynamics. 
 
-A pseudo-spectral method is used to compute spatial derivatives, coupled with an adjustable order Runge-Kutta time stepping. When non-periodic directions are specified, **SPECTER** utilizes FC-Gram continuations to compute Fourier transforms with minimal overhead and considerable accuracy. At its present state, **SPECTER** has support for a single non-periodic direction. Support for two or more non-periodic directions is planned.
+A pseudo-spectral method is used to compute spatial derivatives, coupled with an adjustable order Runge-Kutta time stepping. When non-periodic directions are specified, **SPECTER** utilizes FC-Gram continuations to compute Fourier transforms with minimal overhead and considerable accuracy. At its present state, **SPECTER** has support for a single non-periodic direction, z. Support for two or more non-periodic directions is planned.
 
 **SPECTER** is programmed to scale. It can be run in your workstation as well as in top notch supercomputers. With this in mind, the code is parallelized with **MPI**.
 
