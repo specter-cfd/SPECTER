@@ -25,11 +25,7 @@ Lz = 1.00            ! length of the box in z
 
 ! Parameters for the velocity field
 &velocity
-f0 = 1.0             ! amplitude of the mechanical forcing
-kdn = 2.00           ! minimum wavenumber
-kup = 4.00           ! maximum wavenumber
 nu = 1.e-3           ! kinematic viscosity
-fparam0 = 1.0        ! fparam0-9 can be used to control the forcing
 /
 
 ! Parameters for the velocity boundary conditions
@@ -67,8 +63,20 @@ vxzend = 0.0         ! velocity of the wall at z=Lz (as in &velbound)
 
 ! Laminar Poiseuille profile, added to vx
 &poiseuille_v
-f0 = 1.0             ! amplitude of the forcing (as in &velocity)
+f0 = 1.0             ! amplitude of the forcing (as in &uniform_fv)
 nu = 1.e-3           ! kinematic viscosity (as in &velocity)
+/
+
+! Mechanical forcing (see src/force/force_velocity.f90): pairs
+! "forcing,update method" separated by ";"
+&forcing
+forces = "uniform_fv,constant_fv" ! null_fv or uniform_fv; constant_fv
+cort = 1000.         ! correlation time of the update methods
+/
+
+! Uniform forcing along x (mean pressure gradient)
+&uniform_fv
+f0 = 1.0             ! amplitude of the forcing
 /
 
 ! Parameters for Bousinessq equation's

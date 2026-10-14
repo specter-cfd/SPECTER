@@ -132,20 +132,21 @@ control the length of the time label used to name these files.
 
 ### 2.2 Compiling the code:
 
-The initial velocity field is chosen at run time, with the list
-`initial_conditions` in `parameter.inp` (see section 3.1). External
-forcings, and initial conditions for other fields, are still
-defined at compile time in the files `initial*.f90`. Examples of
-these files can be found in the directory `examples`.
+The initial velocity field and the mechanical forcing are chosen at
+run time, with the lists `initial_conditions` and `forcing` in
+`parameter.inp` (see section 3.1). Initial conditions and forcings
+for other fields (scalar, magnetic field) are still defined at
+compile time in the files `initial*.f90`. Examples of these files
+can be found in the directory `examples`.
 
 Note that the name of all files in the directory `examples` finish
 with `_example-name`. To use any of these files, you must copy the
 file to the `src` directory and remove the `_example-name` from
-the name of the file. As an example, to use a null mechanical
-forcing, from the `src` directory you must do
+the name of the file. As an example, to use a null scalar source,
+from the `src` directory you must do
 
 ```
-cp examples/initialfv.f90_null initialfv.f90
+cp examples/initialfs.f90_null initialfs.f90
 ```
 
 Check the Makefile to see all paths and variables are correct. This
@@ -320,17 +321,10 @@ vparam0 = 0.90    ! free parameter for the velocity
 /
 ```
 
-These variables are:
-- `f0`  : amplitude of the external force.
-- `kdn` and `kup`: lower and upper bounds in Fourier space for the
-      external force.
-- `nu`  : kinematic viscosity
-- `fparam0-9`: variables that can be used to adjust the amplitude of
-    individual terms in the expressions of the external force. See the
-    files `initialf*` in the directory `examples` for more details.
-
-`u0` and `vparam0-9` are still accepted in this list, but the
-initial conditions no longer use them: each one has its own list.
+The only variable used from this list is `nu`, the kinematic
+viscosity. The others are still accepted, but the initial
+conditions and the forcing no longer use them: each one has its
+own list.
 
 # 
 The initial velocity field is set by the list 'initial_conditions':
@@ -357,6 +351,25 @@ applied in order (see `ic/ic_velocity.f90`):
 The profiles add to the previous field, so they go after another
 initial condition: `"cbnoise_v;couette_v"` is noise plus Couette,
 and `"null_v;couette_v"` the laminar flow alone.
+
+# 
+The mechanical forcing is set by the list 'forcing':
+
+```
+&forcing
+forces = "uniform_fv,constant_fv"
+cort = 1000.
+/
+```
+
+`forces` holds one or more pairs `forcing,update` separated by `;`
+(see `force/force_velocity.f90`). The forcings are
+- `null_fv`: null forcing.
+- `uniform_fv`: uniform forcing `f0` along x, the mean pressure
+    gradient of a Poiseuille flow (list `uniform_fv`, with `f0`).
+
+and the only update method is `constant_fv` (forcing constant in
+time). `cort` is the correlation time of the update methods.
 
 # 
 And then the boundary conditions are specified with

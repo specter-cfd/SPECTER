@@ -67,6 +67,7 @@
       USE hd_mod
       USE canuto_stepper_mod
       USE ic_factory
+      USE force_factory
 
 #if defined(DEF_GHOST_CUDA_)
       USE, INTRINSIC :: iso_c_binding
@@ -78,7 +79,6 @@
 
       TYPE(GStateComp), ALLOCATABLE, TARGET :: field(:), field_nxt(:), force(:)
       COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: vx,vy,vz
-      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: fx,fy,fz
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: th,fs
 #endif
@@ -171,6 +171,7 @@
       TYPE(CanutoStepper)  :: stepper
       TYPE(GStepperTraits) :: straits
       CLASS(icChain), ALLOCATABLE :: iclist(:)
+      CLASS(forceChain), ALLOCATABLE :: forcemethod(:)
 
 #ifdef SCALAR_
       TYPE(BCPLAN)          :: splanbc
@@ -294,9 +295,6 @@
       vz => field(3)%ccomp
       CALL GState_alloc(field_nxt, 3)
       CALL GState_alloc(force, 3)
-      fx => force(1)%ccomp
-      fy => force(2)%ccomp
-      fz => force(3)%ccomp
 
       CALL workspace%initialize_pool(6,12)
       CALL workspace%get_complex_tmp(C1)
@@ -661,6 +659,9 @@
 ! Initial conditions (see ic/ic_factory.f90)
       iclist = init_ic_from_file('parameter.inp')
 
+! Forcing (see force/force_factory.f90)
+      forcemethod = init_forcing_from_file('parameter.inp',workspace)
+
 #ifdef SCALAR_
       CALL setup_bc(splanbc,planfc, &
           (/ sbcxsta,sbcxend,sbcysta,sbcyend,sbczsta,sbczend /),'s')
@@ -672,7 +673,6 @@
 #endif
 !
 ! Sets the external forcing
-      INCLUDE 'initialfv.f90'           ! mechanical forcing
 #ifdef SCALAR_
       INCLUDE 'initialfs.f90'           ! scalar source
 #endif
@@ -687,6 +687,8 @@
       tind = 0                          ! index for the binaries
       timet = tstep
       timec = cstep
+      timef = 0
+
 #ifdef SCALAR_
       INCLUDE 'initials.f90'            ! initial scalar density
 #endif
@@ -708,6 +710,7 @@
       tind = int(stat)
       timet = 0
       timec = int(modulo(float(ini-1),float(cstep)))
+      timef = int(modulo(float(ini-1),float(fstep)))
 
 #ifdef SCALAR_
       CALL io_read(1,idir,'th',ext,planio,R1)
@@ -756,6 +759,8 @@
 ! field_nxt is the state that is advanced and written
       CALL init_allstates(iclist,fluid,field)
       CALL GState_copy(field_nxt,field)
+
+      CALL init_forcing(forcemethod,fluid,force)
 
 !
 ! Time integration scheme starts here.
@@ -871,6 +876,9 @@
             timec = 0
             CALL fluid%global(field_nxt,force,t)
          ENDIF
+
+! Forcing update (nothing to do for a constant forcing)
+         CALL update_forcing(forcemethod,fluid,force)
 
 ! Time step (GHOST Canuto stepper): field keeps the state at the
 ! beginning of the step and field_nxt is advanced

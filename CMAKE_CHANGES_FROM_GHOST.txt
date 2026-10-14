@@ -9,8 +9,8 @@ CMakeLists.txt (raíz)
 - IO: el mensaje de error dice SPECTER en vez de GHOST.
 - SOLVER no se define acá sino en UserConfig.cmake (HD). project_defs queda igual y le pasa HD_SOL al main.
 - project_includes suma src/include (los pasos de cada solver, hd/hd_*.f90), src/boundary y build/src/boundary.
-- Subdirectorios: se suman boundary, memmgt, pdes, ic y steppers. particles, force, icpart y tools quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable.
-- Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib, pdes_lib, memmgt_lib, ic_lib y stepper_lib.
+- Subdirectorios: se suman boundary, memmgt, pdes, ic, force y steppers. particles, icpart y tools quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable.
+- Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib, pdes_lib, memmgt_lib, ic_lib, force_lib y stepper_lib.
 - Instalador: instala solo el ejecutable, porque BOOTS y ghost_python no existen en SPECTER.
 
 UserConfig.cmake
@@ -63,6 +63,12 @@ src/ic/CMakeLists.txt
 - ic_lib compila ic_base.f90 (igual al de GHOST), ic_velocity.f90 e ic_factory.f90. No están ic_magnetic, ic_active, ic_passive ni ic_quantum, que no tienen solver en SPECTER.
 - ic_velocity.f90 tiene read_v y null_v de GHOST (read_v transforma con el plan del FC-Gram y, con stat=1, escribe además la salida 0000) y las propias de SPECTER: cbnoise_v (el ruido de examples/initialv.f90) y los perfiles laminares couette_v y poiseuille_v, que suman su perfil a lo que ya hay. tg_v, abc_v y random_v no están porque suponen dominio periódico.
 - ic_lib publica src/ic y build/src/ic; GHOST publica a mano las carpetas de módulos de las bibliotecas que usa y no la propia. Depende de pdes_lib y utils_lib y los enlaza: a través de pdes_lib le llegan memmgt, pseudo, mpiio y fftp (GHOST depende de fftp_lib, pseudo_lib, memmgt_lib, pdes_lib y utils_lib, y enlaza project_mpi y utils_lib).
+
+src/force/CMakeLists.txt
+- force_lib compila force_base.f90, force_velocity.f90 y force_factory.f90. No están force_magnetic, force_active, force_passive ni force_quantum, que no tienen solver en SPECTER.
+- force_base.f90 es el de GHOST sin blend_forcing, que usa saxpby_c de pseudospec_fluid (SPECTER no lo tiene) y solo lo necesitan los métodos shuffle.
+- force_velocity.f90 tiene null_fv de GHOST y uniform_fv, el forzado uniforme en x de SPECTER (el gradiente de presión medio de Poiseuille), con el método constant_fv. tg_fv, abc_fv, random_fv, shift_fv y shuffle_fv no están porque suponen dominio periódico; por eso force_factory.f90 no agranda el pool.
+- Como ic_lib: publica src/force y build/src/force, depende de pdes_lib y utils_lib y los enlaza (GHOST depende de fftp_lib, pseudo_lib, memmgt_lib, pdes_lib y utils_lib, y enlaza project_mpi y utils_lib).
 
 src/steppers/CMakeLists.txt
 - stepper_lib compila gstepper_base.f90 y canuto_stepper.f90, versiones de SPECTER de los de GHOST sin partículas (solo step). El de Canuto llama a solver%end_stage después de actualizar cada etapa.
