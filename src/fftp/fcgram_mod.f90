@@ -59,7 +59,7 @@ MODULE fcgram
 !             direction (ox,oy,oz). [IN]
 !    dx       : A 3-tuple containing the spacings (dx,dy,dz). [IN]
 !    tdir     : Directory containing the FC-Gram tables. [IN]
-!    fftflags : Flags for FFT plans creation (see fftp/fftp.fpp)
+!    fftflags : Flags for FFT plans creation (see fftp/fftp.F90)
 !----------------------------------------------------------------------
       USE commtypes
       USE fprecision

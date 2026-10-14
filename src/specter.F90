@@ -85,7 +85,7 @@
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myrank,ierr)
 
 ! Initializes the grid and the FC-Gram continuation (&grid, see
-! pseudo/pseudospec_mod.fpp). This must be done early to have nx, ny, nz.
+! pseudo/pseudospec_mod.f90). This must be done early to have nx, ny, nz.
       CALL grid_init('parameter.inp')
 
 ! Create partitions across tasks
@@ -105,7 +105,7 @@
       CALL status_init('parameter.inp')
 
 !
-! Box size and grids (see pseudo/pseudospec_mod.fpp)
+! Box size and grids (see pseudo/pseudospec_mod.f90)
       CALL box_init('parameter.inp')
 
  ! Initializes the FFT library. This must be done at

@@ -1,5 +1,5 @@
 ! ===================================================================
-! NAME       : ic_base.fpp
+! NAME       : ic_base.f90
 ! DESCRIPTION: Forms base class for all initial conditions (IC)
 ! DATE       : 01/16/26 (PDM)
 ! ===================================================================

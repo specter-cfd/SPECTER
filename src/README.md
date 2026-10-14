@@ -89,7 +89,7 @@ strip mining is done.
 
 Finally, if required, the users can change the number of digits
 used to label the binary files. The variables in the module
-`filefmt` (in the file `pseudo/pseudospec_mod.fpp`) control the
+`filefmt` (in the file `pseudo/pseudospec_mod.f90`) control the
 length of the time label used to name these files.
 
 ### 2.2. Parallelization:
@@ -100,7 +100,7 @@ The options for hybrid OpenMP-MPI parallelization and for GPUs in
 
 ### 2.3. Structure of the code:
 
-As in `GHOST`, the main program `specter.fpp` builds the solver, the
+As in `GHOST`, the main program `specter.F90` builds the solver, the
 initial conditions, the forcing and the time stepper with their
 factories, from the lists in the input file:
 

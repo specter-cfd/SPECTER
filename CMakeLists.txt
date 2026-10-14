@@ -74,7 +74,7 @@ endif()
 # ----------------------- Hybrid OpenMP ------------------------------
 # P_HYBRID enables the hybrid MPI/OpenMP build. Besides the threaded
 # loops it is what activates every '!$' conditional line, and so what
-# makes main.fpp set nth from omp_get_max_threads() and fftp3D call
+# makes specter.F90 set nth from omp_get_max_threads() and fftp3D call
 # fftp3d_init_threads and plan_with_nthreads: without it the FFTs run
 # on a single thread. The flags are set globally, like the per-compiler
 # options above, so that every library in the build tree gets them.
@@ -276,10 +276,7 @@ add_subdirectory("${SRC_DIR}/steppers")
 add_subdirectory("${SRC_DIR}/tools")
 
 # ---------------------- Main executable ------------------------------
-# El main es specter.fpp, en formato libre porque gfortran toma los .fpp
-# como formato fijo.
-add_executable(${SOLVER} "${SRC_DIR}/specter.fpp")
-set_source_files_properties("${SRC_DIR}/specter.fpp" PROPERTIES Fortran_FORMAT FREE)
+add_executable(${SOLVER} "${SRC_DIR}/specter.F90")
 target_link_libraries(${SOLVER}
     PRIVATE
         project_includes

@@ -1,5 +1,5 @@
 ! ===================================================================
-! NAME       : force_base.fpp
+! NAME       : force_base.f90
 ! DESCRIPTION: Forms base class for all forcing methods
 !
 ! Versión de SPECTER del force_base.f90 de GHOST (rama new_paradigm,

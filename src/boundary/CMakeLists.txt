@@ -1,11 +1,7 @@
 # Propio de SPECTER (no existe en GHOST): ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
-# boundary: condiciones de borde de la velocidad. boundary_mod.fpp
+# boundary: condiciones de borde de la velocidad. boundary_mod.f90
 # incluye adentro vboundary.f90, que por eso no se compila por separado.
-add_library(boundary_lib STATIC boundary_mod.fpp)
-
-# boundary_mod.fpp pasa por el preprocesador, en formato libre
-set_source_files_properties(boundary_mod.fpp
-  PROPERTIES Fortran_PREPROCESS ON Fortran_FORMAT FREE)
+add_library(boundary_lib STATIC boundary_mod.f90)
 
 # Directorios de inclusión
 target_include_directories(boundary_lib PUBLIC

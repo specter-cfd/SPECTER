@@ -4,13 +4,13 @@ CMakeLists.txt (raíz)
 - Parte de una copia literal del de GHOST y conserva todas sus secciones.
 - El proyecto se llama SPECTER. El encabezado aclara que PRECISION vale DOUBLE por defecto y que P_HYBRID, P_GPU y GPU_* todavía no tienen efecto.
 - Flags de gfortran: las de Makefile.in salvo -mfpmath=both (-O3 -funroll-loops -mtune=native) en vez de -O4 -funroll-loops. Con -mfpmath=both gfortran usa registros x87 de 80 bits según cómo quede compilado cada archivo, y dos versiones del código que hacen las mismas cuentas dejan de dar idénticas byte a byte; sin ella sí (probado el 2026-10-09 al pasar &status a un módulo). La flag queda comentada. Desde GCC 10 se agrega -w -fallow-argument-mismatch, necesario porque SPECTER usa mpif.h (GHOST usa mpi_f08).
-- add_compile_definitions suma IKIND_, que usa fftp_mod.fpp.
+- add_compile_definitions suma IKIND_, que usa fftp_mod.F90.
 - FFT: la biblioteca con FFTW se llama fftp (en GHOST, fftp-3).
 - IO: el mensaje de error dice SPECTER en vez de GHOST.
 - SOLVER no se define acá sino en UserConfig.cmake (HD), y da el nombre del ejecutable. project_defs queda igual y define HD_SOL, aunque en SPECTER ya no lo usa nadie: el solver se elige al correr, con &pdes.
 - project_includes suma src/boundary y build/src/boundary.
 - Subdirectorios: se suman boundary, memmgt, pdes, ic, force y steppers. particles e icpart quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable. tools se compila, solo con BOOTS.
-- Ejecutable: el main es specter.fpp (en GHOST, main.F90), en formato libre porque gfortran toma los .fpp como formato fijo. Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib, pdes_lib, memmgt_lib, ic_lib, force_lib y stepper_lib.
+- Ejecutable: el main es specter.F90 (en GHOST, main.F90). Se llama como el solver (HD) y enlaza además project_defs, pseudo_lib, boundary_lib, pdes_lib, memmgt_lib, ic_lib, force_lib y stepper_lib.
 - Instalador: instala el ejecutable y BOOTS; ghost_python no existe en SPECTER.
 
 UserConfig.cmake
@@ -29,8 +29,7 @@ src/utils/CMakeLists.txt
 - timer_lib publica build/src/utils, donde queda gtimer.mod. GHOST publica build/, y cada biblioteca que usa gtimer agrega build/src/utils a mano.
 
 src/fftp/CMakeLists.txt (en GHOST, src/fftp-3)
-- Los fuentes son los de SPECTER: fprecision_mod.fpp, fftp_mod.fpp, fcgram_mod.f90 y fftp.fpp (en GHOST: fprecision_mod.F90, fftp_mod.F90, fftp3D.F90 y fftp.f90).
-- Los .fpp se marcan en formato libre (Fortran_FORMAT FREE), porque gfortran los toma como formato fijo.
+- Los fuentes son los de SPECTER: fprecision_mod.F90, fftp_mod.F90, fcgram_mod.f90 (el FC-Gram) y fftp.F90, que junta lo que en GHOST está en fftp3D.F90 y fftp.f90. fftw_wrappers.h es el de GHOST.
 - No depende de gdevice_lib: las transformadas de SPECTER no tienen código para GPU.
 - Publica build/src/fftp. La carpeta de FFTW llega a través de project_fft.
 
@@ -39,12 +38,12 @@ src/mpiio/CMakeLists.txt
 - Enlaza fftp_lib, timer_lib y utils_lib, cuyos módulos usa. En GHOST llegan a través de pseudo_lib.
 
 src/pseudo/CMakeLists.txt
-- Una sola biblioteca, pseudo_lib, con los fuentes de SPECTER que usa HD: pseudospec_mod.fpp, module_dns.f90 y pseudospec_hd.f90. GHOST separa pseudobase_lib (pseudospec3D_mod.f90) y pseudo_lib (los núcleos de todos los solvers).
-- pseudospec_mod.fpp ya no recibe definiciones del preprocesador: el módulo grid tiene grid_init, como en GHOST, que lee de &grid nx, ny y nz y además las continuaciones (Cx, Cy, Cz) y los órdenes de borde (ox, oy, oz), que valen 0 (dirección periódica) si no se dan.
+- Una sola biblioteca, pseudo_lib, con los fuentes de SPECTER que usa HD: pseudospec_mod.f90, module_dns.f90 y pseudospec_hd.f90. GHOST separa pseudobase_lib (pseudospec3D_mod.f90) y pseudo_lib (los núcleos de todos los solvers).
+- pseudospec_mod.f90 no recibe definiciones del preprocesador: el módulo grid tiene grid_init, como en GHOST, que lee de &grid nx, ny y nz y además las continuaciones (Cx, Cy, Cz) y los órdenes de borde (ox, oy, oz), que valen 0 (dirección periódica) si no se dan.
 - No depende de memmgt_lib ni de gmem_lib.
 
 src/boundary/CMakeLists.txt
-- No existe en GHOST: las condiciones de borde son propias de SPECTER. boundary_mod.fpp incluye vboundary.f90; las del escalar y el campo magnético (sboundary.f90 y bboundary.f90), de otros solvers, ya no están.
+- No existe en GHOST: las condiciones de borde son propias de SPECTER. boundary_mod.f90 incluye vboundary.f90; las del escalar y el campo magnético (sboundary.f90 y bboundary.f90), de otros solvers, ya no están.
 
 src/pdes/CMakeLists.txt
 - pdes_lib compila status_mod.f90, equation_base.f90, hd_solver.f90 y equation_factory.f90. Los otros solvers de GHOST no están.

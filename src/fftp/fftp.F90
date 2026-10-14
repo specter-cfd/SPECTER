@@ -51,7 +51,7 @@
 
       INTEGER, INTENT(INOUT) :: err
 
-!$    CALL GPMANGLE(init_threads)(err)
+!$    CALL GFFTW_INIT_THREADS(err)
       IF (err.eq.0) PRINT *,'FFTP threads initialization failed!'
 
       RETURN
@@ -90,30 +90,30 @@
       ALLOCATE ( plan%ccarr(n(3),n(2),ista:iend)    )
       ALLOCATE ( plan%carr(n(1)/2+1,n(2),ksta:kend) )
       ALLOCATE ( plan%rarr(n(1),n(2),ksta:kend)     )
-!$    CALL GPMANGLE(plan_with_nthreads)(nth)
+!$    CALL GFFTW_PLAN_WITH_NTHREADS(nth)
 
       ! Create XY -> Z plan
       IF (transp .eq. 0) THEN
 
       IF (fftdir .eq. -1) THEN
-      CALL GPMANGLE(plan_many_dft_r2c)(plan%planrxy,2,(/n(1),n(2)/),          &
+      CALL GFFTW_PLAN_MANY_DFT_R2C(plan%planrxy,2,(/n(1),n(2)/),              &
                          kend-ksta+1,plan%rarr,                               &
                          (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),             &
                          plan%carr,(/n(1)/2+1,n(2)*(kend-ksta+1)/),1,         &
                          (n(1)/2+1)*n(2),flags)
-      CALL GPMANGLE(plan_many_dft)(plan%plancz,1,n(3),n(2)*(iend-ista+1),     &
+      CALL GFFTW_PLAN_MANY_DFT(plan%plancz,1,n(3),n(2)*(iend-ista+1),         &
                          plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
                          plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
                          -1,flags)
 
       ELSEIF (fftdir .eq. 1) THEN
-      CALL GPMANGLE(plan_many_dft_c2r)(plan%planrxy,2,(/n(1),n(2)/),          &
+      CALL GFFTW_PLAN_MANY_DFT_C2R(plan%planrxy,2,(/n(1),n(2)/),              &
                          kend-ksta+1,plan%carr,                               &
                          (/n(1)/2+1,n(2)*(kend-ksta+1)/),1,                   &
                          (n(1)/2+1)*n(2),plan%rarr,                           &
                          (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),flags)
 
-      CALL GPMANGLE(plan_many_dft)(plan%plancz,1,n(3),n(2)*(iend-ista+1),     &
+      CALL GFFTW_PLAN_MANY_DFT(plan%plancz,1,n(3),n(2)*(iend-ista+1),         &
                          plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
                          plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
                          1,flags)
@@ -123,20 +123,20 @@
 
       IF (fftdir .eq. -1) THEN
       ! Create X -> YZ plan
-      CALL GPMANGLE(plan_many_dft_r2c)(plan%planrx,1,n(1),                    &
+      CALL GFFTW_PLAN_MANY_DFT_R2C(plan%planrx,1,n(1),                        &
                          n(2)*(kend-ksta+1),plan%rarr,n(1)*n(2)*(kend-ksta+1),&
                          1,n(1),plan%carr,(n(1)/2+1)*n(2)*(kend-ksta+1),1,    &
                          (n(1)/2+1),flags)
-      CALL GPMANGLE(plan_many_dft)(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),&
+      CALL GFFTW_PLAN_MANY_DFT(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),    &
                          plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
                          plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
                          -1,flags)
       ELSEIF (fftdir .eq. 0) THEN
-      CALL GPMANGLE(plan_many_dft_c2r)(plan%planrx,1,n(1),n(2)*(kend-ksta+1), &
+      CALL GFFTW_PLAN_MANY_DFT_C2R(plan%planrx,1,n(1),n(2)*(kend-ksta+1),     &
                          plan%carr,(n(1)/2+1)*n(2)*(kend-ksta+1),1,n(1)/2+1,  &
                          plan%rarr,n(1)*n(2)*(kend-ksta+1),1,n(1),flags)
 
-      CALL GPMANGLE(plan_many_dft)(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),&
+      CALL GFFTW_PLAN_MANY_DFT(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),    &
                          plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
                          plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
                          1,flags)
@@ -190,25 +190,25 @@
       ALLOCATE ( plan%ccarr(n(3),n(2),ista:iend)    )
       ALLOCATE ( plan%carr(n(1)/2+1,n(2),ksta:kend) )
       ALLOCATE ( plan%rarr(n(1),n(2),ksta:kend)     )
-!$    CALL GPMANGLE(plan_with_nthreads)(nth)
+!$    CALL GFFTW_PLAN_WITH_NTHREADS(nth)
 
       ! Create XY -> Z plan
-      CALL GPMANGLE(plan_many_dft_r2c)(plan%planrxy,2,(/n(1),n(2)/),          &
+      CALL GFFTW_PLAN_MANY_DFT_R2C(plan%planrxy,2,(/n(1),n(2)/),              &
                          kend-ksta+1,plan%rarr,                               &
                          (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),             &
                          plan%carr,(/n(1)/2+1,n(2)*(kend-ksta+1)/),1,         &
                          (n(1)/2+1)*n(2),flags)
-      CALL GPMANGLE(plan_many_dft)(plan%plancz,1,n(3),n(2)*(iend-ista+1),     &
+      CALL GFFTW_PLAN_MANY_DFT(plan%plancz,1,n(3),n(2)*(iend-ista+1),         &
                          plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
                          plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
                          -1,flags)
 
       ! Create X -> YZ plan
-      CALL GPMANGLE(plan_many_dft_r2c)(plan%planrx,1,n(1),                    &
+      CALL GFFTW_PLAN_MANY_DFT_R2C(plan%planrx,1,n(1),                        &
                          n(2)*(kend-ksta+1),plan%rarr,n(1)*n(2)*(kend-ksta+1),&
                          1,n(1),plan%carr,(n(1)/2+1)*n(2)*(kend-ksta+1),1,    &
                          (n(1)/2+1),flags)
-      CALL GPMANGLE(plan_many_dft)(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),&
+      CALL GFFTW_PLAN_MANY_DFT(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),    &
                          plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
                          plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
                          -1,flags)
@@ -259,26 +259,26 @@
       ALLOCATE ( plan%ccarr(n(3),n(2),ista:iend)    )
       ALLOCATE ( plan%carr(n(1)/2+1,n(2),ksta:kend) )
       ALLOCATE ( plan%rarr(n(1),n(2),ksta:kend)     )
-!$    CALL GPMANGLE(plan_with_nthreads)(nth)
+!$    CALL GFFTW_PLAN_WITH_NTHREADS(nth)
 
       ! Create Z -> YX plan
-      CALL GPMANGLE(plan_many_dft_c2r)(plan%planrxy,2,(/n(1),n(2)/),          &
+      CALL GFFTW_PLAN_MANY_DFT_C2R(plan%planrxy,2,(/n(1),n(2)/),              &
                          kend-ksta+1,plan%carr,                               &
                          (/n(1)/2+1,n(2)*(kend-ksta+1)/),1,                   &
                          (n(1)/2+1)*n(2),plan%rarr,                           &
                          (/n(1),n(2)*(kend-ksta+1)/),1,n(1)*n(2),flags)
 
-      CALL GPMANGLE(plan_many_dft)(plan%plancz,1,n(3),n(2)*(iend-ista+1),     &
+      CALL GFFTW_PLAN_MANY_DFT(plan%plancz,1,n(3),n(2)*(iend-ista+1),         &
                          plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
                          plan%ccarr,(iend-ista+1)*n(2)*n(3),1,n(3),           &
                          1,flags)
 
       ! Create ZY -> X plan
-      CALL GPMANGLE(plan_many_dft_c2r)(plan%planrx,1,n(1),n(2)*(kend-ksta+1), &
+      CALL GFFTW_PLAN_MANY_DFT_C2R(plan%planrx,1,n(1),n(2)*(kend-ksta+1),     &
                          plan%carr,(n(1)/2+1)*n(2)*(kend-ksta+1),1,n(1)/2+1,  &
                          plan%rarr,n(1)*n(2)*(kend-ksta+1),1,n(1),flags)
 
-      CALL GPMANGLE(plan_many_dft)(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),&
+      CALL GFFTW_PLAN_MANY_DFT(plan%plancyz,2,(/n(3),n(2)/),(iend-ista+1),    &
                          plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
                          plan%ccarr,(/n(3),n(2)*(iend-ista+1)/),1,n(3)*n(2),  &
                          1,flags)
@@ -319,10 +319,10 @@
 
       TYPE(FFTPLAN), INTENT(INOUT) :: plan
 
-      CALL GPMANGLE(destroy_plan)(plan%planrxy)
-      CALL GPMANGLE(destroy_plan)(plan%planrx)
-      CALL GPMANGLE(destroy_plan)(plan%plancyz)
-      CALL GPMANGLE(destroy_plan)(plan%plancz)
+      CALL GFFTW_DESTROY_PLAN(plan%planrxy)
+      CALL GFFTW_DESTROY_PLAN(plan%planrx)
+      CALL GFFTW_DESTROY_PLAN(plan%plancyz)
+      CALL GFFTW_DESTROY_PLAN(plan%plancz)
 
       DEALLOCATE( plan%ccarr  )
       DEALLOCATE( plan%carr   )
@@ -394,7 +394,7 @@
 ! computed.
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : real input array [IN]
 !     out  : complex output array [OUT]
 !     comm : the MPI communicator (handle) [IN]
@@ -432,7 +432,7 @@
 ! output's shape is (nz,ny,nx/2+1).
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : real input array [IN]
 !     out  : complex output array [OUT]
 !     comm : the MPI communicator (handle) [IN]
@@ -466,7 +466,7 @@
 ! 2D FFT in each node using the FFTW library
 !
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft_r2c)(plan%planrc%planrxy,in,plan%planrc%carr)
+      CALL GFFTW_EXECUTE_DFT_R2C(plan%planrc%planrxy,in,plan%planrc%carr)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft); 
    
 !
@@ -532,7 +532,7 @@
 ! is performed inplace.
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : contains f(z,y,kx) as input and returns f(kz,ky,kx) [INOUT]
 !     comm : the MPI communicator (handle) [IN]
 !-----------------------------------------------------------------
@@ -607,7 +607,7 @@
 ! 2D FFT in each node using the FFTW library
 !
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft)(plan%planrc%plancyz,inout,inout)
+      CALL GFFTW_EXECUTE_DFT(plan%planrc%plancyz,inout,inout)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
 
       CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
@@ -624,7 +624,7 @@
 ! shape (nx,ny,nz) the output's shape is (nz,ny,nx/2+1).
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : real input array [IN]
 !     out  : complex output array [OUT]
 !     comm : the MPI communicator (handle) [IN]
@@ -658,7 +658,7 @@
 ! 1D FFT in each node using the FFTW library
 !
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft_r2c)(plan%planrc%planrx,in,plan%planrc%carr)
+      CALL GFFTW_EXECUTE_DFT_R2C(plan%planrc%planrx,in,plan%planrc%carr)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft); 
    
 !
@@ -725,7 +725,7 @@
 ! performed inplace.
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : contains f(z,ky,kx) as input and returns f(kz,ky,kx) [INOUT]
 !     comm : the MPI communicator (handle) [IN]
 !-----------------------------------------------------------------
@@ -777,7 +777,7 @@
 ! 1D FFT in each node using the FFTW library
 !
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft)(plan%planrc%plancz,inout,inout)
+      CALL GFFTW_EXECUTE_DFT(plan%planrc%plancz,inout,inout)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
 
       CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
@@ -795,7 +795,7 @@
 ! The input data is destroyed during the computation.
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : complex input array [IN]
 !     out  : real output array [OUT]
 !     comm : the MPI communicator (handle) [IN]
@@ -829,7 +829,7 @@
 ! (nx,ny,nz). The input data is destroyed during the computation.
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : complex input array f*(z,ky,kx) [IN]
 !     out  : real output array f(x,y,z) [OUT]
 !     comm : the MPI communicator (handle) [IN]
@@ -910,7 +910,7 @@
 ! 2D FFT in each node using the FFTW library
 !
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft_c2r)(plan%plancr%planrxy,plan%plancr%carr,out)
+      CALL GFFTW_EXECUTE_DFT_C2R(plan%plancr%planrxy,plan%plancr%carr,out)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
       
       CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
@@ -925,7 +925,7 @@
 ! of the input array. The operation is performed inplace.
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : f*(kz,ky,kx) at input, f(z,ky,kx) at output [INOUT]
 !     comm : the MPI communicator (handle) [IN]
 !-----------------------------------------------------------------
@@ -948,7 +948,7 @@
 ! 1D FFT in each node using the FFTW library
       CALL GTStart(htot)
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft)(plan%plancr%plancyz,inout,inout)
+      CALL GFFTW_EXECUTE_DFT(plan%plancr%plancyz,inout,inout)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
       CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
 
@@ -966,7 +966,7 @@
 ! The input data is destroyed during the computation.
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : complex input array f(z,y,kx) [IN]
 !     out  : real output array f(x,y,z) [OUT]
 !     comm : the MPI communicator (handle) [IN]
@@ -1047,7 +1047,7 @@
 ! 1D FFT in each node using the FFTW library
 !
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft_c2r)(plan%plancr%planrx,plan%plancr%carr,out)
+      CALL GFFTW_EXECUTE_DFT_C2R(plan%plancr%planrx,plan%plancr%carr,out)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
       
       CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
@@ -1063,7 +1063,7 @@
 ! array. The operation is performed inplace.
 !
 ! Parameters
-!     plan : the FCPLAN plan (see fcgram_mod.fpp) [IN]
+!     plan : the FCPLAN plan (see fcgram_mod.f90) [IN]
 !     in   : f*(kz,ky,kx) at input, f(z,ky,kx) at output [INOUT]
 !     comm : the MPI communicator (handle) [IN]
 !-----------------------------------------------------------------
@@ -1086,7 +1086,7 @@
 ! 1D FFT in each node using the FFTW library
       CALL GTStart(htot)
       CALL GTStart(hfft)
-      CALL GPMANGLE(execute_dft)(plan%plancr%plancz,inout,inout)
+      CALL GFFTW_EXECUTE_DFT(plan%plancr%plancz,inout,inout)
       CALL GTStop(hfft); ffttime = ffttime + GTGetTime(hfft)
       CALL GTStop(htot); tottime = tottime + GTGetTime(htot)
 

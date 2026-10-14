@@ -2,7 +2,7 @@
 ! NAME       : gstepper_base.f90
 ! DESCRIPTION: Forms base class for all time steppers
 !
-! Versión de SPECTER del gstepper_base.fpp de GHOST (rama new_paradigm,
+! Versión de SPECTER del gstepper_base.f90 de GHOST (rama new_paradigm,
 ! afaf9ea), sin partículas: solo el paso de los campos (step), y el
 ! genérico gstep agrupa solo step.
 !

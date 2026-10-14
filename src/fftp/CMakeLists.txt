@@ -2,16 +2,11 @@
 # fftp: FFT paralela con FC-Gram sobre FFTW
 add_library(fftp_lib STATIC
   fftw_wrappers.h
-  fprecision_mod.fpp
-  fftp_mod.fpp
+  fprecision_mod.F90
+  fftp_mod.F90
   fcgram_mod.f90
-  fftp.fpp
+  fftp.F90
 )
-
-# Los .fpp pasan por el preprocesador. gfortran los toma como formato
-# fijo por la extensión, así que hay que indicarle que son formato libre.
-set_source_files_properties(fprecision_mod.fpp fftp_mod.fpp fftp.fpp
-  PROPERTIES Fortran_PREPROCESS ON Fortran_FORMAT FREE)
 
 # La precisión, IKIND, CSIZE y NSTRIP se definen para todo el proyecto
 # en el CMakeLists.txt de la raíz
