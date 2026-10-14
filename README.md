@@ -45,7 +45,7 @@ If you are running **SPECTER** in a cluster that uses a queuing system like `TOR
 
 Forcing and initial conditions
 ------------------------------
-The expressions for the forcing fields and the initial conditions must be specified at compile time. They are defined in the files `initialv.f90` or `initialfv.f90` for the initial velocity field and the initial mechanical forcing, respectively. The same convention is used for the scalar or other fields. A set of commonly used forcings and initial conditions can be found in the `src/examples/` directory.
+The initial velocity field is chosen at run time with the list `iclist` of the namelist `initial_conditions` in `parameter.inp` (null field, noise that satisfies no-slip, and the laminar Couette and Poiseuille profiles, see `src/ic/ic_velocity.f90` and `src/README.md`). The expressions for the forcing fields must still be specified at compile time, in the file `initialfv.f90` for the mechanical forcing. The same convention is used for the scalar or other fields. A set of commonly used forcings can be found in the `src/examples/` directory.
 
 Getting FC-Gram tables
 ----------------------

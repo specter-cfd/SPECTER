@@ -66,6 +66,7 @@
       USE class_GWorkspace3D
       USE hd_mod
       USE canuto_stepper_mod
+      USE ic_factory
 
 #if defined(DEF_GHOST_CUDA_)
       USE, INTRINSIC :: iso_c_binding
@@ -78,7 +79,6 @@
       TYPE(GStateComp), ALLOCATABLE, TARGET :: field(:), field_nxt(:), force(:)
       COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: vx,vy,vz
       COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: fx,fy,fz
-      COMPLEX(KIND=GP), POINTER, DIMENSION (:,:,:) :: pr
 #ifdef SCALAR_
       COMPLEX(KIND=GP), ALLOCATABLE, DIMENSION (:,:,:) :: th,fs
 #endif
@@ -170,6 +170,7 @@
       TYPE(HDSolver), TARGET :: fluid
       TYPE(CanutoStepper)  :: stepper
       TYPE(GStepperTraits) :: straits
+      CLASS(icChain), ALLOCATABLE :: iclist(:)
 
 #ifdef SCALAR_
       TYPE(BCPLAN)          :: splanbc
@@ -648,7 +649,6 @@
 #ifndef TESTS_  /* If building tests jump to after Runge-Kutta*/
 ! Set up boundary conditions
       CALL fluid%Solver_ctor('parameter.inp',workspace,planio)
-      pr => fluid%pr_
 
 ! Time stepper (Canuto); by now the order is ORD, set at compile time
       straits%itype  = 1
@@ -657,6 +657,9 @@
       straits%nstate = fluid%state_size()
       straits%sname  = 'TRADITIONAL'
       CALL stepper%GStepper_ctor(straits,workspace,fluid)
+
+! Initial conditions (see ic/ic_factory.f90)
+      iclist = init_ic_from_file('parameter.inp')
 
 #ifdef SCALAR_
       CALL setup_bc(splanbc,planfc, &
@@ -684,15 +687,6 @@
       tind = 0                          ! index for the binaries
       timet = tstep
       timec = cstep
-      INCLUDE 'initialv.f90'            ! initial velocity
-      ! Zero pressure gradient
-      DO i=ista,iend
-      DO j=1,ny
-      DO k=1,nz-Cz
-         pr(k,j,i)  = 0._GP
-      ENDDO
-      ENDDO
-      ENDDO
 #ifdef SCALAR_
       INCLUDE 'initials.f90'            ! initial scalar density
 #endif
@@ -712,52 +706,8 @@
 ! If stat.ne.0 a previous run is continued
       ini = int((stat-1)*tstep) + 1
       tind = int(stat)
-      WRITE(ext, fmtext) tind
       timet = 0
       timec = int(modulo(float(ini-1),float(cstep)))
-
-      CALL io_read(1,idir,'vx',ext,planio,R1)
-      CALL io_read(1,idir,'vy',ext,planio,R2)
-      CALL io_read(1,idir,'vz',ext,planio,R3)
-      CALL fftp3d_real_to_complex(planfc,R1,vx,MPI_COMM_WORLD)
-      CALL fftp3d_real_to_complex(planfc,R2,vy,MPI_COMM_WORLD)
-      CALL fftp3d_real_to_complex(planfc,R3,vz,MPI_COMM_WORLD)
-
-      CALL io_read(1,idir,'pr',ext,planio,R1)
-      CALL fftp2d_real_to_complex_xy(planfc,R1,pr,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz-Cz
-               pr(k,j,i) = pr(k,j,i)*dt   ! Convert to p'
-             END DO
-          END DO
-      END DO
-
-      rmp = 1.0_GP/ &
-        (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               C1(k,j,i) = vx(k,j,i)*rmp
-               C2(k,j,i) = vy(k,j,i)*rmp
-               C3(k,j,i) = vz(k,j,i)*rmp
-            END DO
-         END DO
-      END DO
-
-      IF (stat .eq. 1) THEN
-         CALL fftp3d_complex_to_real(planfc,C1,R1,MPI_COMM_WORLD)
-         CALL fftp3d_complex_to_real(planfc,C2,R2,MPI_COMM_WORLD)
-         CALL fftp3d_complex_to_real(planfc,C3,R3,MPI_COMM_WORLD)
-         CALL io_write(1,odir,'vx','0000',planio,R1)
-         CALL io_write(1,odir,'vy','0000',planio,R2)
-         CALL io_write(1,odir,'vz','0000',planio,R3)
-      ENDIF
-
 
 #ifdef SCALAR_
       CALL io_read(1,idir,'th',ext,planio,R1)
@@ -802,7 +752,9 @@
 #endif
       ENDIF IC
 
+! Initial conditions for the fields (iclist in &initial_conditions);
 ! field_nxt is the state that is advanced and written
+      CALL init_allstates(iclist,fluid,field)
       CALL GState_copy(field_nxt,field)
 
 !

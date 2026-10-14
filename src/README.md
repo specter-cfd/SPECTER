@@ -132,19 +132,20 @@ control the length of the time label used to name these files.
 
 ### 2.2 Compiling the code:
 
-Initial conditions for the fields and the external forcings are
-defined in the files `initial*.f90`. Examples of these files can
-be found in the directory `examples`.
+The initial velocity field is chosen at run time, with the list
+`initial_conditions` in `parameter.inp` (see section 3.1). External
+forcings, and initial conditions for other fields, are still
+defined at compile time in the files `initial*.f90`. Examples of
+these files can be found in the directory `examples`.
 
 Note that the name of all files in the directory `examples` finish
 with `_example-name`. To use any of these files, you must copy the
 file to the `src` directory and remove the `_example-name` from
-the name of the file. As an example, to use null initial
-conditions for the velocity field, from the `src` directory you
-must do
+the name of the file. As an example, to use a null mechanical
+forcing, from the `src` directory you must do
 
 ```
-cp examples/initialv.f90_null initialv.f90
+cp examples/initialfv.f90_null initialfv.f90
 ```
 
 Check the Makefile to see all paths and variables are correct. This
@@ -321,14 +322,41 @@ vparam0 = 0.90    ! free parameter for the velocity
 
 These variables are:
 - `f0`  : amplitude of the external force.
-- `u0`  : amplitude of the initial velocity field.
 - `kdn` and `kup`: lower and upper bounds in Fourier space for the
-      external force and/or the initial velocity field.
+      external force.
 - `nu`  : kinematic viscosity
 - `fparam0-9`: variables that can be used to adjust the amplitude of
     individual terms in the expressions of the external force. See the
     files `initialf*` in the directory `examples` for more details.
-- `vparam0-9`: idem for the initial velocity field.
+
+`u0` and `vparam0-9` are still accepted in this list, but the
+initial conditions no longer use them: each one has its own list.
+
+# 
+The initial velocity field is set by the list 'initial_conditions':
+
+```
+&initial_conditions
+iclist = "cbnoise_v;couette_v"
+/
+```
+
+`iclist` holds one or more initial conditions separated by `;`,
+applied in order (see `ic/ic_velocity.f90`):
+- `read_v`: reads vx, vy and vz from `idir`, numbered by `stat`
+    (to continue a run).
+- `null_v`: null velocity field.
+- `cbnoise_v`: incompressible noise that satisfies no-slip at the
+    walls (Clever & Busse), with parameters in the list `cbnoise_v`
+    (`u0`, `kdn`, `kup`, `nmin`, `nmax` and `rphase`).
+- `couette_v`: adds to vx the laminar Couette profile between the
+    wall velocities `vxzsta` and `vxzend` (list `couette_v`).
+- `poiseuille_v`: adds to vx the laminar Poiseuille profile of the
+    forcing `f0` with viscosity `nu` (list `poiseuille_v`).
+
+The profiles add to the previous field, so they go after another
+initial condition: `"cbnoise_v;couette_v"` is noise plus Couette,
+and `"null_v;couette_v"` the laminar flow alone.
 
 # 
 And then the boundary conditions are specified with

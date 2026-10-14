@@ -12,8 +12,9 @@
 !
 ! Versión de SPECTER del hd_solver.f90 de GHOST (rama new_paradigm,
 ! afaf9ea), que se arma de a un método por vez. init lee nu de
-! &velocity y &velbound, arma el plan de bordes y reserva la presión;
-! dudt calcula el lado derecho sin la presión y end_stage impone las
+! &velocity y &velbound, arma el plan de bordes, y reserva e inicializa
+! la presión (init_pressure: cero en una corrida nueva, leída del
+! archivo pr al continuar una); dudt calcula el lado derecho sin la presión y end_stage impone las
 ! paredes y proyecta después de cada etapa del RK (las llama el
 ! integrador, src/steppers/canuto_stepper.f90); global y write_states
 ! escriben las salidas.
@@ -78,9 +79,9 @@ CONTAINS
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Subroutine to initialize the solver
   !! Reads the &velbound namelist, sets up the boundary
-  !! conditions, allocates the pressure and sets sector
-  !! indices. Uses the FC-Gram plan, so it must be called
-  !! after fcgram_create_plan.
+  !! conditions, allocates and initializes the pressure and
+  !! sets sector indices. Uses the FC-Gram plan, so it must
+  !! be called after fcgram_create_plan.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine init_impl(this)
     use commtypes
@@ -171,6 +172,9 @@ CONTAINS
     this%idir_  = idir
     this%odir_  = odir
     this%todir_ = '.'
+
+    ! Initial pressure (uses idir_)
+    call init_pressure(this)
 
     this%nd_      = 3                        ! 3d
     this%nc_      = this%nd_                 ! # field components
@@ -361,6 +365,42 @@ CONTAINS
   ! ===================================================================
   ! Solver specific methods
   ! ===================================================================
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Presión inicial p' = p.dt: cero en una corrida nueva
+  !! (stat=0); al continuar una corrida se lee del archivo pr
+  !! numerado por stat, como la velocidad (ic/ic_velocity.f90)
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine init_pressure(this)
+    use grid
+    use mpivars
+    use commtypes
+    use iovar
+    use status
+    use filefmt
+    use fft
+    implicit none
+
+    class (HDSolver), intent(inout)             :: this
+    real   (kind=GP), pointer, dimension(:,:,:) :: R1
+    integer                                     :: i,j,k
+
+    this%pr_ = 0.0_GP
+    if ( stat .eq. 0 ) return
+    call this%workspace_%get_real_tmp(R1)
+    WRITE(ext, fmtext) stat
+    call io_read(1,this%idir_,'pr',ext,this%planio_,R1)
+    call fftp2d_real_to_complex_xy(planfc,R1,this%pr_,MPI_COMM_WORLD)
+    do i = ista,iend
+       do j = 1,ny
+          do k = 1,nz-Cz
+             this%pr_(k,j,i) = this%pr_(k,j,i)*dt   ! p -> p'
+          end do
+       end do
+    end do
+    call this%workspace_%free_real_tmp(R1)
+  end subroutine init_pressure
+
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Constructor

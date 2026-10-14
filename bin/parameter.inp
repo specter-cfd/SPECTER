@@ -26,12 +26,10 @@ Lz = 1.00            ! length of the box in z
 ! Parameters for the velocity field
 &velocity
 f0 = 1.0             ! amplitude of the mechanical forcing
-u0 = 1.00            ! amplitude of the initial velocity field
 kdn = 2.00           ! minimum wavenumber
 kup = 4.00           ! maximum wavenumber
 nu = 1.e-3           ! kinematic viscosity
 fparam0 = 1.0        ! fparam0-9 can be used to control the forcing
-vparam0 = 1.0        ! idem for the initial velocity field
 /
 
 ! Parameters for the velocity boundary conditions
@@ -42,6 +40,35 @@ vxzsta  = 0.0        ! uniform vx at z=0
 vyzsta  = 0.0        ! uniform vy at z=0
 vxzend  = 0.0        ! uniform vx at z=Lz
 vyzend  = 0.0        ! uniform vy at z=Lz
+/
+
+! Initial conditions for the velocity (see src/ic/ic_velocity.f90),
+! applied in order. couette_v and poiseuille_v add their laminar
+! profile to the previous one, e.g. "cbnoise_v;couette_v"
+&initial_conditions
+iclist = "cbnoise_v" ! read_v, null_v, cbnoise_v, couette_v, poiseuille_v
+/
+
+! Incompressible noise that satisfies no-slip at the walls
+&cbnoise_v
+u0 = 1.00            ! amplitude of the velocity
+kdn = 2.00           ! minimum perpendicular wavenumber
+kup = 4.00           ! maximum perpendicular wavenumber
+nmin = 1             ! minimum Chandrasekhar-Reid harmonic
+nmax = 3             ! maximum Chandrasekhar-Reid harmonic
+rphase = .false.     ! random phase for Psi if .true.
+/
+
+! Laminar Couette profile, added to vx
+&couette_v
+vxzsta = 0.0         ! velocity of the wall at z=0 (as in &velbound)
+vxzend = 0.0         ! velocity of the wall at z=Lz (as in &velbound)
+/
+
+! Laminar Poiseuille profile, added to vx
+&poiseuille_v
+f0 = 1.0             ! amplitude of the forcing (as in &velocity)
+nu = 1.e-3           ! kinematic viscosity (as in &velocity)
 /
 
 ! Parameters for Bousinessq equation's
