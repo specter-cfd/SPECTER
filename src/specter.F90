@@ -73,7 +73,6 @@
       INTEGER :: ihcpu1,ihcpu2
       INTEGER :: ihomp1,ihomp2
       INTEGER :: ihwtm1,ihwtm2
-!$    INTEGER, EXTERNAL     :: omp_get_max_threads
 
       CLASS(EquationBase), ALLOCATABLE, TARGET :: fluid
       CLASS(GStepperBase), ALLOCATABLE :: stepper

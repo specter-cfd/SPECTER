@@ -893,8 +893,8 @@
 
       TYPE(FCPLAN), INTENT(IN) :: plan
 
-      COMPLEX(KIND=GP), INTENT(OUT), TARGET, DIMENSION(plan%z%n,plan%y%n,ista:iend) :: out
-      REAL(KIND=GP), INTENT(IN), TARGET, DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: IN
+      COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: out
+      REAL(KIND=GP), INTENT(IN), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: IN
 
       TYPE(MPI_Request), DIMENSION(0:nprocs-1) :: ireq1,ireq2
       TYPE(MPI_Status)                         :: istatus
@@ -1018,7 +1018,7 @@
       IMPLICIT NONE
 
       TYPE(FCPLAN), INTENT(IN) :: plan
-      COMPLEX(KIND=GP), INTENT(INOUT), TARGET, DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout
       TYPE(MPI_Comm)   , INTENT(IN)            :: comm
 
       INTEGER :: n,C,d
@@ -1148,8 +1148,8 @@
 
       TYPE(FCPLAN), INTENT(IN) :: plan
 
-      COMPLEX(KIND=GP), INTENT(IN), TARGET, DIMENSION(plan%z%n,plan%y%n,ista:iend) :: in 
-      REAL(KIND=GP), INTENT(OUT), TARGET, DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
+      COMPLEX(KIND=GP), INTENT(IN), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: in 
+      REAL(KIND=GP), INTENT(OUT), DIMENSION(plan%x%n,plan%y%n,ksta:kend) :: out
 
       TYPE(MPI_Request), DIMENSION(0:nprocs-1) :: ireq1,ireq2
       TYPE(MPI_Status)                         :: istatus
@@ -1270,7 +1270,7 @@
       IMPLICIT NONE
 
       TYPE(FCPLAN), INTENT(IN) :: plan
-      COMPLEX(KIND=GP), INTENT(INOUT), TARGET, DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout 
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(plan%z%n,plan%y%n,ista:iend) :: inout 
       TYPE(MPI_Comm)   , INTENT(IN)            :: comm
 
       CALL GTStart(htot)

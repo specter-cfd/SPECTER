@@ -520,6 +520,9 @@ MODULE boundary
 
 !NOTE: This generates a NaN, but shouldn't propagate to relevant
 !variables. Written this way is easier for the compiler to vectorize
+! La división por kk2 se hace componente a componente: en el
+! dispositivo no hay división compleja (como en GHOST), y en el host
+! gfortran ya la hace así cuando el divisor es real.
 #if defined(GHOST_GPU)
 !$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
 #else
@@ -529,7 +532,9 @@ MODULE boundary
          DO j = 1,ny
             DO k = 1,nz
                d(k,j,i) = -im*(kx(i)*a(k,j,i) + ky(j)*b(k,j,i) + &
-                               kz(k)*c(k,j,i))/kk2(k,j,i)
+                               kz(k)*c(k,j,i))
+               d(k,j,i) = CMPLX(REAL(d(k,j,i),kind=GP)/kk2(k,j,i), &
+                                AIMAG(d(k,j,i))/kk2(k,j,i),kind=GP)
             END DO
           END DO
       END DO
@@ -596,7 +601,9 @@ MODULE boundary
 #if defined(GHOST_GPU)
 !$omp target if(target: gdev_active)
 #endif
-            coefbuf(1,1,1) = (bc(2,1,1)-bc(1,1,1))/Lz
+            coefbuf(1,1,1) = bc(2,1,1)-bc(1,1,1)
+            coefbuf(1,1,1) = CMPLX(REAL(coefbuf(1,1,1),kind=GP)/Lz, &
+                                   AIMAG(coefbuf(1,1,1))/Lz,kind=GP)
             coefbuf(2,1,1) = bc(1,1,1)
 #if defined(GHOST_GPU)
 !$omp end target

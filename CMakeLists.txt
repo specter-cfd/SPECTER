@@ -273,16 +273,15 @@ add_subdirectory("${SRC_DIR}/tools")
 
 # ---------------------- Main executable ------------------------------
 add_executable(${SOLVER} "${SRC_DIR}/specter.F90")
+# Solo las bibliotecas de arriba: las demás llegan por sus dependencias.
+# Each archive must appear once: with amdflang a duplicate makes the
+# device link fail with duplicate symbols, and listing a library before
+# one that depends on it makes CMake repeat it.
 target_link_libraries(${SOLVER}
     PRIVATE
         project_includes
         project_gpu
         project_defs
-        mpiio_lib
-        pseudo_lib
-        boundary_lib
-        pdes_lib
-        memmgt_lib
         ic_lib
         # Todavía no implementados en SPECTER:
         # particles_lib

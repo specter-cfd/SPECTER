@@ -52,6 +52,7 @@
   MODULE threads
 !
 ! nth: number of threads used in OpenMP loops and FFTs
+!$    USE omp_lib
       INTEGER :: nth
       SAVE
 

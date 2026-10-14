@@ -415,9 +415,9 @@ MODULE fcgram
       ! Y direction
       ! ...........
       IF ( boun .eq. 3 .AND. ord .eq. 1 .AND. ALLOCATED(plan%y%neu) ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,nz-Cz
                f(j,1,i) = plan%y%neu(dy)*f(j,1,i)
                DO k=1,dy-1
@@ -426,9 +426,9 @@ MODULE fcgram
             ENDDO
          ENDDO
       ELSEIF ( boun .eq. 3 .AND. ord .eq. 2 .AND. ALLOCATED(plan%y%neu) ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,nz-Cz
                f(j,1,i) = plan%y%neu2(dy)*f(j,1,i)
                DO k=1,dy-1
@@ -437,9 +437,9 @@ MODULE fcgram
             ENDDO
          ENDDO
       ELSEIF ( boun .eq. 4 .AND. ord .eq. 1 .AND. ALLOCATED(plan%y%neu) ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,nz-Cz
                f(j,ny-Cy,i) = plan%y%neu(dy)*f(j,ny-Cy,i)
                DO k=1,dy-1
@@ -448,9 +448,9 @@ MODULE fcgram
             ENDDO
          ENDDO
       ELSEIF ( boun .eq. 4 .AND. ord .eq. 2 .AND. ALLOCATED(plan%y%neu) ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,nz-Cz
                f(j,ny-Cy,i) = plan%y%neu2(dy)*f(j,ny-Cy,i)
                DO k=1,dy-1
@@ -462,9 +462,9 @@ MODULE fcgram
       ! Z direction
       ! ...........
       ELSEIF ( boun .eq. 5 .AND. ord .eq. 1 .AND. ALLOCATED(plan%z%neu) ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                f(1,j,i) = plan%z%neu(dz)*f(1,j,i)
                DO k=1,dz-1
@@ -473,9 +473,9 @@ MODULE fcgram
             ENDDO
          ENDDO
       ELSEIF ( boun .eq. 5 .AND. ord .eq. 2 .AND. ALLOCATED(plan%z%neu2) ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                f(1,j,i) = plan%z%neu2(dz)*f(1,j,i)
                DO k=1,dz-1
@@ -484,9 +484,9 @@ MODULE fcgram
             ENDDO
          ENDDO
       ELSEIF ( boun .eq. 6 .AND. ord .eq. 1 .AND. ALLOCATED(plan%z%neu) ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                f(nz-Cz,j,i) = plan%z%neu(dz)*f(nz-Cz,j,i)
                DO k=1,dz-1
@@ -495,9 +495,9 @@ MODULE fcgram
             ENDDO
          ENDDO
       ELSEIF ( boun .eq. 6 .AND. ord .eq. 2 .AND. ALLOCATED(plan%z%neu2) ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                f(nz-Cz,j,i) = plan%z%neu2(dz)*f(nz-Cz,j,i)
                DO k=1,dz-1
@@ -586,9 +586,9 @@ MODULE fcgram
       ! Y direction
       ! ...........
       IF ( boun .eq. 3 ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,nz-Cz
                f(j,1,i) = plan%y%neu(dy)*f(j,1,i)
                DO k=1,dy-1
@@ -599,9 +599,9 @@ MODULE fcgram
             ENDDO
          ENDDO
       ELSEIF ( boun .eq. 4 ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,nz-Cz
                f(j,ny-Cy,i) = plan%y%neu(dy)*f(j,ny-Cy,i)
                DO k=1,dy-1
@@ -615,9 +615,9 @@ MODULE fcgram
       ! Z direction
       ! ...........
       ELSEIF ( boun .eq. 5 ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                f(1,j,i) = plan%z%neu(dz)*f(1,j,i)
                DO k=1,dz-1
@@ -628,9 +628,9 @@ MODULE fcgram
             ENDDO
          ENDDO
       ELSEIF ( boun .eq. 6 ) THEN
-!$omp paralleldo if (iend-ista.ge.nth) private (j,k,tmp)
+!$omp paralleldo if (iend-ista.ge.nth) private (j,k)
          DO i=ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k,tmp)
+!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j=1,ny
                f(nz-Cz,j,i) = plan%z%neu(dz)*f(nz-Cz,j,i)
                DO k=1,dz-1

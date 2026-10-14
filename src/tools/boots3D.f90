@@ -29,7 +29,18 @@
 ! 14 Oct 2026: The new grid is read at run time from the &grid
 !              namelist in boots.inp (grid_init), as in GHOST, and
 !              tasks outside the truncated communicator no longer
-!              copy unset data (as fixed in GHOST).
+!              copy unset data (as fixed in GHOST). BOOTS runs on
+!              the host also in offload builds (see below).
+!
+! BOOTS is a host program. In offload builds (P_GPU) nothing is sent
+! to the device: gdev_active is never set, so the FFTs take the host
+! FFTW path of fftp-gpu and the loops run on the host. The device
+! path is not used because fftp-gpu creates its exchange buffers and
+! block tables once, for the first plan and the full set of tasks,
+! while BOOTS needs two grids (old and new) with different numbers of
+! tasks. Note that fftp3d_create_plan creates the device plans and
+! registers its buffers anyway, so an offload build of BOOTS must run
+! in a node with a visible GPU and call device_init.
 !======================================================================
 
 
@@ -102,12 +113,15 @@
       CALL MPI_INIT(ierr)
       CALL MPI_COMM_SIZE(MPI_COMM_WORLD,nprocs,ierr)
       CALL MPI_COMM_RANK(MPI_COMM_WORLD,myrank,ierr)
-! In offload builds the FFT plans register their buffers on the
-! device, so the task must be bound to a GPU (no-op otherwise)
-      CALL device_init(myrank)
 ! Initializes the grid. This must be done early to have nx, ny, nz.
 ! The new (prolongated) grid is read from &grid in boots.inp
       CALL grid_init('boots.inp')
+
+! Binds this MPI task to a GPU in offload builds (no-op otherwise):
+! the FFT plans register their exchange buffers on the device even
+! though BOOTS transforms on the host (see the header)
+      CALL device_init(myrank)
+
       idir   = '.'
       odir   = '.'
       tdir   = '.'
