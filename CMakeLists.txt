@@ -15,7 +15,9 @@
 # -DP_HYBRID=ON (multithreaded, default: OFF)
 # -DP_GPU=ON -DGPU_VENDOR=NVIDIA|AMD -DGPU_ARCH=<arch> (OpenMP offload,
 #    default: OFF; needs nvfortran, flang, or amdflang, see src/README)
-# P_HYBRID, P_GPU y GPU_* todavía no tienen efecto en SPECTER.
+# P_HYBRID sola todavía no tiene efecto en SPECTER (está bloqueada en
+# UserConfig.cmake); P_GPU sí, y la enciende. Probado con amdflang en
+# las AMD MI210 (GPU_VENDOR=AMD, GPU_ARCH=gfx90a).
 # -------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.12)

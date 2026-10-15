@@ -1,8 +1,8 @@
-Cambios de los archivos de CMake de SPECTER respecto de los de GHOST (rama new_paradigm, commit afaf9ea). Por ahora se compila solo HD, en CPU. CMake es el único build: el Makefile viejo de SPECTER (src/Makefile, src/Makefile.in y los de cada carpeta) ya no está, y las menciones a Makefile.in de abajo dicen de dónde salió cada valor. Del SPECTER original quedó solo lo que usa HD, más boots: no están los otros solvers, el código para CUDA (fftp-cu) ni las pruebas.
+Cambios de los archivos de CMake de SPECTER respecto de los de GHOST (rama new_paradigm, commit afaf9ea). Por ahora se compila solo HD, en CPU y en GPU (probado con amdflang en las AMD MI210). CMake es el único build: el Makefile viejo de SPECTER (src/Makefile, src/Makefile.in y los de cada carpeta) ya no está, y las menciones a Makefile.in de abajo dicen de dónde salió cada valor. Del SPECTER original quedó solo lo que usa HD, más boots: no están los otros solvers, el código para CUDA (fftp-cu) ni las pruebas.
 
 CMakeLists.txt (raíz)
 - Parte de una copia literal del de GHOST y conserva todas sus secciones.
-- El proyecto se llama SPECTER. El encabezado aclara que PRECISION vale DOUBLE por defecto y que P_HYBRID, P_GPU y GPU_* todavía no tienen efecto.
+- El proyecto se llama SPECTER. El encabezado aclara que PRECISION vale DOUBLE por defecto y que P_HYBRID sola todavía no tiene efecto (P_GPU sí, y la enciende).
 - Flags de gfortran: las de Makefile.in salvo -mfpmath=both (-O3 -funroll-loops -mtune=native) en vez de -O4 -funroll-loops. Con -mfpmath=both gfortran usa registros x87 de 80 bits según cómo quede compilado cada archivo, y dos versiones del código que hacen las mismas cuentas dejan de dar idénticas byte a byte; sin ella sí (probado el 2026-10-09 al pasar &status a un módulo). La flag queda comentada. Como en GHOST, no se usa -fallow-argument-mismatch: hacía falta por mpif.h y por las llamadas a FFTW de la continuación en y, y ya no están.
 - add_compile_definitions suma IKIND_, que usa fftp_mod.F90.
 - FFT: la biblioteca con FFTW se llama fftp (en GHOST, fftp-3).
@@ -14,7 +14,7 @@ CMakeLists.txt (raíz)
 - Instalador: instala el ejecutable y BOOTS; ghost_python no existe en SPECTER.
 
 UserConfig.cmake
-- Conserva las opciones de GHOST. Salvo PRECISION, todavía no tienen efecto. P_HYBRID está bloqueada: se declara con set(... CACHE BOOL ... FORCE) en vez de option(), para que quede en OFF aunque se pase -DP_HYBRID=ON.
+- Conserva las opciones de GHOST. Tienen efecto PRECISION y las de GPU (P_GPU, GPU_VENDOR, GPU_ARCH). P_HYBRID está bloqueada: se declara con set(... CACHE BOOL ... FORCE) en vez de option(), para que quede en OFF aunque se pase -DP_HYBRID=ON; P_GPU la enciende igual, como en GHOST.
 - PRECISION vale DOUBLE por defecto (en GHOST, SINGLE), como en Makefile.in.
 - FFTP vale fftp (en GHOST, fftp-3).
 - IKIND, CSIZE y NSTRIP se toman de Makefile.in: IKIND=8 no existe en GHOST, CSIZE=32 en vez de 8 y NSTRIP=1 igual.

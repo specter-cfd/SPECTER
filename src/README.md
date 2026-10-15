@@ -94,9 +94,35 @@ length of the time label used to name these files.
 
 ### 2.2. Parallelization:
 
-`SPECTER` uses 1D domain decomposition with pure MPI parallelization.
-The options for hybrid OpenMP-MPI parallelization and for GPUs in
-`UserConfig.cmake` come from `GHOST` and have no effect yet.
+`SPECTER` uses 1D domain decomposition with MPI. As in `GHOST`, the
+field computations can be offloaded to GPUs with OpenMP target
+directives. The offload build is selected with, e.g.,
+
+```
+cmake .. -DPRECISION=SINGLE -DP_GPU=ON -DGPU_VENDOR=AMD -DGPU_ARCH=gfx90a
+```
+
+`P_GPU` implies `P_HYBRID` and selects the `fftp-gpu` FFT backend
+(`src/fftp-gpu`): hipFFT or cuFFT on the device, with the FC-Gram
+continuation in z also done on the device, and FFTW on the host. It
+needs a Fortran compiler with OpenMP offload (tested: ROCm amdflang
+on AMD MI210 GPUs) and an MPI library built with the same compiler,
+preferably GPU-aware (UCX with the ROCm transports, e.g.
+`OMPI_MCA_pml=ucx UCX_TLS=rocm_copy,rocm_ipc,sm,self,tcp`; otherwise
+set `GHOST_GPU_EXCHANGE=staged`). Each MPI task is bound to the GPU
+number rank modulo (GPUs per node), so the number of tasks per node
+must be a multiple of the number of GPUs per node.
+
+The fields live on the device during the time step (right-hand side,
+walls and projection, Runge-Kutta stages) and their host copies are
+refreshed only for output and diagnostics, which run on the host.
+Those diagnostics still use automatic arrays, which flang places on
+the stack, so offload runs need `ulimit -s unlimited`. GPU results
+agree with the CPU ones up to round-off, not bit for bit. `BOOTS`
+runs on the host in offload builds, but needs a node with a GPU.
+
+Hybrid OpenMP-MPI parallelization without GPUs is still blocked in
+`UserConfig.cmake`.
 
 ### 2.3. Structure of the code:
 

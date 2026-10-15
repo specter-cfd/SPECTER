@@ -10,9 +10,9 @@
 # -------------------------------------------------------------------
 
 # ----------------------- Opciones / variantes (GHOST) ---------------
-# Declaradas por compatibilidad con GHOST. Salvo PRECISION, todavía no
-# tienen efecto en SPECTER: solo se compila la versión MPI en CPU.
-# P_HYBRID está bloqueada: queda siempre en OFF.
+# Las de GHOST. Tienen efecto PRECISION y las de GPU (P_GPU, GPU_VENDOR
+# y GPU_ARCH; probado con amdflang en las AMD MI210, gfx90a). P_HYBRID
+# está bloqueada: queda en OFF salvo con P_GPU, que la enciende.
 set(P_HYBRID   OFF      CACHE BOOL   "Enable hybrid OpenMP (bloqueada en SPECTER)" FORCE)
 option(P_GPU    "Enable OpenMP offload to GPUs (implies P_HYBRID)" OFF)
 set(GPU_VENDOR "NVIDIA" CACHE STRING "GPU vendor for P_GPU (NVIDIA or AMD)")
