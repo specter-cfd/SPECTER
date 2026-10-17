@@ -17,7 +17,7 @@
 !           index 'j' moves in the 'y' direction (or ky)
 !           index 'k' moves in the 'z' direction (or kz)
 !
-! Organizado como el main de GHOST (rama new_paradigm, afaf9ea): el
+! Organizado como el main de GHOST (rama new_paradigm, cb6943d): el
 ! solver (&pdes), las condiciones iniciales (&initial_conditions), el
 ! forzado (&forcing) y el integrador (&stepper) se eligen al correr,
 ! con sus fábricas. Por ahora el único solver es HD. En las

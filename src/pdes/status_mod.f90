@@ -1,7 +1,7 @@
 !=================================================================
 ! General MODULES for pde methods
 !
-! Adaptado de status_mod.f90 de GHOST (rama new_paradigm, afaf9ea).
+! Adaptado de status_mod.f90 de GHOST (rama new_paradigm, cb6943d).
 ! Diferencias: suma tdir (tablas del FC-Gram), no tiene sstep ni los
 ! contadores de los espectros (SPECTER no los escribe) y status_init
 ! no usa grid, kes ni ali.

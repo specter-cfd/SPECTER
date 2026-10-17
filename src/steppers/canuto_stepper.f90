@@ -9,7 +9,7 @@
 !              norder = 2, or for linear ODEs/PDEs.
 !
 ! Versión de SPECTER del canuto_stepper.f90 de GHOST (rama
-! new_paradigm, afaf9ea): solo el paso de los campos, y después de
+! new_paradigm, cb6943d): solo el paso de los campos, y después de
 ! actualizar cada etapa llama a solver%end_stage, donde cada solver
 ! aplica su corrección (en HD con paredes, imponer los bordes y
 ! proyectar).

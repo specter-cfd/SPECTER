@@ -15,7 +15,7 @@
 !   poiseuille_v : Adds the laminar Poiseuille profile to vx
 !
 ! Versión de SPECTER del ic_velocity.f90 de GHOST (rama new_paradigm,
-! afaf9ea). read_v hace lo mismo que hacía el main de SPECTER al
+! cb6943d). read_v hace lo mismo que hacía el main de SPECTER al
 ! continuar una corrida. Respecto del de GHOST, transforma con planfc
 ! (el plan del FC-Gram) en vez de planrc, y con stat=1 escribe además
 ! la velocidad leída como la salida 0000. null_v es el de GHOST.

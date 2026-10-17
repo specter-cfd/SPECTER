@@ -5,7 +5,7 @@
 ! conditions for all fields in a pde solver.
 !
 ! Versión de SPECTER del ic_factory.f90 de GHOST (rama new_paradigm,
-! afaf9ea), con las condiciones iniciales de la velocidad que ya están
+! cb6943d), con las condiciones iniciales de la velocidad que ya están
 ! en ic_velocity.f90.
 !
 ! DATE : 04/08/26 (PDM)

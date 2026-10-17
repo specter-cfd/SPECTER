@@ -5,7 +5,7 @@
 ! and forcing update methods for all fields in a pde solver.
 !
 ! Versión de SPECTER del force_factory.f90 de GHOST (rama
-! new_paradigm, afaf9ea), con los forzados de la velocidad de
+! new_paradigm, cb6943d), con los forzados de la velocidad de
 ! force_velocity.f90 y solo el método constant_fv (forzado constante
 ! en el tiempo). Sin métodos shuffle no hace falta agrandar el pool,
 ! así que workspace no se usa.

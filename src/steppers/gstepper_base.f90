@@ -3,7 +3,7 @@
 ! DESCRIPTION: Forms base class for all time steppers
 !
 ! Versión de SPECTER del gstepper_base.f90 de GHOST (rama new_paradigm,
-! afaf9ea), sin partículas: solo el paso de los campos (step), y el
+! cb6943d), sin partículas: solo el paso de los campos (step), y el
 ! genérico gstep agrupa solo step.
 !
 ! DATE       : 2/8/26 (DLR)

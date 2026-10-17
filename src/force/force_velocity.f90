@@ -15,7 +15,7 @@
 !   constant_fv: Constant forcing (no method)
 !
 ! Versión de SPECTER del force_velocity.f90 de GHOST (rama
-! new_paradigm, afaf9ea). null_fv es el de GHOST y uniform_fv es el
+! new_paradigm, cb6943d). null_fv es el de GHOST y uniform_fv es el
 ! src/initialfv.f90 de SPECTER. tg_fv, abc_fv y random_fv, y los
 ! métodos shift_fv y shuffle_fv, no están: suponen un dominio
 ! periódico en las tres direcciones.

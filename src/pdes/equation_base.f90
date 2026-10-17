@@ -3,7 +3,7 @@
 ! DESCRIPTION: Forms base class for all PDEs
 !
 ! Versión de SPECTER del equation_base.f90 de GHOST (rama new_paradigm,
-! afaf9ea). Quedan solo EquationBase y VelocityBase (sin escalares
+! cb6943d). Quedan solo EquationBase y VelocityBase (sin escalares
 ! pasivos), que es lo que usa HD. Se agrega end_stage, que el integrador
 ! llama después de actualizar cada etapa; por defecto no hace nada, y
 ! los solvers con paredes lo usan para imponer los bordes y proyectar.

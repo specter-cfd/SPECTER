@@ -11,7 +11,7 @@
 !                VELOCITY (VELOCITY+1, VELOCITY+2)
 !
 ! Versión de SPECTER del hd_solver.f90 de GHOST (rama new_paradigm,
-! afaf9ea). init lee &HD y &velbound, arma el plan de bordes, y
+! cb6943d). init lee &HD y &velbound, arma el plan de bordes, y
 ! reserva e inicializa la presión (init_pressure: cero en una corrida
 ! nueva, leída del archivo pr al continuar una); dudt calcula el lado
 ! derecho sin la presión y end_stage impone las paredes y proyecta
