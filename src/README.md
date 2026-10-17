@@ -104,18 +104,21 @@ cmake .. -DPRECISION=SINGLE -DP_GPU=ON -DGPU_VENDOR=AMD -DGPU_ARCH=gfx90a
 
 The scripts in `build/` are complete examples, with the modules,
 compilers and paths of the cluster where they were tested:
-`build_host.sh` builds for the host in `build/host` and
-`build_amd.sh` for the AMD GPUs in `build/amd`, both with the
-precision as their argument.
+`build_host.sh` builds for the host in `build/host`,
+`build_amd.sh` for the AMD GPUs in `build/amd` and
+`build_nvidia.sh` for the NVIDIA GPUs in `build/nvidia-llvm`, all
+with the precision as their argument.
 
 `P_GPU` implies `P_HYBRID` and selects the `fftp-gpu` FFT backend
 (`src/fftp-gpu`): hipFFT or cuFFT on the device, with the FC-Gram
 continuation in z also done on the device, and FFTW on the host. It
 needs a Fortran compiler with OpenMP offload (tested: ROCm amdflang
-on AMD MI210 GPUs) and an MPI library built with the same compiler,
-preferably GPU-aware (UCX with the ROCm transports, e.g.
-`OMPI_MCA_pml=ucx UCX_TLS=rocm_copy,rocm_ipc,sm,self,tcp`; otherwise
-set `GHOST_GPU_EXCHANGE=staged`). Each MPI task is bound to the GPU
+on AMD MI210 GPUs, and LLVM flang 23 on NVIDIA Tesla P4 GPUs) and an
+MPI library built with the same compiler, preferably GPU-aware (for
+AMD, UCX with the ROCm transports, e.g.
+`OMPI_MCA_pml=ucx UCX_TLS=rocm_copy,rocm_ipc,sm,self,tcp`; for
+NVIDIA, OpenMPI built with CUDA support; otherwise set
+`GHOST_GPU_EXCHANGE=staged`). Each MPI task is bound to the GPU
 number rank modulo (GPUs per node), so the number of tasks per node
 must be a multiple of the number of GPUs per node.
 

@@ -20,7 +20,8 @@ make
 make install
 
 The shell scripts in this directory are not needed for compilation, but provide
-examples on how to compile SPECTER with different configurations (host only and
-amd offloading). Each one builds in its own subdirectory (build/host and
-build/amd), takes the precision as an argument, and leaves the executables in
-bin and bin/amd.
+examples on how to compile SPECTER with different configurations (host only,
+amd offloading, and nvidia offloading with LLVM or NVIDIA compilers). Each one
+builds in its own subdirectory (build/host, build/amd and build/nvidia-llvm or
+build/nvidia-nvhpc), takes the precision as an argument, and leaves the
+executables in bin, bin/amd and bin/nvidia.

@@ -17,7 +17,8 @@
 #    default: OFF; needs nvfortran, flang, or amdflang, see src/README)
 # P_HYBRID sola todavía no tiene efecto en SPECTER (está bloqueada en
 # UserConfig.cmake); P_GPU sí, y la enciende. Probado con amdflang en
-# las AMD MI210 (GPU_VENDOR=AMD, GPU_ARCH=gfx90a).
+# las AMD MI210 (GPU_VENDOR=AMD, GPU_ARCH=gfx90a) y con el flang de
+# LLVM 23 en las NVIDIA Tesla P4 (GPU_VENDOR=NVIDIA, GPU_ARCH=sm_61).
 # -------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.12)

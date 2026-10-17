@@ -11,7 +11,8 @@
 
 # ----------------------- Opciones / variantes (GHOST) ---------------
 # Las de GHOST. Tienen efecto PRECISION y las de GPU (P_GPU, GPU_VENDOR
-# y GPU_ARCH; probado con amdflang en las AMD MI210, gfx90a). P_HYBRID
+# y GPU_ARCH; probado con amdflang en las AMD MI210, gfx90a, y con el
+# flang de LLVM 23 en las NVIDIA Tesla P4, sm_61). P_HYBRID
 # está bloqueada: queda en OFF salvo con P_GPU, que la enciende.
 set(P_HYBRID   OFF      CACHE BOOL   "Enable hybrid OpenMP (bloqueada en SPECTER)" FORCE)
 option(P_GPU    "Enable OpenMP offload to GPUs (implies P_HYBRID)" OFF)
