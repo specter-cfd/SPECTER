@@ -518,7 +518,7 @@
       ELSE IF (kin .eq. 0) THEN
          CALL curlk(b,c,C1,1)
          CALL curlk(a,c,C2,2)
-         CALL curlk(a,c,C3,2)
+         CALL curlk(a,b,C3,3)
          V1 => C1; V2 => C2; V3 => C3
 
       ! Compute the energy of the curl^2 of the field (a,b,c)
