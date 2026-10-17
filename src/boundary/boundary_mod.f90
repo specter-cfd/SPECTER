@@ -878,6 +878,7 @@ MODULE boundary
       USE grid
       USE fcgram
       USE mpivars
+      USE class_GWorkspace3D, ONLY: gws
       USE commtypes
 !$    USE threads
       IMPLICIT NONE
@@ -889,14 +890,16 @@ MODULE boundary
 
       DOUBLE PRECISION, INTENT(OUT) :: bot,top
 
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend)  :: C1
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:)   :: C1
       REAL(KIND=GP), DIMENSION(ny,ista:iend)        :: R1,R2
 
       DOUBLE PRECISION   :: botloc,toploc
       REAL(KIND=GP)      :: tmp
 
       INTEGER  :: i,j,k
+      LOGICAL  :: bret
 
+      CALL gws%get_complex_htmp(C1,bret)
       tmp = (1.0_GP/(planfc%x%n*planfc%y%n*planfc%z%n))**2
 
       bot    = 0d0; top    = 0d0
@@ -977,6 +980,7 @@ MODULE boundary
       CALL MPI_REDUCE(toploc,top,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,&
           MPI_COMM_WORLD,ierr)
 
+      CALL gws%free_complex_htmp(C1)
       RETURN
       END SUBROUTINE bouncheck_z
 

@@ -116,8 +116,8 @@ must be a multiple of the number of GPUs per node.
 The fields live on the device during the time step (right-hand side,
 walls and projection, Runge-Kutta stages) and their host copies are
 refreshed only for output and diagnostics, which run on the host.
-Those diagnostics still use automatic arrays, which flang places on
-the stack, so offload runs need `ulimit -s unlimited`. GPU results
+As in `GHOST`, those diagnostics take their temporaries from a
+host-only pool, so no field-sized arrays go on the stack. GPU results
 agree with the CPU ones up to round-off, not bit for bit. `BOOTS`
 runs on the host in offload builds, but needs a node with a GPU.
 

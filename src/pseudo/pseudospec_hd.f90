@@ -155,60 +155,67 @@
 !          =2 computes the y-component
 !          =3 computes the z-component
 !
+! Each component is computed in one pass, c = i (k_2 b - k_1 a),
+! without temporaries (rotor3 de GHOST).
+!
       USE fprecision
+      USE kes
+      USE var
       USE grid
       USE mpivars
-!$    USE threads
+      USE gdevice, ONLY: gdev_active
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT (IN), DIMENSION(nz,ny,ista:iend) :: a,b
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend) :: c
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: c1,c2
       INTEGER, INTENT(IN) :: dir
       INTEGER             :: i,j,k
 
 !
-! Computes the x-component
+! Computes the x-component: c = d_y(b) - d_z(a)
 !
       IF (dir.eq.1) THEN
-         CALL derivk(a,c1,3)
-         CALL derivk(b,c2,2)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k = 1,nz
-                  c(k,j,i) = c2(k,j,i)-c1(k,j,i)
+                  c(k,j,i) = im*(ky(j)*b(k,j,i)-kz(k)*a(k,j,i))
                END DO
             END DO
          END DO
 !
-! Computes the y-component
+! Computes the y-component: c = d_z(a) - d_x(b)
 !
       ELSE IF (dir.eq.2) THEN
-         CALL derivk(a,c1,3)
-         CALL derivk(b,c2,1)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k = 1,nz
-                  c(k,j,i) = c1(k,j,i)-c2(k,j,i)
+                  c(k,j,i) = im*(kz(k)*a(k,j,i)-kx(i)*b(k,j,i))
                END DO
             END DO
          END DO
 !
-! Computes the z-component
+! Computes the z-component: c = d_x(b) - d_y(a)
 !
       ELSE
-         CALL derivk(a,c1,2)
-         CALL derivk(b,c2,1)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
          DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
             DO j = 1,ny
                DO k = 1,nz
-                  c(k,j,i) = c2(k,j,i)-c1(k,j,i)
+                  c(k,j,i) = im*(kx(i)*b(k,j,i)-ky(j)*a(k,j,i))
                END DO
             END DO
          END DO
@@ -369,23 +376,32 @@
 !     e  : product [curl(A)xA]_y in Fourier space [output]
 !     f  : product [curl(A)xA]_z in Fourier space [output]
 !
+! Los temporarios salen del pool del workspace (gws), como en el
+! prodre3 de GHOST, para que existan en el dispositivo.
+!
       USE fprecision
       USE commtypes
       USE mpivars
       USE grid
       USE fft
-!$    USE threads
+      USE class_GWorkspace3D, ONLY: gws
+      USE gdevice, ONLY: gdev_active
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT (IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
       COMPLEX(KIND=GP), INTENT(OUT), DIMENSION(nz,ny,ista:iend) :: d,e,f
-      REAL(KIND=GP), DIMENSION(nx,ny,ksta:kend)    :: r1,r2
-      REAL(KIND=GP), DIMENSION(nx,ny,ksta:kend)    :: r3,r4
-      REAL(KIND=GP), DIMENSION(nx,ny,ksta:kend)    :: r5,r6
-      REAL(KIND=GP), DIMENSION(nx,ny,ksta:kend)    :: r7
+      REAL(KIND=GP), POINTER, DIMENSION(:,:,:) :: r1,r2,r3,r4,r5,r6,r7
       REAL(KIND=GP)    :: tmp
       INTEGER :: i,j,k
+      LOGICAL :: bret
 
+      CALL gws%get_real_tmp(r1,bret)
+      CALL gws%get_real_tmp(r2,bret)
+      CALL gws%get_real_tmp(r3,bret)
+      CALL gws%get_real_tmp(r4,bret)
+      CALL gws%get_real_tmp(r5,bret)
+      CALL gws%get_real_tmp(r6,bret)
+      CALL gws%get_real_tmp(r7,bret)
 !
 ! Computes curl(A)
 !
@@ -398,17 +414,9 @@
 !
 ! Computes A
 !
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               d(k,j,i) = a(k,j,i)
-               e(k,j,i) = b(k,j,i)
-               f(k,j,i) = c(k,j,i)
-            END DO
-         END DO
-      END DO
+      CALL copy(a,d)
+      CALL copy(b,e)
+      CALL copy(c,f)
       CALL fftp3d_complex_to_real(planfc,d,r4,MPI_COMM_WORLD)
       CALL fftp3d_complex_to_real(planfc,e,r5,MPI_COMM_WORLD)
       CALL fftp3d_complex_to_real(planfc,f,r6,MPI_COMM_WORLD)
@@ -417,9 +425,12 @@
 !
       tmp = 1.0_GP/ &
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
-!$omp parallel do if (pkend-ksta.ge.nth) private (j,i)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (i)
+#endif
       DO k = ksta,pkend
-!$omp parallel do if (pkend-ksta.lt.nth) private (i)
          DO j = 1,ny
             DO i = 1,nx
                r7(i,j,k) = (r2(i,j,k)*r6(i,j,k)-r5(i,j,k)*r3(i,j,k))*tmp
@@ -432,6 +443,13 @@
       CALL fftp3d_real_to_complex(planfc,r7,d,MPI_COMM_WORLD)
       CALL fftp3d_real_to_complex(planfc,r3,e,MPI_COMM_WORLD)
       CALL fftp3d_real_to_complex(planfc,r1,f,MPI_COMM_WORLD)
+      CALL gws%free_real_tmp(r1)
+      CALL gws%free_real_tmp(r2)
+      CALL gws%free_real_tmp(r3)
+      CALL gws%free_real_tmp(r4)
+      CALL gws%free_real_tmp(r5)
+      CALL gws%free_real_tmp(r6)
+      CALL gws%free_real_tmp(r7)
 
       RETURN
       END SUBROUTINE prodre
@@ -453,11 +471,16 @@
 !          =1 computes the energy of the field
 !          =2 computes the energy of the curl^2 of the field
 !
+! Los temporarios salen del pool solo del host (gws), como en GHOST.
+! Las tres componentes (V1, V2, V3) se suman en el mismo orden en
+! que se acumulaban en un arreglo real.
+!
       USE fprecision
       USE commtypes
       USE grid
       USE fft
       USE mpivars
+      USE class_GWorkspace3D, ONLY: gws
 !$    USE threads
       IMPLICIT NONE
 
@@ -465,14 +488,18 @@
       INTEGER, INTENT(IN)           :: kin
       DOUBLE PRECISION, INTENT(OUT) :: d
 
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: C1,C2,C3,C4
-      REAL(KIND=GP), DIMENSION(nz,ny,ista:iend)    :: R1
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: C1,C2,C3,C4
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: V1,V2,V3
 
       DOUBLE PRECISION  :: dloc
       REAL(KIND=GP)     :: tmp
       INTEGER           :: i,j,k
+      LOGICAL           :: bret
 
-
+      CALL gws%get_complex_htmp(C1,bret)
+      CALL gws%get_complex_htmp(C2,bret)
+      CALL gws%get_complex_htmp(C3,bret)
+      CALL gws%get_complex_htmp(C4,bret)
       dloc = 0.0D0
       ! One nx*ny from parsevals, an nx*ny*(nz-Cz) from averaging over
       ! physical domain and a nz**2 due to fft normalization.
@@ -482,163 +509,41 @@
 
       ! Computes the energy of field (a,b,c)
       IF (kin .eq. 1) THEN
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  C1(k,j,i) = a(k,j,i)
-               END DO
-            END DO
-         END DO
-         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  R1(k,j,i) = real(C1(k,j,i), kind=GP)**2+aimag(C1(k,j,i))**2
-               ENDDO
-            ENDDO
-         ENDDO
-
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  C1(k,j,i) = b(k,j,i)
-               END DO
-            END DO
-         END DO
-         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
-                                 aimag(C1(k,j,i))**2
-               ENDDO
-            ENDDO
-         ENDDO
-
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  C1(k,j,i) = c(k,j,i)
-               END DO
-            END DO
-         END DO
-         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
-                                 aimag(C1(k,j,i))**2
-               ENDDO
-            ENDDO
-         ENDDO
-
+         CALL copy(a,C1)
+         CALL copy(b,C2)
+         CALL copy(c,C3)
+         V1 => C1; V2 => C2; V3 => C3
 
       ! Compute the energy of the curl of the field (a,b,c)
       ELSE IF (kin .eq. 0) THEN
          CALL curlk(b,c,C1,1)
-         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  R1(k,j,i) = real(C1(k,j,i), kind=GP)**2+aimag(C1(k,j,i))**2
-               ENDDO
-            ENDDO
-         ENDDO
-
-         CALL curlk(a,c,C1,2)
-         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
-                                 aimag(C1(k,j,i))**2
-               ENDDO
-            ENDDO
-         ENDDO
-
-         CALL curlk(a,c,C1,2)
-         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
-                                 aimag(C1(k,j,i))**2
-               ENDDO
-            ENDDO
-         ENDDO
-
+         CALL curlk(a,c,C2,2)
+         CALL curlk(a,c,C3,2)
+         V1 => C1; V2 => C2; V3 => C3
 
       ! Compute the energy of the curl^2 of the field (a,b,c)
       ELSE IF (kin .eq. 2) THEN
          CALL curlk(b,c,C1,1)
          CALL curlk(a,c,C2,2)
          CALL curlk(a,b,C3,3)
-         
+
          CALL curlk(C2,C3,C4,1)
          CALL curlk(C1,C3,C3,2)
          CALL curlk(C1,C2,C1,3)
-
-         CALL fftp1d_complex_to_real_z(planfc,C4,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  R1(k,j,i) = real(C4(k,j,i), kind=GP)**2+aimag(C4(k,j,i))**2
-               ENDDO
-            ENDDO
-         ENDDO
-
-         CALL fftp1d_complex_to_real_z(planfc,C3,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  R1(k,j,i) = R1(k,j,i) + real(C3(k,j,i), kind=GP)**2 +&
-                                 aimag(C3(k,j,i))**2
-               ENDDO
-            ENDDO
-         ENDDO
-
-         CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  R1(k,j,i) = R1(k,j,i) + real(C1(k,j,i), kind=GP)**2 +&
-                                 aimag(C1(k,j,i))**2
-               ENDDO
-            ENDDO
-         ENDDO
+         V1 => C4; V2 => C3; V3 => C1
       ENDIF
-
+      CALL fftp1d_complex_to_real_z(planfc,V1,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,V2,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,V3,MPI_COMM_WORLD)
 
       ! Compute mean value
       IF (ista.eq.1) THEN
 !$omp parallel do private (k) reduction(+:dloc)
          DO j = 1,ny
             DO k = 1,nz-Cz
-               dloc = dloc + R1(k,j,1)*tmp
+               dloc = dloc + (real(V1(k,j,1),kind=GP)**2+aimag(V1(k,j,1))**2+ &
+                              real(V2(k,j,1),kind=GP)**2+aimag(V2(k,j,1))**2+ &
+                              real(V3(k,j,1),kind=GP)**2+aimag(V3(k,j,1))**2)*tmp
             END DO
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:dloc)
@@ -646,7 +551,9 @@
 !$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:dloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  dloc = dloc + 2*R1(k,j,i)*tmp
+                  dloc = dloc + 2*(real(V1(k,j,i),kind=GP)**2+aimag(V1(k,j,i))**2+ &
+                                   real(V2(k,j,i),kind=GP)**2+aimag(V2(k,j,i))**2+ &
+                                   real(V3(k,j,i),kind=GP)**2+aimag(V3(k,j,i))**2)*tmp
                END DO
             END DO
          END DO
@@ -654,18 +561,24 @@
 !$omp parallel do if (iend-ista.ge.nth) private (j,k) reduction(+:dloc)
          DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k) reduction(+:dloc)
-           DO j = 1,ny
-              DO k = 1,nz-Cz
-                 dloc = dloc + 2*R1(k,j,i)*tmp
-              END DO
-           END DO
-        END DO
+            DO j = 1,ny
+               DO k = 1,nz-Cz
+                  dloc = dloc + 2*(real(V1(k,j,i),kind=GP)**2+aimag(V1(k,j,i))**2+ &
+                                   real(V2(k,j,i),kind=GP)**2+aimag(V2(k,j,i))**2+ &
+                                   real(V3(k,j,i),kind=GP)**2+aimag(V3(k,j,i))**2)*tmp
+               END DO
+            END DO
+         END DO
       ENDIF
 
 ! Computes the reduction between nodes
       CALL MPI_REDUCE(dloc,d,1,MPI_DOUBLE_PRECISION,MPI_SUM,0, &
                       MPI_COMM_WORLD,ierr)
 
+      CALL gws%free_complex_htmp(C1)
+      CALL gws%free_complex_htmp(C2)
+      CALL gws%free_complex_htmp(C3)
+      CALL gws%free_complex_htmp(C4)
       RETURN
       END SUBROUTINE energy
 
@@ -682,24 +595,37 @@
 !     c: input matrix in the z-direction
 !     d: at the output contains the helicity
 !
+! Los temporarios salen del pool solo del host (gws), como en GHOST:
+! c1, c2, c3 tienen el campo y c4, c5, c6 su rotor. Los productos de
+! las tres componentes se suman en el mismo orden en que se
+! acumulaban en un arreglo real.
+!
       USE fprecision
       USE commtypes
       USE fft
       USE grid
       USE mpivars
+      USE class_GWorkspace3D, ONLY: gws
 !$    USE threads
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
       DOUBLE PRECISION, INTENT(OUT) :: d
 
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend)             :: c1,c2
-      REAL(KIND=GP), DIMENSION(nz,ny,ista:iend)                :: r1
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: c1,c2,c3
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: c4,c5,c6
 
       DOUBLE PRECISION :: dloc
       REAL(KIND=GP)    :: tmp
       INTEGER          :: i,j,k
+      LOGICAL          :: bret
 
+      CALL gws%get_complex_htmp(c1,bret)
+      CALL gws%get_complex_htmp(c2,bret)
+      CALL gws%get_complex_htmp(c3,bret)
+      CALL gws%get_complex_htmp(c4,bret)
+      CALL gws%get_complex_htmp(c5,bret)
+      CALL gws%get_complex_htmp(c6,bret)
       dloc = 0.0D0
       ! One nx*ny from parsevals, an nx*ny*(nz-Cz) from averaging over
       ! physical domain and a nz**2 due to fft normalization.
@@ -707,79 +633,28 @@
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2 / &
             real(nz-Cz,kind=GP)
 
-      ! Compute the pointwise helicity
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               c1(k,j,i) = a(k,j,i)
-            END DO
-         END DO
-      END DO
-      CALL curlk(b,c,c2,1)
+      ! Computes the field and its curl in (z,ky,kx)
+      CALL copy(a,c1)
+      CALL copy(b,c2)
+      CALL copy(c,c3)
+      CALL curlk(b,c,c4,1)
+      CALL curlk(a,c,c5,2)
+      CALL curlk(a,b,c6,3)
       CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
       CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               r1(k,j,i) = real(c1(k,j,i)*conjg(c2(k,j,i)))
-            END DO
-         END DO
-      END DO
-
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               c1(k,j,i) = b(k,j,i)
-            END DO
-         END DO
-      END DO
-      CALL curlk(a,c,c2,2)
-      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
-      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               r1(k,j,i) = r1(k,j,i) + real(c1(k,j,i)*conjg(c2(k,j,i)))
-            END DO
-         END DO
-      END DO
-
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               c1(k,j,i) = c(k,j,i)
-            END DO
-         END DO
-      END DO
-      CALL curlk(a,b,c2,3)
-      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
-      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               r1(k,j,i) = r1(k,j,i) + real(c1(k,j,i)*conjg(c2(k,j,i)))
-            END DO
-         END DO
-      END DO
+      CALL fftp1d_complex_to_real_z(planfc,c3,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c4,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c5,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c6,MPI_COMM_WORLD)
 
       ! Compute average values
       IF (ista.eq.1) THEN
 !$omp parallel do private (k) reduction(+:dloc)
          DO j = 1,ny
             DO k = 1,nz-Cz
-                 dloc = dloc+r1(k,j,1)*tmp
+               dloc = dloc + (real(c1(k,j,1)*conjg(c4(k,j,1)))+ &
+                              real(c2(k,j,1)*conjg(c5(k,j,1)))+ &
+                              real(c3(k,j,1)*conjg(c6(k,j,1))))*tmp
             END DO
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:dloc)
@@ -787,7 +662,9 @@
 !$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:dloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  dloc = dloc+2*r1(k,j,i)*tmp
+                  dloc = dloc + 2*(real(c1(k,j,i)*conjg(c4(k,j,i)))+ &
+                                   real(c2(k,j,i)*conjg(c5(k,j,i)))+ &
+                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp
                END DO
             END DO
          END DO
@@ -797,7 +674,9 @@
 !$omp parallel do if (iend-ista.lt.nth) private (k) reduction(+:dloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  dloc = dloc+2*r1(k,j,i)*tmp
+                  dloc = dloc + 2*(real(c1(k,j,i)*conjg(c4(k,j,i)))+ &
+                                   real(c2(k,j,i)*conjg(c5(k,j,i)))+ &
+                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp
                END DO
             END DO
          END DO
@@ -806,6 +685,12 @@
       CALL MPI_REDUCE(dloc,d,1,MPI_DOUBLE_PRECISION,MPI_SUM,0, &
                       MPI_COMM_WORLD,ierr)
 
+      CALL gws%free_complex_htmp(c1)
+      CALL gws%free_complex_htmp(c2)
+      CALL gws%free_complex_htmp(c3)
+      CALL gws%free_complex_htmp(c4)
+      CALL gws%free_complex_htmp(c5)
+      CALL gws%free_complex_htmp(c6)
       RETURN
       END SUBROUTINE helicity
 
@@ -828,12 +713,18 @@
 !     kin: =0 computes the inner product of the curls
 !          =1 computes the inner product of the fields
 !
+! Los temporarios salen del pool solo del host (gws), como en GHOST:
+! c1, c2, c3 tienen el primer campo y c4, c5, c6 el segundo. Los
+! productos de las tres componentes se suman en doble precisión y en
+! el mismo orden en que se acumulaban en un arreglo real.
+!
       USE fprecision
       USE commtypes
       USE kes
       USE fft
       USE grid
       USE mpivars
+      USE class_GWorkspace3D, ONLY: gws
 !$    USE threads
       IMPLICIT NONE
 
@@ -841,14 +732,21 @@
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(nz,ny,ista:iend) :: d,e,f
       DOUBLE PRECISION, INTENT(OUT) :: g
 
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend)             :: c1,c2
-      DOUBLE PRECISION, DIMENSION(nz,ny,ista:iend)             :: r1
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: c1,c2,c3
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: c4,c5,c6
 
       DOUBLE PRECISION              :: gloc
       REAL(KIND=GP)                 :: tmp
       INTEGER, INTENT(IN) :: kin
       INTEGER             :: i,j,k
+      LOGICAL             :: bret
 
+      CALL gws%get_complex_htmp(c1,bret)
+      CALL gws%get_complex_htmp(c2,bret)
+      CALL gws%get_complex_htmp(c3,bret)
+      CALL gws%get_complex_htmp(c4,bret)
+      CALL gws%get_complex_htmp(c5,bret)
+      CALL gws%get_complex_htmp(c6,bret)
       gloc = 0.0D0
       ! One nx*ny from parsevals, an nx*ny*(nz-Cz) from averaging over
       ! physical domain and a nz**2 due to fft normalization.
@@ -856,94 +754,37 @@
             (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2/ &
             real(nz-Cz, kind=GP)
 
-      ! Computes the pointwise inner product between the fields
+      ! Computes the fields (or their curls) in (z,ky,kx)
       IF (kin.eq.1) THEN
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  c1(k,j,i) = a(k,j,i)
-                  c2(k,j,i) = d(k,j,i)
-               END DO
-            END DO
-         END DO
+         CALL copy(a,c1)
+         CALL copy(b,c2)
+         CALL copy(c,c3)
+         CALL copy(d,c4)
+         CALL copy(e,c5)
+         CALL copy(f,c6)
       ELSE
          CALL curlk(b,c,c1,1)
-         CALL curlk(e,f,c2,1)
-      ENDIF 
-      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
-      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               r1(k,j,i) = real(c1(k,j,i)*conjg(c2(k,j,i)))
-            END DO
-         END DO
-      END DO
-
-      IF (kin.eq.1) THEN
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  c1(k,j,i) = b(k,j,i)
-                  c2(k,j,i) = e(k,j,i)
-               END DO
-            END DO
-         END DO
-      ELSE
-         CALL curlk(a,c,c1,2)
-         CALL curlk(d,f,c2,2)
+         CALL curlk(a,c,c2,2)
+         CALL curlk(a,b,c3,3)
+         CALL curlk(e,f,c4,1)
+         CALL curlk(d,f,c5,2)
+         CALL curlk(d,e,c6,3)
       ENDIF
       CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
       CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               r1(k,j,i) = r1(k,j,i) + real(c1(k,j,i)*conjg(c2(k,j,i)))
-            END DO
-         END DO
-      END DO
-
-      IF (kin.eq.1) THEN
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-         DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-            DO j = 1,ny
-               DO k = 1,nz
-                  c1(k,j,i) = c(k,j,i)
-                  c2(k,j,i) = f(k,j,i)
-               END DO
-            END DO
-         END DO
-      ELSE
-         CALL curlk(a,b,c1,3)
-         CALL curlk(d,e,c2,3)
-      ENDIF
-      CALL fftp1d_complex_to_real_z(planfc,c1,MPI_COMM_WORLD)
-      CALL fftp1d_complex_to_real_z(planfc,c2,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               r1(k,j,i) = r1(k,j,i) + real(c1(k,j,i)*conjg(c2(k,j,i)))
-            END DO
-         END DO
-      END DO
+      CALL fftp1d_complex_to_real_z(planfc,c3,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c4,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c5,MPI_COMM_WORLD)
+      CALL fftp1d_complex_to_real_z(planfc,c6,MPI_COMM_WORLD)
 
       ! Compute average value
       IF (ista.eq.1) THEN
 !$omp parallel do private (k) reduction(+:gloc)
          DO j = 1,ny
             DO k = 1,nz-Cz
-               gloc = gloc+r1(k,j,1)*tmp
+               gloc = gloc + (DBLE(real(c1(k,j,1)*conjg(c4(k,j,1))))+ &
+                              real(c2(k,j,1)*conjg(c5(k,j,1)))+ &
+                              real(c3(k,j,1)*conjg(c6(k,j,1))))*tmp
             END DO
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:gloc)
@@ -951,7 +792,9 @@
 !$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:gloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  gloc = gloc+2*r1(k,j,i)*tmp
+                  gloc = gloc + 2*(DBLE(real(c1(k,j,i)*conjg(c4(k,j,i))))+ &
+                                   real(c2(k,j,i)*conjg(c5(k,j,i)))+ &
+                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp
                END DO
             END DO
          END DO
@@ -961,7 +804,9 @@
 !$omp parallel do if (iend-ista.lt.nth) private (k) reduction(+:gloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  gloc = gloc+2*r1(k,j,i)*tmp
+                  gloc = gloc + 2*(DBLE(real(c1(k,j,i)*conjg(c4(k,j,i))))+ &
+                                   real(c2(k,j,i)*conjg(c5(k,j,i)))+ &
+                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp
                END DO
             END DO
          END DO
@@ -971,6 +816,12 @@
       CALL MPI_REDUCE(gloc,g,1,MPI_DOUBLE_PRECISION,MPI_SUM,0, &
                           MPI_COMM_WORLD,ierr)
 
+      CALL gws%free_complex_htmp(c1)
+      CALL gws%free_complex_htmp(c2)
+      CALL gws%free_complex_htmp(c3)
+      CALL gws%free_complex_htmp(c4)
+      CALL gws%free_complex_htmp(c5)
+      CALL gws%free_complex_htmp(c6)
       RETURN
       END SUBROUTINE cross
 
@@ -1005,7 +856,6 @@
 
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(nz,ny,ista:iend) :: d,e,f
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend)          :: c1,c2,c3
       DOUBLE PRECISION    :: eng,ens,pot,khe
       REAL(KIND=GP)       :: dt
       INTEGER, INTENT(IN) :: hel
@@ -1061,17 +911,25 @@
       USE fft
       USE grid
       USE mpivars
+      USE class_GWorkspace3D, ONLY: gws
 !$    USE threads
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend)          :: c1,c2,c3
-      REAL(KIND=GP), DIMENSION(nx,ny,ksta:kend)             :: r1,r2,r3
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: c1,c2,c3
+      REAL(KIND=GP), POINTER, DIMENSION(:,:,:)    :: r1,r2,r3
       REAL(KIND=GP), INTENT(OUT)   :: d
       REAL(KIND=GP)                :: dloc
       INTEGER, INTENT(IN) :: kin
       INTEGER             :: i,j,k
+      LOGICAL             :: bret
 
+      CALL gws%get_complex_htmp(c1,bret)
+      CALL gws%get_complex_htmp(c2,bret)
+      CALL gws%get_complex_htmp(c3,bret)
+      CALL gws%get_real_htmp(r1,bret)
+      CALL gws%get_real_htmp(r2,bret)
+      CALL gws%get_real_htmp(r3,bret)
       IF (kin.eq.0) THEN
          CALL curlk(b,c,c1,1)
          CALL curlk(a,c,c2,2)
@@ -1109,6 +967,12 @@
       dloc = sqrt(dloc)/(real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
       CALL MPI_REDUCE(dloc,d,1,GC_REAL,MPI_MAX,0,MPI_COMM_WORLD,ierr)
 
+      CALL gws%free_complex_htmp(c1)
+      CALL gws%free_complex_htmp(c2)
+      CALL gws%free_complex_htmp(c3)
+      CALL gws%free_real_htmp(r1)
+      CALL gws%free_real_htmp(r2)
+      CALL gws%free_real_htmp(r3)
       RETURN
       END SUBROUTINE maxabs
 
@@ -1230,20 +1094,23 @@
       USE fft
       USE mpivars
       USE commtypes
+      USE class_GWorkspace3D, ONLY: gws
 !$    USE threads
       IMPLICIT NONE
 
       COMPLEX(KIND=GP), INTENT(IN), DIMENSION(nz,ny,ista:iend) :: a,b,c
       DOUBLE PRECISION, INTENT(OUT) :: d
 
-      COMPLEX(KIND=GP), DIMENSION(nz,ny,ista:iend) :: C1,C2
-      REAL(KIND=GP), DIMENSION(nz,ny,ista:iend)    :: R1
+      COMPLEX(KIND=GP), POINTER, DIMENSION(:,:,:) :: C1,C2
 
       DOUBLE PRECISION  :: dloc
       REAL(KIND=GP)     :: tmp
 
       INTEGER :: i,j,k
+      LOGICAL :: bret
 
+      CALL gws%get_complex_htmp(C1,bret)
+      CALL gws%get_complex_htmp(C2,bret)
       ! One nx*ny from parsevals, an nx*ny*(nz-Cz) from averaging over
       ! physical domain and a nz**2 due to fft normalization.
       tmp = 1.0_GP/ &
@@ -1287,22 +1154,13 @@
       ENDDO
 
       CALL fftp1d_complex_to_real_z(planfc,C2,MPI_COMM_WORLD)
-!$omp parallel do if (iend-ista.ge.nth) private (j,k)
-      DO i = ista,iend
-!$omp parallel do if (iend-ista.lt.nth) private (k)
-         DO j = 1,ny
-            DO k = 1,nz
-               R1(k,j,i) = real(c2(k,j,i),kind=GP)**2 + aimag(c2(k,j,i))**2
-            ENDDO
-         ENDDO
-      ENDDO
 
       ! Compute mean value
       IF (ista.eq.1) THEN
 !$omp parallel do private (k) reduction(+:dloc)
          DO j = 1,ny
             DO k = 1,nz-Cz
-               dloc = dloc + R1(k,j,1)*tmp
+               dloc = dloc + (real(C2(k,j,1),kind=GP)**2 + aimag(C2(k,j,1))**2)*tmp
             END DO
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:dloc)
@@ -1310,7 +1168,7 @@
 !$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:dloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  dloc = dloc + 2*R1(k,j,i)*tmp
+                  dloc = dloc + 2*(real(C2(k,j,i),kind=GP)**2 + aimag(C2(k,j,i))**2)*tmp
                END DO
             END DO
          END DO
@@ -1318,17 +1176,19 @@
 !$omp parallel do if (iend-ista.ge.nth) private (j,k) reduction(+:dloc)
          DO i = ista,iend
 !$omp parallel do if (iend-ista.lt.nth) private (k) reduction(+:dloc)
-           DO j = 1,ny
-              DO k = 1,nz-Cz
-                 dloc = dloc + 2*R1(k,j,i)*tmp
-              END DO
-           END DO
-        END DO
+            DO j = 1,ny
+               DO k = 1,nz-Cz
+                  dloc = dloc + 2*(real(C2(k,j,i),kind=GP)**2 + aimag(C2(k,j,i))**2)*tmp
+               END DO
+            END DO
+         END DO
       ENDIF
 
       CALL MPI_REDUCE(dloc,d,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,&
           MPI_COMM_WORLD,ierr)
 
+      CALL gws%free_complex_htmp(C1)
+      CALL gws%free_complex_htmp(C2)
       RETURN
       END SUBROUTINE divergence
 

@@ -28,9 +28,9 @@ module equation_factory
   ! report_peaks on the example inputs.
   integer, public :: NUMTMPCOMP = 0 ! Number of cmplx tmp arrays
   integer, public :: NUMTMPREAL = 0 ! Number of real tmp arrays
-  ! Host-only temporaries, for the diagnostics (not used in SPECTER).
-  integer, public :: NUMTMPHCOMP = 0 ! Number of host-only cmplx tmp arrays
-  integer, public :: NUMTMPHREAL = 0 ! Number of host-only real tmp arrays
+  ! Host-only temporaries, for the diagnostics (all solvers).
+  integer, public :: NUMTMPHCOMP = 6 ! Number of host-only cmplx tmp arrays
+  integer, public :: NUMTMPHREAL = 3 ! Number of host-only real tmp arrays
 
 CONTAINS
 
