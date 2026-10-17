@@ -12,6 +12,7 @@ CMakeLists.txt (raíz)
 - Subdirectorios: se suman boundary, memmgt, pdes, ic, force y steppers. particles e icpart quedan comentados hasta implementarlos, igual que sus bibliotecas en el ejecutable. tools se compila, solo con BOOTS.
 - Ejecutable: el main es specter.F90 (en GHOST, main.F90). Se llama como el solver (HD) y enlaza project_defs y solo las bibliotecas de arriba, ic_lib, force_lib y stepper_lib: las demás llegan por sus dependencias, cada una una sola vez (con amdflang una biblioteca estática repetida hace fallar el enlace del dispositivo por símbolos duplicados, y CMake repite una biblioteca si se lista antes que otra que depende de ella).
 - Instalador: instala el ejecutable y BOOTS; ghost_python no existe en SPECTER.
+- Con P_HYBRID, la biblioteca de hilos de FFTW se guarda en una variable de caché por precisión, FFTW3F_OMP_LIBRARY en simple y FFTW3_OMP_LIBRARY en doble, como FindFFTW3 con FFTW3F_LIBRARY y FFTW3_LIBRARY. En GHOST es una sola, FFTW3_OMP_LIBRARY: al cambiar PRECISION en un directorio ya configurado se reusa la de la otra precisión y el enlace falla (dfftw_init_threads indefinido). Pasa con cualquier compilación para GPU, porque P_GPU enciende P_HYBRID.
 
 UserConfig.cmake
 - Conserva las opciones de GHOST. Tienen efecto PRECISION y las de GPU (P_GPU, GPU_VENDOR, GPU_ARCH). P_HYBRID está bloqueada: se declara con set(... CACHE BOOL ... FORCE) en vez de option(), para que quede en OFF aunque se pase -DP_HYBRID=ON; P_GPU la enciende igual, como en GHOST.

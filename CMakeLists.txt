@@ -185,17 +185,23 @@ if(FFTP STREQUAL "fftp" OR FFTP STREQUAL "fftp-gpu")
     # used rather than _threads so that FFTW shares the OpenMP thread
     # pool instead of starting pthreads of its own. It has to be listed
     # before the base library for static linking to resolve.
+    # The library is kept in one cache variable per precision, as
+    # FindFFTW3 does with FFTW3F_LIBRARY and FFTW3_LIBRARY, so that
+    # changing PRECISION in an existing build directory does not reuse
+    # the threading library of the other precision.
     if(P_HYBRID)
         if(PRECISION STREQUAL "SINGLE")
+            set(_fftw_omp_var FFTW3F_OMP_LIBRARY)
             set(_fftw_omp_name fftw3f_omp)
         else()
+            set(_fftw_omp_var FFTW3_OMP_LIBRARY)
             set(_fftw_omp_name fftw3_omp)
         endif()
-        find_library(FFTW3_OMP_LIBRARY NAMES ${_fftw_omp_name}
+        find_library(${_fftw_omp_var} NAMES ${_fftw_omp_name}
                      HINTS ${FFTW3_ROOT}/lib ${FFTW3_LIBRARY_DIRS}
                      PATH_SUFFIXES lib lib64 REQUIRED)
-        target_link_libraries(project_fft INTERFACE ${FFTW3_OMP_LIBRARY})
-        message(STATUS "FFTW threading: ${FFTW3_OMP_LIBRARY}")
+        target_link_libraries(project_fft INTERFACE ${${_fftw_omp_var}})
+        message(STATUS "FFTW threading: ${${_fftw_omp_var}}")
     endif()
     if(PRECISION STREQUAL "SINGLE")
         target_link_libraries(project_fft INTERFACE ${FFTW3F_LIBRARIES} m)
