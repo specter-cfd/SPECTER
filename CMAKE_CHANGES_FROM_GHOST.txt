@@ -20,6 +20,10 @@ UserConfig.cmake
 - IKIND, CSIZE y NSTRIP se toman de Makefile.in: IKIND=8 no existe en GHOST, CSIZE=32 en vez de 8 y NSTRIP=1 igual.
 - Se agrega SOLVER (HD), que da el nombre del ejecutable. La grilla, las continuaciones y los órdenes de borde, que SPECTER fijaba al compilar (NX, ..., OZ), se leen al correr de &grid, como la grilla en GHOST; el orden del Runge-Kutta (ORD) se lee de &stepper.
 
+build/ (README y scripts de ejemplo)
+- Como en GHOST: el README explica cómo compilar desde build/ y los scripts son ejemplos completos para el cluster, cada uno con su subdirectorio (build/host, build/amd) y la precisión como argumento.
+- build_host.sh no tiene el argumento hybrid|mpi, porque P_HYBRID sin GPU está bloqueada. Los dos scripts usan por defecto DOUBLE, el valor por defecto de PRECISION en SPECTER (en GHOST, SINGLE), y no pasan LIB_DIR, porque SPECTER no tiene la biblioteca para Python. No hay build_nvidia.sh todavía.
+
 FindFFTW3.cmake
 - Sin cambios.
 

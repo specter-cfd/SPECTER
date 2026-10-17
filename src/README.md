@@ -102,6 +102,12 @@ directives. The offload build is selected with, e.g.,
 cmake .. -DPRECISION=SINGLE -DP_GPU=ON -DGPU_VENDOR=AMD -DGPU_ARCH=gfx90a
 ```
 
+The scripts in `build/` are complete examples, with the modules,
+compilers and paths of the cluster where they were tested:
+`build_host.sh` builds for the host in `build/host` and
+`build_amd.sh` for the AMD GPUs in `build/amd`, both with the
+precision as their argument.
+
 `P_GPU` implies `P_HYBRID` and selects the `fftp-gpu` FFT backend
 (`src/fftp-gpu`): hipFFT or cuFFT on the device, with the FC-Gram
 continuation in z also done on the device, and FFTW on the host. It
