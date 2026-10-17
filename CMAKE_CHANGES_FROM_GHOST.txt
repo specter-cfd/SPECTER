@@ -35,7 +35,7 @@ src/fftp/CMakeLists.txt (en GHOST, src/fftp-3)
 
 src/fftp-gpu/CMakeLists.txt (en GHOST, src/fftp-gpu)
 - Es el FFTP que se usa con P_GPU, como en GHOST. Compila con amdflang para las MI210 (gfx90a).
-- fftw_wrappers.h, gfft_defs.h, gfft_bindings.F90 y fprecision_mod.F90 son los de GHOST. fftp_mod.F90 es el de src/fftp más los planes del dispositivo (dplanrxy y dplancz) y los buffers compartidos de GHOST. fcgram_mod.f90 es el de src/fftp. fftp.F90 junta lo que en GHOST está en fftp3D.F90 y fftp.f90: el camino del dispositivo de GHOST partido en las dos mitades de SPECTER (fftp2d_*_xy y fftp1d_*_z), más un kernel para la continuación del FC-Gram en z.
+- fftw_wrappers.h, gfft_defs.h, gfft_bindings.F90 y fprecision_mod.F90 son los de GHOST. fftp_mod.F90 es el de src/fftp más los planes del dispositivo (dplanrxy y dplancz) y los buffers compartidos de GHOST. fcgram_mod.f90 es el de src/fftp. fftp.F90 junta lo que en GHOST está en fftp3D.F90 y fftp.f90: el camino del dispositivo de GHOST partido en las dos mitades de SPECTER (fftp2d_*_xy y fftp1d_*_z), más un kernel para la continuación del FC-Gram en z, cuya tabla (planfc%z%dir) registra el main en el dispositivo después de crear el plan, como box_init registra khom.
 - Como el de src/fftp, publica src/fftp-gpu y build/src/fftp-gpu, y además build/src/memmgt, donde queda gdevice.mod (GHOST lo agrega igual). Depende de gdevice_lib, como en GHOST. Las bibliotecas de FFTW y de cuFFT o hipFFT llegan a través de project_fft.
 
 src/mpiio/CMakeLists.txt

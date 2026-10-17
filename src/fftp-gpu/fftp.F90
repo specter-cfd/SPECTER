@@ -515,8 +515,8 @@
 ! SPECTER): llena los últimos C puntos de cada línea en z de a a
 ! partir de sus primeros y últimos d puntos, con las mismas cuentas
 ! y en el mismo orden que el lazo del host en
-! fftp1d_real_to_complex_z. La tabla dir (C x d, chica) se copia al
-! dispositivo en cada lanzamiento.
+! fftp1d_real_to_complex_z. La tabla dir (C x d) tiene su copia en el
+! dispositivo desde que se crea el plan (ver specter.F90).
 !-----------------------------------------------------------------
       USE fprecision
       USE mpivars
@@ -525,7 +525,7 @@
       DOUBLE PRECISION, INTENT(IN)    :: dir(C,d)
       COMPLEX(KIND=GP), INTENT(INOUT) :: a(nz,ny,ista:iend)
       INTEGER :: i,j,ii,jj
-!$omp target teams distribute parallel do collapse(3) map(to:dir)
+!$omp target teams distribute parallel do collapse(3)
       DO i = ista,iend
          DO j = 1,ny
             DO ii = 1,C

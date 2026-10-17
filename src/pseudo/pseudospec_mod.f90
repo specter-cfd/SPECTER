@@ -81,7 +81,7 @@
 
   MODULE fft
       USE fcgram
-      TYPE(FCPLAN), SAVE :: planfc
+      TYPE(FCPLAN), SAVE, TARGET :: planfc
 
   END MODULE fft
 !=================================================================

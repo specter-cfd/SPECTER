@@ -138,6 +138,15 @@
       CALL fcgram_create_plan(planfc, (/nx,ny,nz/), (/Cx,Cy,Cz/), &
                               (/ox,oy,oz/), (/x(2),y(2),z(2)/), &
                               tdir, FFTW_ESTIMATE)
+! La tabla de la continuación en z la lee un kernel del FFT: se le
+! registra una copia en el dispositivo, como a khom (no hace nada en
+! las compilaciones para CPU)
+      IF (ALLOCATED(planfc%z%dir)) THEN
+         CALL gdev_alloc(C_LOC(planfc%z%dir),INT(SIZE(planfc%z%dir),C_SIZE_T)* &
+                         INT(STORAGE_SIZE(planfc%z%dir)/8,C_SIZE_T))
+         CALL gdev_update_to(C_LOC(planfc%z%dir),INT(SIZE(planfc%z%dir),C_SIZE_T)* &
+                             INT(STORAGE_SIZE(planfc%z%dir)/8,C_SIZE_T))
+      ENDIF
       IF (bench.eq.2) THEN
          CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
          CALL GTStop(ihcpu2)
@@ -298,6 +307,7 @@
       CALL GTFree(ihomp2)
       CALL GTFree(ihwtm2)
 
+      IF (ALLOCATED(planfc%z%dir)) CALL gdev_free(C_LOC(planfc%z%dir))
       CALL fcgram_destroy_plan(planfc)
 
       CALL GState_dealloc(field)
