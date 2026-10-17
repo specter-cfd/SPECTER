@@ -130,9 +130,10 @@ CONTAINS
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Copia al host los arreglos auxiliares del solver que
-  !! cambian en el dispositivo durante el paso, antes de las
-  !! salidas (propio de SPECTER). Por defecto el solver no
-  !! tiene arreglos auxiliares.
+  !! cambian en el dispositivo durante el paso, antes de
+  !! escribir los campos (write_states; global no los usa)
+  !! (propio de SPECTER). Por defecto el solver no tiene
+  !! arreglos auxiliares.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine sync_host(this)
     class (EquationBase), intent(inout) :: this

@@ -205,8 +205,9 @@
 ! Time integration scheme starts here. In offload builds the fields are
 ! worked on the device inside the time step (gdev_active set) and on
 ! their host copies elsewhere (for I/O and diagnostics): the host copies
-! of the fields and of the auxiliary arrays of the solver are refreshed
-! before any output, and the forcing, which is computed on the host, is
+! of the fields are refreshed before any output, and those of the
+! auxiliary arrays of the solver before writing the fields; the forcing,
+! which is computed on the host, is
 ! copied to the device in the steps in which it changes. If we are doing
 ! a benchmark, we measure cputime before starting.
 
@@ -223,17 +224,18 @@
 
 
  RK : DO t = ini,step
-! Refreshes the host copies if any output is due
+! Refreshes the host copies of the fields if any output is due
          IF (((timet.eq.tstep).or.(timec.eq.cstep)).and.(bench.eq.0)) THEN
             CALL GState_update_from(field_nxt)
-            CALL fluid%sync_host()
          ENDIF
 
 ! Every 'tstep' steps, stores the fields 
-! in binary files
+! in binary files (with the auxiliary arrays of the solver,
+! which are brought to the host only here)
  BIN:    IF ((timet.eq.tstep).and.(bench.eq.0)) THEN
             timet = 0
             tind = tind+1
+            CALL fluid%sync_host()
             CALL fluid%write_states(field_nxt,planio)
          ENDIF BIN
 
