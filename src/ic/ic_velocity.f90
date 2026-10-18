@@ -15,10 +15,10 @@
 !   poiseuille_v : Adds the laminar Poiseuille profile to vx
 !
 ! Versión de SPECTER del ic_velocity.f90 de GHOST (rama new_paradigm,
-! cb6943d). read_v hace lo mismo que hacía el main de SPECTER al
-! continuar una corrida. Respecto del de GHOST, transforma con planfc
-! (el plan del FC-Gram) en vez de planrc, y con stat=1 escribe además
-! la velocidad leída como la salida 0000. null_v es el de GHOST.
+! cb6943d). read_v es el de GHOST, salvo que transforma con planfc (el
+! plan del FC-Gram) en vez de planrc; a diferencia del main viejo de
+! SPECTER, con stat=1 ya no reescribe la velocidad leída como la
+! salida 0000. null_v es el de GHOST.
 ! cbnoise_v es el ruido de examples/initialv.f90 de SPECTER y, con
 ! rphase, el de examples/initialv.f90_random. couette_v y poiseuille_v
 ! suman su perfil a lo que ya hay, así que van después de otra
@@ -80,45 +80,25 @@ CONTAINS
     class    (icRead_v), intent   (in)          :: this
     class(EquationBase), intent(inout)          :: solver
     type   (GStateComp), intent(inout)          :: state(:)
-    complex(kind=GP), pointer, dimension(:,:,:) :: C1
     real   (kind=GP), pointer, dimension(:,:,:) :: R1
-    real   (kind=GP)                            :: rmp
-    integer                                     :: i,j,k,nc
+    integer                                     :: i
     logical                                     :: bret
 
     if ((stat .eq. 0).and.(solver%myrank_ .eq. 0)) then
       stop 'Cannot read files if starting a new run with stat=0'
     endif
-    call solver%workspace_%get_complex_tmp(C1,bret)
     call solver%workspace_%get_real_tmp(R1,bret)
     select type (solver)
     class is (VelocityBase)
       tind = int(stat)
       WRITE(ext, fmtext) tind
-      do nc = solver%VELOCITY,solver%VELOCITY+solver%nc_-1
-        call io_read(1,solver%idir_,trim(solver%sstate_(nc)),ext,solver%planio_,R1)
-        call fftp3d_real_to_complex(planfc,R1,state(nc)%ccomp,MPI_COMM_WORLD)
+      do i = solver%VELOCITY,solver%VELOCITY+solver%nc_-1
+        call io_read(1,solver%idir_,trim(solver%sstate_(i)),ext,solver%planio_,R1)
+        call fftp3d_real_to_complex(planfc,R1,state(i)%ccomp,MPI_COMM_WORLD)
       end do
-      ! Con stat=1, la velocidad leída se escribe también como la salida 0000
-      if ( stat .eq. 1 ) then
-        rmp = 1.0_GP/(real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))
-        do nc = solver%VELOCITY,solver%VELOCITY+solver%nc_-1
-!$omp parallel do collapse(2) private (k)
-          do i = ista,iend
-             do j = 1,ny
-                do concurrent (k=1:nz)
-                  C1(k,j,i) = state(nc)%ccomp(k,j,i)*rmp
-                end do
-             end do
-          end do
-          call fftp3d_complex_to_real(planfc,C1,R1,MPI_COMM_WORLD)
-          call io_write(1,solver%odir_,trim(solver%sstate_(nc)),'0000',solver%planio_,R1)
-        end do
-      endif
     class default
       error stop "This solver does not support velocity field ICs"
     end select
-    call solver%workspace_%free_complex_tmp(C1)
     call solver%workspace_%free_real_tmp(R1)
   end subroutine init_readv
 

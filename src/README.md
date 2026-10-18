@@ -379,10 +379,9 @@ injection rate (`eps`).
 
 The binary files of the HD solver are the velocity (`vx`, `vy`, `vz`),
 the vorticity (`wx`, `wy`, `wz`, if `outs` is 1 or larger) and the
-pressure (`pr`). When a run is continued with `stat=1`, the velocity
-read is also written with the number `0000`. The file
-`noslip_diagnostic.txt` checks the divergence and the boundary
-conditions. More details are in the comments of `pdes/hd_solver.f90`.
+pressure (`pr`). The file `noslip_diagnostic.txt` checks the
+divergence and the boundary conditions. More details are in the
+comments of `pdes/hd_solver.f90`.
 
 
 4 - FC-Gram continuations

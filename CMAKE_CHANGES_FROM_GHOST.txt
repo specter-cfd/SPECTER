@@ -72,7 +72,7 @@ src/memmgt/CMakeLists.txt
 
 src/ic/CMakeLists.txt
 - ic_lib compila ic_base.f90 (igual al de GHOST), ic_velocity.f90 e ic_factory.f90. No están ic_magnetic, ic_active, ic_passive ni ic_quantum, que no tienen solver en SPECTER.
-- ic_velocity.f90 tiene read_v y null_v de GHOST (read_v transforma con el plan del FC-Gram y, con stat=1, escribe además la salida 0000) y las propias de SPECTER: cbnoise_v (el ruido de examples/initialv.f90) y los perfiles laminares couette_v y poiseuille_v, que suman su perfil a lo que ya hay. tg_v, abc_v y random_v no están porque suponen dominio periódico.
+- ic_velocity.f90 tiene read_v y null_v de GHOST (read_v transforma con el plan del FC-Gram) y las propias de SPECTER: cbnoise_v (el ruido de examples/initialv.f90) y los perfiles laminares couette_v y poiseuille_v, que suman su perfil a lo que ya hay. tg_v, abc_v y random_v no están porque suponen dominio periódico.
 - ic_lib publica src/ic y build/src/ic; GHOST publica a mano las carpetas de módulos de las bibliotecas que usa y no la propia. Depende de pdes_lib y utils_lib y los enlaza: a través de pdes_lib le llegan memmgt, pseudo, mpiio y fftp (GHOST depende de fftp_lib, pseudo_lib, memmgt_lib, pdes_lib y utils_lib, y enlaza project_mpi y utils_lib).
 
 src/force/CMakeLists.txt
