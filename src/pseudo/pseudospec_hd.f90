@@ -537,7 +537,7 @@
             ENDDO
          ENDDO
 
-         CALL curlk(a,c,C1,2)
+         CALL curlk(a,b,C1,3)
          CALL fftp1d_complex_to_real_z(planfc,C1,MPI_COMM_WORLD)
 !$omp parallel do if (iend-ista.ge.nth) private (j,k)
          DO i = ista,iend
