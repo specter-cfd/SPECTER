@@ -110,9 +110,7 @@
 ! non-continued) box, either in units of 2.pi (if periodic
 ! direction) or 1 (non-periodic case). Dkx, Dky, Dkz are the
 ! spacings between wavenumbers in each direction.
-! Como boxsize de GHOST, sin Dkk ni anis (SPECTER no escribe
-! espectros); las grillas x, y, z siguen en grid y los números
-! de onda en kes.
+! As boxsize in GHOST, without Dkk and anis.
       USE fprecision
       REAL(KIND=GP)    :: Lx,Ly,Lz
       REAL(KIND=GP)    :: Dkx,Dky,Dkz
@@ -151,10 +149,7 @@
       CALL MPI_BCAST(Ly,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(Lz,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
 
-      ! Grillas y números de onda, con su copia en el dispositivo en
-      ! las compilaciones para GPU (los kernels los leen de ahí), como
-      ! en GHOST. galloc no tiene la forma (ny,ista:iend) de khom, así
-      ! que su copia se registra directamente
+      ! Grids and wavenumbers (with device copies in GPU builds)
       CALL galloc( x, nx )
       CALL galloc( y, ny )
       CALL galloc( z, nz )
@@ -256,8 +251,7 @@
          END DO
       END DO
 
-      ! Copias en el dispositivo (no hacen nada en las compilaciones
-      ! para CPU)
+      ! Device copies (no-op in CPU builds)
       CALL gupdate_to( x )
       CALL gupdate_to( y )
       CALL gupdate_to( z )

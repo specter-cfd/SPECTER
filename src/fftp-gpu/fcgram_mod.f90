@@ -10,10 +10,6 @@
 !      require interfaces to subroutines that operate on real arrays.
 !      (Continuation in x should result in real array)
 !
-! Versión de SPECTER: por ahora solo la dirección z puede ser no
-! periódica (paredes en z). Con continuación u orden distintos de
-! cero en x o en y, fcgram_create_plan para con un mensaje.
-!
 ! 2020 Mauro Fontana. DF-UBA.
 !======================================================================
 

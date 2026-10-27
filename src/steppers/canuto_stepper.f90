@@ -6,13 +6,23 @@
 !              Dynamics. This is a low storage time stepper
 !              for a specifiable order, though it is strictly
 !              speaking of full truncation order only for
-!              norder = 2, or for linear ODEs/PDEs.
+!              norder = 2, or for linear ODEs/PDEs. Explicit number
+!              of stages are not required. While norder > 2 may
+!              not yield a truncation of that order in nonlinear
+!              PDEs, it can still provide a benefit.
 !
-! Versión de SPECTER del canuto_stepper.f90 de GHOST (rama
-! new_paradigm, cb6943d): solo el paso de los campos, y después de
-! actualizar cada etapa llama a solver%end_stage, donde cada solver
-! aplica su corrección (en HD con paredes, imponer los bordes y
-! proyectar).
+! SPECTER version of GHOST's canuto_stepper.f90 (new_paradigm branch),
+! without particles: after each stage it calls the end_stage of the
+! solver (boundary conditions and projection in HD).
+!
+! INPUT FILE : Stepper looks for a "&stepper" namelist with:
+!                sname   : 'TRADITIONAL' to use this time stepper
+!                itype   : Ignored by this solver. The stepper type:
+!                    =1 => Butcher type (norder = nstage, this solver)
+!                    =2 => Mixed type (norder != nstage; not available)
+!                    =3 => SSP type (strong stability preserving; not available)
+!                norder  : Stepper order (>=1)
+!                nstage  : No. stepper stages (ignored by this solver)
 !
 ! DATE       : 2/8/26 (DLR)
 ! =====================================================================

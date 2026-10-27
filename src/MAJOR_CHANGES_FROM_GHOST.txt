@@ -1,4 +1,4 @@
-Differences of the pseudospectral and boundary routines of SPECTER with respect to those of GHOST. The changes in the structure of the code (solver, initial conditions, forcing and time stepper as classes, as in the new_paradigm branch of GHOST) are described in CMAKE_CHANGES_FROM_GHOST.txt and in the header of each file.
+Differences of the pseudospectral and boundary routines of SPECTER with respect to those of GHOST. The changes in the structure of the code (solver, initial conditions, forcing and time stepper as classes, as in the new_paradigm branch of GHOST) are described in the header of each file.
 
 - No 2/3 rule. Operations are applied over entire arrays and results are filtered with calls to `fc_filter` when needed.
 - Module `boxsize`, as in GHOST, but in non-periodic directions the lengths are in units of 1 and `box_init` builds the grids including the continuation points.

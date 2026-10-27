@@ -3,10 +3,6 @@
 !
 !
 ! 2020 Mauro Fontana. DF-UBA.
-!
-! En el fork solo quedan las condiciones de borde de la velocidad
-! (vboundary.f90): las del escalar y el campo magnético eran de otros
-! solvers.
 !======================================================================
 
 MODULE boundary
@@ -18,10 +14,8 @@ MODULE boundary
          INTEGER  :: bcxsta,bcxend,bcysta,bcyend,bczsta,bczend
       ENDTYPE BCPLAN
 
-      ! Condiciones de borde y coeficientes de la solución de Laplace
-      ! en z=0 y z=Lz (2,ny,ista:iend), que sol_project y laplace_z
-      ! usan en sus kernels: se reservan con galloc la primera vez que
-      ! se usan, para que existan en el dispositivo
+      ! Boundary conditions and coefficients of the Laplace solution
+      ! at z=0 and z=Lz (used by sol_project and laplace_z)
       COMPLEX(KIND=GP), ALLOCATABLE, TARGET, DIMENSION(:,:,:) :: bczbuf
       COMPLEX(KIND=GP), ALLOCATABLE, TARGET, DIMENSION(:,:,:) :: coefbuf
 
@@ -112,10 +106,8 @@ MODULE boundary
 !**********************************************************************
       SUBROUTINE normalize_z(a,tmp)
 !----------------------------------------------------------------------
-!  Multiplica por tmp los puntos físicos en z (1 a nz-Cz) de a, en el
-! dominio (z,ky,kx). Es el lazo de normalización de
-! goto_domain_w_boundaries, aparte para que el kernel reciba un
-! arreglo de forma explícita y no un argumento opcional.
+!  Multiplies by tmp the physical points in z (1 to nz-Cz) of a, in
+! the (z,ky,kx) domain (normalization of goto_domain_w_boundaries).
 !----------------------------------------------------------------------
       USE fprecision
       USE grid
@@ -146,10 +138,8 @@ MODULE boundary
 !**********************************************************************
       SUBROUTINE noslip_wall(vx,vy,pr,ind,tmp)
 !----------------------------------------------------------------------
-!  Velocidad tangencial en la pared del plano z = ind a partir de la
-! presión p' (el lazo de noslip_z, en vboundary.f90): va acá porque
-! vboundary.f90 entra con INCLUDE, que no pasa por el preprocesador,
-! y GHOST no pone directivas de lazos en archivos incluidos.
+!  Tangential velocity at the wall in the plane z = ind, from the
+! pressure p' (used by noslip_z in vboundary.f90).
 !----------------------------------------------------------------------
       USE fprecision
       USE grid
@@ -252,10 +242,6 @@ MODULE boundary
 !     bczend   : same as bczsta but for z=Lz                       [IN]
 !              * =0 for homogeneous Dirichlet BC
 !              * =2 for homogeneous Robin BC
-!
-! Los temporarios C1, C2, C3 salen del pool del workspace (gws) y
-! las condiciones de borde van en bczbuf, para que existan en el
-! dispositivo.
 !
       USE grid
       USE var
@@ -520,9 +506,6 @@ MODULE boundary
 
 !NOTE: This generates a NaN, but shouldn't propagate to relevant
 !variables. Written this way is easier for the compiler to vectorize
-! La división por kk2 se hace componente a componente: en el
-! dispositivo no hay división compleja (como en GHOST), y en el host
-! gfortran ya la hace así cuando el divisor es real.
 #if defined(GHOST_GPU)
 !$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
 #else
@@ -567,9 +550,6 @@ MODULE boundary
 !             * =0 for homogeneous Dirichlet BC
 !             * =1 for homogeneous Neumann BC
 !             * =2 for homogeneous Robin BC
-!
-! Los coeficientes van en coefbuf, para que existan en el
-! dispositivo.
 !
 
       USE kes

@@ -1,6 +1,5 @@
 # -------------------------------------------------------------------
-# SPECTER CMakeLists (a partir del de GHOST; por ahora solo HD)
-# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt
+# SPECTER CMakeLists
 #
 # If libraries are not in the path, use -DCMAKE_PREFIX_PATH
 # and -DFFTW3_ROOT to set paths, e.g., from the build directory do
@@ -15,10 +14,7 @@
 # -DP_HYBRID=ON (multithreaded, default: OFF)
 # -DP_GPU=ON -DGPU_VENDOR=NVIDIA|AMD -DGPU_ARCH=<arch> (OpenMP offload,
 #    default: OFF; needs nvfortran, flang, or amdflang, see src/README)
-# P_HYBRID sola todavía no tiene efecto en SPECTER (está bloqueada en
-# UserConfig.cmake); P_GPU sí, y la enciende. Probado con amdflang en
-# las AMD MI210 (GPU_VENDOR=AMD, GPU_ARCH=gfx90a) y con el flang de
-# LLVM 23 en las NVIDIA Tesla P4 (GPU_VENDOR=NVIDIA, GPU_ARCH=sm_61).
+# P_HYBRID is locked in UserConfig.cmake (P_GPU turns it on)
 # -------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.12)
@@ -40,8 +36,8 @@ file(MAKE_DIRECTORY "${BIN_DIR}")
 
 # ----------------------- Compiler options ---------------------------
 if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-    # Las mismas de Makefile.in de SPECTER, salvo -mfpmath=both: con x87 el
-    # redondeo depende de cómo se compila cada versión del código
+    # The flags of Makefile.in of SPECTER, without -mfpmath=both (with
+    # x87 the rounding depends on how each version of the code is built)
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -funroll-loops -mtune=native")
     # set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -mfpmath=both")
     # GNU debug flags
@@ -233,7 +229,7 @@ if(NOT IOLIB STREQUAL "mpiio")
 endif()
 
 # ---------------------- Compile definitions -------------------------
-# SOLVER se define en UserConfig.cmake (en SPECTER, por ahora solo HD)
+# SOLVER is set in UserConfig.cmake
 add_library(project_defs INTERFACE)
 string(TOUPPER "${SOLVER}" SOLVER_UP)
 target_compile_definitions(project_defs INTERFACE "${SOLVER_UP}_SOL")
@@ -273,7 +269,7 @@ add_subdirectory("${SRC_DIR}/boundary")
 add_subdirectory("${SRC_DIR}/memmgt")
 add_subdirectory("${SRC_DIR}/pdes")
 add_subdirectory("${SRC_DIR}/ic")
-# Todavía no implementados en SPECTER:
+# Not implemented in SPECTER yet:
 # add_subdirectory("${SRC_DIR}/particles")
 add_subdirectory("${SRC_DIR}/force")
 # add_subdirectory("${SRC_DIR}/icpart")
@@ -282,7 +278,7 @@ add_subdirectory("${SRC_DIR}/tools")
 
 # ---------------------- Main executable ------------------------------
 add_executable(${SOLVER} "${SRC_DIR}/specter.F90")
-# Solo las bibliotecas de arriba: las demás llegan por sus dependencias.
+# Only the libraries above: the others come in through their dependencies.
 # Each archive must appear once: with amdflang a duplicate makes the
 # device link fail with duplicate symbols, and listing a library before
 # one that depends on it makes CMake repeat it.
@@ -292,7 +288,7 @@ target_link_libraries(${SOLVER}
         project_gpu
         project_defs
         ic_lib
-        # Todavía no implementados en SPECTER:
+        # Not implemented in SPECTER yet:
         # particles_lib
         force_lib
         # icp_lib

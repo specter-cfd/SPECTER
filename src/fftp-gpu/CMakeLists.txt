@@ -1,6 +1,5 @@
-# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
-# fftp-gpu: FFT paralela con FC-Gram, con cuFFT/hipFFT en el dispositivo
-# y FFTW en el host (requiere P_GPU)
+# FFTP-GPU: parallel FFT with cuFFT/hipFFT on the device and FFTW on
+# the host (requires P_GPU)
 add_library(fftp_lib STATIC
   fftw_wrappers.h
   gfft_defs.h
@@ -11,19 +10,15 @@ add_library(fftp_lib STATIC
   fftp.F90
 )
 
-# La precisión, IKIND, CSIZE y NSTRIP se definen para todo el proyecto
-# en el CMakeLists.txt de la raíz
-
-# Directorios de inclusión (gdevice.mod queda en build/src/memmgt)
+# Include directories
 target_include_directories(fftp_lib PUBLIC
   ${CMAKE_SOURCE_DIR}/src/fftp-gpu
   ${CMAKE_BINARY_DIR}/src/fftp-gpu
   ${CMAKE_BINARY_DIR}/src/memmgt
 )
 
-# Dependencias
+# Make sure dependencies are satisfied
 add_dependencies(fftp_lib timer_lib gdevice_lib)
 
-# Bibliotecas
+# Link MPI, the FFT libraries and the device management
 target_link_libraries(fftp_lib PUBLIC project_mpi project_fft gdevice_lib timer_lib)
-

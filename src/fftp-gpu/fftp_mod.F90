@@ -4,14 +4,8 @@
 !
 ! 2007 Pablo D. Mininni.
 !      National Center for Atmospheric Research.
-!      e-mail: mininni@ucar.uba.ar 
+!      e-mail: mininni@ucar.edu
 ! 2026 GPU version with cuFFT/hipFFT (P.D. Mininni)
-!
-! Versión de SPECTER del fftp_mod.F90 de fftp-gpu de GHOST: el plan
-! es el de src/fftp (los planes de FFTW planrxy y plancz como enteros
-! de kind ikind, y el cronómetro de la continuación) más lo que
-! agrega GHOST para el dispositivo, con los planes del dispositivo
-! llamados dplanrxy y dplancz.
 !=================================================================
 
 !=================================================================

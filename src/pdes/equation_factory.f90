@@ -6,12 +6,8 @@
 ! allocate the solver class, and declare the number of field
 ! components the solver needs.
 !
-! Versión de SPECTER del equation_factory.f90 de GHOST (rama
-! new_paradigm, cb6943d), solo con el solver HD. El pool de
-! temporarios es el pico de SPECTER (10 complejos y 7 reales, los de
-! dudt con gradre, medidos con report_peaks), y el pool solo del host
-! tiene los valores de GHOST (6 complejos y 3 reales): de ahí toman
-! sus temporarios los diagnósticos.
+! SPECTER version of GHOST's equation_factory.f90 (new_paradigm
+! branch), with the HD solver only.
 !
 ! DATE : 03/29/26 (PDM)
 ! ===================================================================
@@ -61,6 +57,9 @@ CONTAINS
       case ('HD')
         allocate(HDsolver    :: new_object)
         NUMTMPCOMP = 10; NUMTMPREAL = 7
+!     case ('UserDefined')
+!       allocate(UserDefinedsolver :: new_object)
+!       NUMTMPCOMP =  8; NUMTMPREAL = 3
       case default
         stop 'Equation factory :: init_pdes_from_file : Unknown solver name'
     end select

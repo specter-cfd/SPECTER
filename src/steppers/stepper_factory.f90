@@ -1,9 +1,8 @@
 ! ===================================================================
 ! Factory for all allowed time stepper objects
 !
-! Versión de SPECTER del stepper_factory.f90 de GHOST (rama
-! new_paradigm, cb6943d): sin partículas y solo con el integrador de
-! Canuto (TRADITIONAL); GEXRK no está en SPECTER.
+! SPECTER version of GHOST's stepper_factory.f90 (new_paradigm branch),
+! without particles and with the Canuto stepper only.
 !
 ! DATE : 02/8/26 (DLR)
 ! ===================================================================
