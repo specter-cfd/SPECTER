@@ -50,6 +50,57 @@ norder = 2           ! order of the Runge-Kutta method
 nstage = 2           ! number of stages (= norder)
 /
 
+! Particle status (see src/particles/pstatus_mod.f90). If this
+! namelist is ABSENT the run has no particles. maxparts is the global
+! number of particles; lgmult must divide tstep evenly (particles are
+! written every tstep/lgmult steps).
+&pstatus
+maxparts = 1000      ! maximum number of particles
+lgmult = 1           ! particle output every tstep/lgmult steps
+ilgexchtype = 0      ! boundary exchange: 0=nearest neighbor, 1=VDB
+ilgouttype = 0       ! particle output: 0=binary, 1=ASCII
+ilgcoll = 1          ! 1=collective binary I/O, 0=task 0 (posix) I/O
+ilgwrtunit = 1       ! write positions in box units (1) or grid units (0)
+intorder = 3         ! interpolation order (cubic splines)
+/
+
+! Particle solver (see src/particles/particle_factory.f90)
+&particles
+psolver = "inerpart" ! inertial particles (the only solver available)
+/
+
+! Parameters of the inertial particles (see
+! src/particles/inerpart_solver.f90). z is bounded: particles interact
+! with the walls at z=0 and z=Lz.
+&inerpart
+tau = 0.05           ! Stokes time
+gamma = 0.0          ! mass ratio rho_f/rho_p (>0 defines the particle
+                     ! diameter: wall contact gap, lift, nonlinear drag)
+dograv = .false.     ! gravity (z, positive downward)
+grav = 0.0           ! gravity acceleration
+donldrag = .false.   ! nonlinear drag (Clift & Gauvin; needs gamma>0)
+cc = 1.0             ! Cunningham slip correction (drag divided by Cc)
+dolift = .false.     ! Saffman shear lift (needs gamma>0)
+dobrown = .false.    ! Brownian (thermal) force
+brownkT = 0.0        ! Brownian intensity k_B T/m_p (velocity^2 units)
+iwall = 0            ! walls: 0=inelastic deposition (NN exchange only),
+                     ! 1=elastic reflection, 2=stick/trap
+doreinj = .false.    ! re-inject deposited particles in the bulk (iwall=0)
+iwallinterp = 0      ! near-wall interpolation: 0=off (baseline),
+                     ! 1=one-sided cubic, 2=linear, 3=natural-BC z-spline
+collogmax = 0        ! elastic walls: log the first collogmax
+                     ! reflections per wall to collisions_rNNNN.txt
+partlod = 1          ! output: 1=xlg,vip,vlg; 2=also wlg and strain
+/
+
+! Initial conditions of the particles (see src/icpart/icp_factory.f90),
+! applied in order: positions first, then velocities.
+!   random_x: uniform in the physical domain / read_x: restart files /
+!   user_x: user seed file; null_v / fluid_v / thermal_v / read_v
+&part_initial_conditions
+iclist = "random_x;fluid_v"
+/
+
 ! Parameters for the velocity boundary conditions
 &velbound
 vbczsta = "noslip"   ! velocity BC kind at z=0

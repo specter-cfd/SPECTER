@@ -364,9 +364,14 @@
 !-----------------------------------------------------------------
 !-----------------------------------------------------------------
 !
-! Computes unique seed for each MPI task. Note: there is a limit
-! of 2^(size(integer)) for number of tasks that can have a unique
-! seed
+! Computes a unique seed for each MPI task. Note: there is a limit
+! of 2^(size(integer)) for the number of tasks that can have a
+! unique seed. iseed must be an integer seed, and iseed+myrank
+! must not be the value of mask in randu (randu stays at that
+! value, and all the words of the seed would be equal).
+! (Fixed as in GHOST, rama new_paradigm: the old array constructor
+! had size(seed)+1 elements, an out-of-bounds write, and seeds with
+! many small or correlated words give biased first numbers.)
 !
 ! Parameters
 !     iseed : integer seed
@@ -377,11 +382,25 @@
 
        INTEGER, INTENT(INOUT)   :: iseed
        INTEGER, ALLOCATABLE     :: iseed1(:)
-       INTEGER                  :: j,k
+       INTEGER                  :: j,k,idum
+       REAL(KIND=GP)            :: r
 
        iseed     = mod(iseed+myrank,abs(huge(0)-iseed)-1)
        CALL random_seed(size=k)
-       ALLOCATE (iseed1(k), source = iseed*[(j, j=0, k)])
+       ALLOCATE (iseed1(k))
+! Fills the seed with successive states of randu, since some
+! compilers (nvfortran) do not scramble the seed, and seeds with
+! many small or correlated words give biased first numbers. The
+! first states are discarded because the seeds of adjacent ranks
+! start close.
+       idum = iseed
+       DO j = 1,3
+          r = randu(idum)
+       END DO
+       DO j = 1,k
+          r = randu(idum)
+          iseed1(j) = idum
+       END DO
        CALL random_seed(put=iseed1)
        DEALLOCATE(iseed1)
 

@@ -273,10 +273,9 @@ add_subdirectory("${SRC_DIR}/boundary")
 add_subdirectory("${SRC_DIR}/memmgt")
 add_subdirectory("${SRC_DIR}/pdes")
 add_subdirectory("${SRC_DIR}/ic")
-# Todavía no implementados en SPECTER:
-# add_subdirectory("${SRC_DIR}/particles")
+add_subdirectory("${SRC_DIR}/particles")
 add_subdirectory("${SRC_DIR}/force")
-# add_subdirectory("${SRC_DIR}/icpart")
+add_subdirectory("${SRC_DIR}/icpart")
 add_subdirectory("${SRC_DIR}/steppers")
 add_subdirectory("${SRC_DIR}/tools")
 
@@ -292,10 +291,9 @@ target_link_libraries(${SOLVER}
         project_gpu
         project_defs
         ic_lib
-        # Todavía no implementados en SPECTER:
-        # particles_lib
+        particles_lib
         force_lib
-        # icp_lib
+        icp_lib
         stepper_lib
 )
 

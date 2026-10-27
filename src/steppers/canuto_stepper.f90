@@ -1,24 +1,38 @@
 ! =====================================================================
 ! NAME       : canuto_stepper.f90
 !
-!              Performs time stepping using the modified RK method 
+!              Performs time stepping using the modified RK method
 !              of Canuto et al., Spectral Methods in Fluid
 !              Dynamics. This is a low storage time stepper
 !              for a specifiable order, though it is strictly
 !              speaking of full truncation order only for
-!              norder = 2, or for linear ODEs/PDEs.
+!              norder = 2, or for linear ODEs/PDEs. Particles in
+!              this stepper are sync'd at every substepper stage.
 !
 ! Versión de SPECTER del canuto_stepper.f90 de GHOST (rama
-! new_paradigm, cb6943d): solo el paso de los campos, y después de
-! actualizar cada etapa llama a solver%end_stage, donde cada solver
-! aplica su corrección (en HD con paredes, imponer los bordes y
-! proyectar).
+! new_paradigm): después de actualizar cada etapa llama a
+! solver%end_stage, donde cada solver aplica su corrección (en HD con
+! paredes, imponer los bordes y proyectar), y a psolver%end_stage con
+! la etapa (la física de las paredes de las partículas depende de la
+! etapa; ver particles/inerpart_solver.f90). El lado derecho de las
+! partículas se evalúa con el campo del comienzo de la etapa (el
+! estado uout corregido en la etapa anterior), como en GHOST.
+!
+! INPUT FILE : Stepper looks for a "&stepper" namelist with:
+!                sname   : 'TRADITIONAL' to use this time stepper
+!                itype   : Ignored by this solver. The stepper type:
+!                    =1 => Butcher type (norder = nstage, this solver)
+!                    =2 => Mixed type (norder != nstage; not available)
+!                    =3 => SSP type (strong stability preserving; not available)
+!                norder  : Stepper order (>=1)
+!                nstage  : No. stepper stages (ignored by this solver)
 !
 ! DATE       : 2/8/26 (DLR)
 ! =====================================================================
 
 module canuto_stepper_mod
   use gstepperbase_mod
+  use gdevice, only: gdev_active
   implicit none
 
   ! ================= Stepper ==========================================
@@ -29,6 +43,8 @@ module canuto_stepper_mod
   contains
     procedure, public :: init          => init_impl          ! initialize
     procedure, public :: step          => step_impl          ! take one field timestep
+    procedure, public :: pstep         => pstep_impl         ! take one part  timestep
+    procedure, public :: cstep         => cstep_impl         ! take one part+field timestep
     procedure, public :: GStepper_ctor => CanutoStepper_ctor
     final             :: CanutoStepper_dtor
   end type CanutoStepper
@@ -42,13 +58,19 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Constructor
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine CanutoStepper_ctor(this, traits, workspace, solver)
-    class(CanutoStepper), intent(inout)         :: this
-    type(GStepperTraits), intent(inout)         :: traits
-    type    (GWorkspace), intent(inout), target :: workspace
-    class (EquationBase), intent   (in), target :: solver
+  subroutine CanutoStepper_ctor(this, traits, workspace, solver, psolver)
+    class(CanutoStepper), intent(inout)                   :: this
+    type(GStepperTraits), intent(inout)                   :: traits
+    type    (GWorkspace), intent(inout), target           :: workspace
+    class (EquationBase), intent   (in), target           :: solver
+    class (ParticleBase), intent   (in), target, optional :: psolver
     this%workspace_ => workspace
     this%solver_    => solver
+    if (present(psolver)) then
+      this%psolver_ => psolver
+    else
+      this%psolver_ => null()
+    endif
     if (.not. associated(this%workspace_)) then
       stop 'CanutoStepper::CanutoStepper_ctor: Worskpace not associated'
     endif
@@ -63,6 +85,7 @@ contains
     type(CanutoStepper), intent(inout) :: this
     if (associated(this%workspace_)) nullify(this%workspace_)
     if (associated(this%solver_))    nullify(this%solver_)
+    if (associated(this%psolver_))   nullify(this%psolver_)
   end subroutine CanutoStepper_dtor
 
 
@@ -82,7 +105,6 @@ contains
   !! uout: at input, a copy of uin; at output, the new state
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine step_impl(this, time, uin, uf, dt, uout)
-    use gdevice, only: gdev_active
     implicit none
 
     class(CanutoStepper), intent(inout) :: this
@@ -91,7 +113,7 @@ contains
     real       (kind=GP)                :: eff_dt
     integer                             :: i,j,k,o,ic
     complex    (kind=GP), pointer       :: po(:,:,:), pi(:,:,:)
-       
+
     if ( size (uin) .ne. this%traits_%nstate &
      .or.size(uout) .ne. this%traits_%nstate  ) then
       stop 'CanutoStepper::step: Inconsistent input state'
@@ -124,5 +146,131 @@ contains
       call this%solver_%end_stage(uout, o, this%traits_%norder)
     end do
   end subroutine step_impl
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Implementation function to take one step of the particles.
+  !! This time stepper does not perform computation of feedback
+  !! forces on the fluid (one-way coupled), and evolves the
+  !! particles in a fixed velocity field during the substepping
+  !! stages. This method is mainly inteded for manual
+  !! integration of multiple sets of (same type) one-way
+  !! coupled particles.
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine pstep_impl(this, time, uin, upin, dt, upout)
+    use gpstate_mod
+    implicit none
+
+    class(CanutoStepper), intent(inout)         :: this
+    type    (GStateComp), intent(inout)         :: uin (:)
+    type   (GPStateComp), intent(inout), target, allocatable :: upin(:), upout(:)
+    real       (kind=GP), intent   (in)         :: time, dt
+    real       (kind=GP)                        :: eff_dt
+    integer                                     :: o
+
+    if ( size (uin) .ne. this%traits_%nstate ) then
+      stop 'CanutoStepper::pstep: Inconsistent input state'
+    endif
+    if ( size(upin) .ne. this%traits_%npstate &
+    .or.size(upout) .ne. this%traits_%npstate  ) then
+      stop 'CanutoStepper::pstep: Inconsistent particle state'
+    endif
+    if ( .not. this%traits_%dopart ) then
+      stop 'CanutoStepper::pstep: The particle stepper was not initialized'
+    endif
+    if ( this%psolver_%hasfeedback_ ) then
+      stop 'CanutoStepper::pstep: Particles are not one-way coupled'
+    endif
+
+    do o = this%traits_%norder,1,-1
+      eff_dt = dt/real(o,kind=GP)
+      ! We compute dpdt; we assume that at input, upout has a copy of upin
+      call this%psolver_%dpdt(time, this%solver_, uin, upout, eff_dt, upout)
+      ! Update particles (device kernel in offload builds):
+      call GPState_upd(upout, eff_dt, upin, this%psolver_%nparts_)
+      ! Sync particles at each stage (wall physics and exchange)
+      call this%psolver_%end_stage(upin, upout, o, this%traits_%norder)
+    end do ! end, o-loop
+  end subroutine pstep_impl
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Implementation function to take one *coupled* step for
+  !! particles + fields. Feedback forces are computed if
+  !! needed. Both particles and fields are evolved
+  !! simultaneously in the substepping stages. The particle RHS
+  !! is evaluated with the field state at the beginning of the
+  !! stage (corrected by the solver at the end of the previous
+  !! stage: boundaries imposed and projected).
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine cstep_impl(this, time, uin, upin, uf, dt, uout, upout)
+    use gpstate_mod
+    implicit none
+
+    class(CanutoStepper), intent(inout)         :: this
+    type    (GStateComp), intent(inout), target :: uin (:), uf(:), uout(:)
+    type    (GStateComp), allocatable           :: fdbk(:)
+    type   (GPStateComp), intent(inout), target, allocatable :: upin(:), upout(:)
+    real       (kind=GP), intent   (in)         :: time, dt
+    real       (kind=GP)                        :: eff_dt
+    complex    (kind=GP), pointer, dimension(:,:,:) :: po,pi
+    integer                                     :: i,j,k,o,ic
+
+    if ( size (uin) .ne. this%traits_%nstate &
+     .or.size(uout) .ne. this%traits_%nstate  ) then
+      stop 'CanutoStepper::cstep: Inconsistent input state'
+    endif
+    if ( size(upin) .ne. this%traits_%npstate &
+    .or.size(upout) .ne. this%traits_%npstate  ) then
+      stop 'CanutoStepper::cstep: Inconsistent particle state'
+    endif
+    if ( .not. this%traits_%dopart ) then
+      stop 'CanutoStepper::cstep: The particle stepper was not initialized'
+    endif
+    if ( this%psolver_%hasfeedback_ ) then  ! We alloc arrays if we have feedback
+      call GState_alloc(fdbk, this%traits_%nstate)
+    endif
+
+    do o = this%traits_%norder,1,-1
+      eff_dt = dt/real(o,kind=GP)
+      ! If needed we compute the feedback of the particles in the fluid
+      if ( this%psolver_%hasfeedback_ ) call this%psolver_%feedback(upout,fdbk)
+      ! We compute dpdt first; we assume that at input, upout has a copy of upin
+      call this%psolver_%dpdt(time, this%solver_, uout, upout, eff_dt, upout)
+      ! We assume that at input, uout has a copy of uin
+      call this%solver_%dudt (time, uout, uf, eff_dt, uout)
+      ! If needed we update the forcing to include the feedback
+      if ( this%psolver_%hasfeedback_ ) then
+        call this%psolver_%feedback(upout,fdbk)
+        do ic = 1,this%traits_%nstate
+          uout(ic)%ccomp = uout(ic)%ccomp + fdbk(ic)%ccomp
+        end do
+      endif
+      ! Update fields and particles (device kernels in offload builds)
+      do ic = 1,this%traits_%nstate
+        po => uout(ic)%ccomp
+        pi => uin (ic)%ccomp
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
+        do i = ista,iend
+          do j = 1,ny
+            do k = 1,nz
+              po(k,j,i) = pi(k,j,i) + eff_dt*po(k,j,i)
+            end do
+          end do
+        end do
+      end do
+      ! Correction of the stage by the solver (in HD with walls:
+      ! boundary conditions and projection)
+      call this%solver_%end_stage(uout, o, this%traits_%norder)
+      call GPState_upd(upout, eff_dt, upin, this%psolver_%nparts_)
+      ! Sync particles at each stage (wall physics and exchange)
+      call this%psolver_%end_stage(upin, upout, o, this%traits_%norder)
+    end do ! end, o-loop
+    if ( this%psolver_%hasfeedback_ ) call GState_dealloc(fdbk)
+  end subroutine cstep_impl
 
 end module canuto_stepper_mod
