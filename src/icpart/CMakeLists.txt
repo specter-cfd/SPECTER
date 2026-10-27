@@ -1,5 +1,5 @@
-# icpart: condiciones iniciales de las partículas y su fábrica.
-# Versión de SPECTER del CMakeLists de GHOST/src/icpart.
+# icpart: initial conditions of the particles and their factory.
+# SPECTER version of GHOST's src/icpart.
 add_library(icp_lib STATIC
   icp_base.f90
   icp_position.f90

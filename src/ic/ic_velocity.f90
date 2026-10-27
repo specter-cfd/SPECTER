@@ -14,19 +14,9 @@
 !   couette_v    : Adds the laminar Couette profile to vx
 !   poiseuille_v : Adds the laminar Poiseuille profile to vx
 !
-! Versión de SPECTER del ic_velocity.f90 de GHOST (rama new_paradigm,
-! cb6943d). read_v es el de GHOST, salvo que transforma con planfc (el
-! plan del FC-Gram) en vez de planrc; a diferencia del main viejo de
-! SPECTER, con stat=1 ya no reescribe la velocidad leída como la
-! salida 0000. null_v es el de GHOST.
-! cbnoise_v es el ruido de examples/initialv.f90 de SPECTER y, con
-! rphase, el de examples/initialv.f90_random. couette_v y poiseuille_v
-! suman su perfil a lo que ya hay, así que van después de otra
-! condición inicial en iclist: "cbnoise_v;couette_v" es el
-! initialv.f90_randcou del SPECTER adaptado, "cbnoise_v;poiseuille_v"
-! el _randpois y "cbnoise_v;poiseuille_v;couette_v" el _randcpf.
-! tg_v, abc_v y random_v de GHOST no están: suponen un dominio
-! periódico en las tres direcciones.
+! SPECTER version of GHOST's ic_velocity.f90 (new_paradigm branch).
+! cbnoise_v is the noise of examples/initialv.f90 of SPECTER
+! (M. Fontana).
 !
 ! DATE       : 01/16/26 (PDM)
 ! =====================================================================
@@ -57,6 +47,10 @@ module ic_velocity
     contains
       procedure :: init_GState => init_poiseuillev
   end type icPoiseuille_v
+! type, extends(icBase) :: icUserdef_v
+!   contains
+!     procedure :: init_GState => init_userdefv
+! end type icUserdef_v
 
 CONTAINS
 
@@ -137,20 +131,21 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Ruido incompresible que cumple no deslizamiento en las
-  !! paredes, de Clever & Busse ("Tertiary and quaternary
-  !! solutions for plane Couette flow"). C1 = dPhi/dz, C2 = Phi
-  !! (con las funciones de Chandrasekhar-Reid) y C3 = Psi (con
-  !! senos); las derivadas en z se calculan analíticamente.
-  !! Como Phi ~ k^-3 y Psi ~ k^-2, v_phi ~ v_psi ~ k^-1.
+  !! 3D BC-satisfying, incompressible noise
+  !! From Clever & Busse "Tertiary and quaternary solutions for
+  !! plane Couette flow". C1 = dPhi/dz, C2 = Phi, C3 = Psi
+  !! For amplitude decay, remember that is Phi~k^-3 => v_phi~k^-1
+  !! and Psi~k^-2 => v_psi~k^-1.
+  !! Derivatives in z direction are calculated analytically, to
+  !! have a more accurate initial condition (specially the no-slip)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !   u0    : amplitud de la velocidad
-  !   kdn   : número de onda perpendicular mínimo
-  !   kup   : número de onda perpendicular máximo
-  !   nmin  : armónico de Chandrasekhar-Reid mínimo
-  !   nmax  : armónico de Chandrasekhar-Reid máximo
-  !   rphase: fase de Psi al azar (.true.) o atada a la de Phi
-  !           (.false., por defecto)
+  !   u0    : amplitude of the velocity
+  !   kdn   : minimum perpendicular wave number
+  !   kup   : maximum perpendicular wave number
+  !   nmin  : minimum Chandrasekhar-Reid harmonic
+  !   nmax  : maximum Chandrasekhar-Reid harmonic
+  !   rphase: random phase of Psi (.true.) or tied to the phase
+  !           of Phi (.false., default)
   subroutine init_cbnoisev(this,solver,state)
     use gstate_mod
     use hd_mod
@@ -200,7 +195,7 @@ CONTAINS
     call mpi_bcast(nmax  ,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
     call mpi_bcast(rphase,1,MPI_LOGICAL,0,MPI_COMM_WORLD,ierr)
 
-    ! Primeros ocho "números de onda" de Chandrasekhar-Reid
+    ! CR "wavenumbers"
     rcr = (/  4.73004074,  7.85320462, 10.99560784, 14.13716549, &
              17.27875966, 20.42035225, 23.56194490, 26.70353756 /)
 
@@ -388,13 +383,10 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Suma a vx el perfil laminar de Couette, lineal entre las
-  !! velocidades de las paredes. Va después de otra condición
-  !! inicial en iclist: "cbnoise_v;couette_v" es ruido más
-  !! Couette y "null_v;couette_v", el laminar solo.
+  !! Adds the laminar Couette profile to vx
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !   vxzsta: velocidad de la pared en z=0
-  !   vxzend: velocidad de la pared en z=Lz
+  !   vxzsta: velocity of the wall at z=0
+  !   vxzend: velocity of the wall at z=Lz
   subroutine init_couettev(this,solver,state)
     use gstate_mod
     use hd_mod
@@ -447,13 +439,10 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Suma a vx el perfil laminar de Poiseuille del forzado
-  !! uniforme f0 con paredes quietas, f0.z(Lz-z)/(2 nu), de
-  !! máximo f0.Lz^2/(8 nu). Va después de otra condición
-  !! inicial en iclist: "cbnoise_v;poiseuille_v".
+  !! Adds the laminar Poiseuille profile f0 z (Lz-z)/(2 nu) to vx
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !   f0: amplitud del forzado (la misma que en &uniform_fv)
-  !   nu: viscosidad cinemática (la misma que en &HD)
+  !   f0: amplitude of the forcing (as in &uniform_fv)
+  !   nu: kinematic viscosity (as in &HD)
   subroutine init_poiseuillev(this,solver,state)
     use gstate_mod
     use hd_mod

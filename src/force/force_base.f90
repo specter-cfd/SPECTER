@@ -2,9 +2,9 @@
 ! NAME       : force_base.f90
 ! DESCRIPTION: Forms base class for all forcing methods
 !
-! Versión de SPECTER del force_base.f90 de GHOST (rama new_paradigm,
-! cb6943d), sin blend_forcing: usa saxpby_c de pseudospec_fluid, que
-! SPECTER no tiene, y solo lo necesitan los métodos shuffle.
+! SPECTER version of GHOST's force_base.f90 (new_paradigm branch),
+! without blend_forcing (only needed by the shuffle methods).
+!
 ! DATE       : 01/16/26 (PDM)
 ! ===================================================================
 

@@ -1,6 +1,6 @@
-# particles: clases de partículas (base, inerciales) y su fábrica.
-# Versión de SPECTER del CMakeLists de GHOST/src/particles: solo las
-# partículas inerciales (portadas de SPECTER_v1).
+# particles: particle classes (base, inertial) and their factory.
+# SPECTER version of GHOST's src/particles: inertial particles only
+# (ported from SPECTER_v1).
 add_library(particles_lib STATIC
   pstatus_mod.f90
   gpselect_mod.f90

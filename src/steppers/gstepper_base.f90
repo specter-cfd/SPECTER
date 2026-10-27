@@ -2,13 +2,9 @@
 ! NAME       : gstepper_base.f90
 ! DESCRIPTION: Forms base class for all time steppers
 !
-! Versión de SPECTER del gstepper_base.f90 de GHOST (rama new_paradigm):
-! el paso de los campos (step), el de las partículas con el campo
-! congelado (pstep) y el acoplado campos + partículas (cstep); el
-! genérico gstep los agrupa. A diferencia de GHOST, los steppers de
-! SPECTER llaman a solver%end_stage después de cada etapa (bordes y
-! proyección) y pasan la etapa a psolver%end_stage (la física de las
-! paredes de las partículas depende de la etapa).
+! SPECTER version of GHOST's gstepper_base.f90 (new_paradigm branch):
+! the steppers call the end_stage of the solver and of the particles
+! after each stage.
 !
 ! DATE       : 2/8/26 (DLR)
 ! ===================================================================

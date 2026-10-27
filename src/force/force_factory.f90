@@ -4,11 +4,8 @@
 ! This factory applies chain operation to create multiple forcings
 ! and forcing update methods for all fields in a pde solver.
 !
-! Versión de SPECTER del force_factory.f90 de GHOST (rama
-! new_paradigm, cb6943d), con los forzados de la velocidad de
-! force_velocity.f90 y solo el método constant_fv (forzado constante
-! en el tiempo). Sin métodos shuffle no hace falta agrandar el pool,
-! así que workspace no se usa.
+! SPECTER version of GHOST's force_factory.f90 (new_paradigm branch),
+! with the forcings of the velocity and only constant forcings.
 !
 ! DATE : 01/18/26 (PDM)
 ! ===================================================================

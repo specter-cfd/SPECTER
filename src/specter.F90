@@ -17,13 +17,8 @@
 !           index 'j' moves in the 'y' direction (or ky)
 !           index 'k' moves in the 'z' direction (or kz)
 !
-! Organizado como el main de GHOST (rama new_paradigm, cb6943d): el
-! solver (&pdes), las condiciones iniciales (&initial_conditions), el
-! forzado (&forcing) y el integrador (&stepper) se eligen al correr,
-! con sus fábricas. Por ahora el único solver es HD. En las
-! compilaciones para GPU, como en GHOST, los campos se trabajan en el
-! dispositivo dentro del paso (gdev_active) y en sus copias del host
-! para las salidas y los diagnósticos.
+! Solvers (chosen at run time with &pdes):
+!           HD         Hydrodynamic solver
 !
 ! 2019 Mauro Fontana
 !      Department of Physics,
@@ -33,6 +28,7 @@
 !
 ! Feb 2020: Initial release.
 ! Jul 2021: Added MHD support.
+! Oct 2026: Ported to the GHOST new paradigm.
 !
 ! References:
 ! - Fontana M, Bruno OP, Mininni PD, Dmitruk P; Comp. Phys. Comm. 256,
@@ -65,7 +61,7 @@
 
       IMPLICIT NONE
 
-      TYPE(GStateComp), ALLOCATABLE, TARGET :: field(:), field_nxt(:), force(:)
+      TYPE(GStateComp), ALLOCATABLE :: field(:), field_nxt(:), force(:)
       TYPE(GPStateComp), ALLOCATABLE :: part(:), part_nxt(:)
 
       TYPE(GWorkspace), TARGET :: workspace
@@ -150,9 +146,7 @@
       CALL fcgram_create_plan(planfc, (/nx,ny,nz/), (/Cx,Cy,Cz/), &
                               (/ox,oy,oz/), (/x(2),y(2),z(2)/), &
                               tdir, FFTW_ESTIMATE)
-! La tabla de la continuación en z la lee un kernel del FFT: se le
-! registra una copia en el dispositivo, como a khom (no hace nada en
-! las compilaciones para CPU)
+! Device copy of the FC-Gram table in z (no-op in CPU builds)
       IF (ALLOCATED(planfc%z%dir)) THEN
          CALL gdev_alloc(C_LOC(planfc%z%dir),INT(SIZE(planfc%z%dir),C_SIZE_T)* &
                          INT(STORAGE_SIZE(planfc%z%dir)/8,C_SIZE_T))

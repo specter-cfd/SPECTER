@@ -14,13 +14,6 @@
 ! When dealing with non-periodic data, an FC-Gram scheme
 ! is utilized to eliminate Gibbs phenomenon.
 !
-! Versión de SPECTER: solo la dirección z puede ser no periódica
-! (paredes en z). La transformada directa hace la FFT 2D en (x,y),
-! la transposición entre tareas y la FFT en z con la continuación
-! del FC-Gram; la inversa, el camino opuesto. Las dos mitades
-! (fftp2d_*_xy y fftp1d_*_z) se usan también por separado, para
-! trabajar en el dominio mixto (z,ky,kx).
-!
 ! 2007 Pablo D. Mininni.
 !      National Center for Atmospheric Research.
 !      e-mail: mininni@ucar.uba.ar 

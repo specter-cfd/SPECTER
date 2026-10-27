@@ -110,9 +110,7 @@
 ! non-continued) box, either in units of 2.pi (if periodic
 ! direction) or 1 (non-periodic case). Dkx, Dky, Dkz are the
 ! spacings between wavenumbers in each direction.
-! Como boxsize de GHOST, sin Dkk ni anis (SPECTER no escribe
-! espectros); las grillas x, y, z siguen en grid y los números
-! de onda en kes.
+! As boxsize in GHOST, without Dkk and anis.
       USE fprecision
       REAL(KIND=GP)    :: Lx,Ly,Lz
       REAL(KIND=GP)    :: Dkx,Dky,Dkz
@@ -151,10 +149,7 @@
       CALL MPI_BCAST(Ly,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
       CALL MPI_BCAST(Lz,1,GC_REAL,0,MPI_COMM_WORLD,ierr)
 
-      ! Grillas y números de onda, con su copia en el dispositivo en
-      ! las compilaciones para GPU (los kernels los leen de ahí), como
-      ! en GHOST. galloc no tiene la forma (ny,ista:iend) de khom, así
-      ! que su copia se registra directamente
+      ! Grids and wavenumbers (with device copies in GPU builds)
       CALL galloc( x, nx )
       CALL galloc( y, ny )
       CALL galloc( z, nz )
@@ -256,8 +251,7 @@
          END DO
       END DO
 
-      ! Copias en el dispositivo (no hacen nada en las compilaciones
-      ! para CPU)
+      ! Device copies (no-op in CPU builds)
       CALL gupdate_to( x )
       CALL gupdate_to( y )
       CALL gupdate_to( z )
@@ -369,7 +363,7 @@
 ! unique seed. iseed must be an integer seed, and iseed+myrank
 ! must not be the value of mask in randu (randu stays at that
 ! value, and all the words of the seed would be equal).
-! (Fixed as in GHOST, rama new_paradigm: the old array constructor
+! (Fixed as in GHOST, new_paradigm branch: the old array constructor
 ! had size(seed)+1 elements, an out-of-bounds write, and seeds with
 ! many small or correlated words give biased first numbers.)
 !

@@ -41,7 +41,7 @@ MODULE gtimer
       SUBROUTINE GTInitHandle(ih,itype)
 !-----------------------------------------------------------------
 !-----------------------------------------------------------------
-! DESCRIPTION: Name used in GHOST (rama new_paradigm) for
+! DESCRIPTION: Name used in GHOST (new_paradigm branch) for
 ! GTStartnew: initializes a time level and returns its handle.
 ! Added so the particle classes ported from GHOST compile
 ! unchanged.
