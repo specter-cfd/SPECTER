@@ -48,22 +48,25 @@
       USE threads
       USE boxsize
       USE status
+      USE pstatus
       USE gtimer
       USE ic_factory
       USE force_factory
       USE equation_factory
+      USE particle_factory
+      USE icp_factory
       USE stepper_factory
       USE gdevice
       USE gmem
 
       IMPLICIT NONE
 
-      TYPE(GStateComp), ALLOCATABLE :: field(:), field_nxt(:), force(:)
-
-      TYPE(GWorkspace), TARGET :: workspace
+      TYPE(GStateComp) , ALLOCATABLE, TARGET :: field(:), field_nxt(:), force(:)
+      TYPE(GPStateComp), ALLOCATABLE         :: part(:), part_nxt(:)
+      TYPE(GWorkspace) ,              TARGET :: workspace
 
 !
-! Book keeping variables, options holders and clocks 
+! Book keeping variables, options holders and clocks
       INTEGER :: t
       INTEGER :: num_components
       INTEGER :: ihcpu1,ihcpu2
@@ -71,14 +74,17 @@
       INTEGER :: ihwtm1,ihwtm2
 
       CLASS(EquationBase), ALLOCATABLE, TARGET :: fluid
-      CLASS(GStepperBase), ALLOCATABLE :: stepper
-      CLASS(icChain), ALLOCATABLE :: iclist(:)
-      CLASS(forceChain), ALLOCATABLE :: forcemethod(:)
+      CLASS(ParticleBase), ALLOCATABLE         :: particle
+      CLASS(GStepperBase), ALLOCATABLE         :: stepper
+      CLASS(icChain)     , ALLOCATABLE         :: iclist(:)
+      CLASS(forceChain)  , ALLOCATABLE         :: forcemethod(:)
+      CLASS(icpChain)    , ALLOCATABLE         :: icplist(:)
 
       TYPE(IOPLAN), TARGET :: planio
 
-      LOGICAL               :: bbenchexist
-      LOGICAL               :: fstatic
+      LOGICAL              :: bbenchexist
+      LOGICAL              :: fstatic
+      REAL                 :: rbal = 0.0
 
 ! Initializes the MPI and I/O libraries
       CALL MPI_INIT_THREAD(MPI_THREAD_FUNNELED,provided,ierr)
@@ -100,15 +106,20 @@
 ! Initialize array IO
       CALL io_init(myrank,(/nx-Cx,ny-Cy,nz-Cz/),ksta,kend,planio)
 
-! PDE solver (&pdes, see pdes/equation_factory.f90) and the pool of
-! temporary arrays, sized for that solver
-      fluid = init_pdes_from_file('parameter.inp')
-      CALL workspace%initialize_pool(NUMTMPREAL,NUMTMPCOMP)
-      CALL workspace%init_host_entries(NUMTMPHREAL,NUMTMPHCOMP)
+! Reads the namelist 'status' on the external file 'parameter.inp'
+! (see pdes/status_mod.f90), and the particle status '&pstatus'
+! (see particles/pstatus_mod.f90; if absent, dopart is false and
+! the run has no particles)
+      CALL status_init ('parameter.inp')
+      CALL pstatus_init('parameter.inp')
 
-! Reads the namelist 'status' on the external file
-! 'parameter.inp' (see pdes/status_mod.f90)
-      CALL status_init('parameter.inp')
+! PDE solver (&pdes, see pdes/equation_factory.f90), particle solver
+! (&particles, see particles/particle_factory.f90), and the pool of
+! temporary arrays, sized for them
+      fluid = init_pdes_from_file('parameter.inp')
+      if (dopart) particle = init_particles_from_file('parameter.inp')
+      CALL workspace%initialize_pool(NUMTMPREAL,NUMTMPCOMP,NUMTMPPART)
+      CALL workspace%init_host_entries(NUMTMPHREAL,NUMTMPHCOMP)
 
 !
 ! Box size and grids (see pseudo/pseudospec_mod.f90)
@@ -157,6 +168,14 @@
       CALL GState_alloc(field_nxt, num_components)
       CALL GState_alloc(force    , num_components)
 
+! Initialization of the particles (needs the solver, for nu and the
+! I/O directories, and the box; see particles/inerpart_solver.f90 and
+! icpart/icp_factory.f90)
+      IF (dopart) THEN
+         CALL particle%part_ctor('parameter.inp',fluid,workspace,part,part_nxt)
+         icplist = init_icp_from_file('parameter.inp')
+      ENDIF
+
 ! Initial conditions (see ic/ic_factory.f90)
       iclist = init_ic_from_file('parameter.inp')
 
@@ -169,14 +188,18 @@
  IC : IF (stat.eq.0) THEN
       ini = 1
       tind = 0                          ! index for the binaries
+      pind = 0                          ! index for the particles
       timet = tstep
+      timep = pstep
       timec = cstep
       timef = 0
       ELSE
 ! If stat.ne.0 a previous run is continued
       ini = int((stat-1)*tstep) + 1
       tind = int(stat)
+      pind = int((stat-1)*lgmult+1)
       timet = 0
+      timep = 0
       timec = int(modulo(float(ini-1),float(cstep)))
       timef = int(modulo(float(ini-1),float(fstep)))
       ENDIF IC
@@ -192,8 +215,24 @@
       CALL fluid%sync_device()            ! Auxiliary arrays of the solver (if any).
       fstatic = forcing_is_static(forcemethod)
 
+! Initial conditions for the particles (icplist in
+! &part_initial_conditions); part_nxt is the state that is advanced
+      IF (dopart) THEN
+         CALL init_allpstates(icplist,fluid,field,particle,part)
+         IF (size(part(1)%rcomp) .ne. size(part_nxt(1)%rcomp)) THEN
+            CALL GPState_resize(part_nxt,particle%partbuff_) ! We resize part_nxt
+         ENDIF
+         CALL GPState_update_to(part)     ! Device copies of the particle
+         CALL particle%sync_device()      ! states and of the class arrays.
+         CALL GPState_copy(part_nxt,part) ! We also update part_nxt.
+      ENDIF
+
 ! Sets up the time stepper (&stepper, see steppers/stepper_factory.f90)
-      CALL build_stepper_from_file('parameter.inp',stepper,workspace,fluid)
+      IF (dopart) THEN
+         CALL build_stepper_from_file('parameter.inp',stepper,workspace,fluid,particle)
+      ELSE
+         CALL build_stepper_from_file('parameter.inp',stepper,workspace,fluid)
+      ENDIF
 
 !
 ! Time integration scheme starts here. In offload builds the fields are
@@ -219,11 +258,12 @@
 
  RK : DO t = ini,step
 ! Refreshes the host copies of the fields if any output is due
-         IF (((timet.eq.tstep).or.(timec.eq.cstep)).and.(bench.eq.0)) THEN
+         IF (((timet.eq.tstep).or.(timec.eq.cstep) &
+              .or.(dopart.and.(timep.eq.pstep))).and.(bench.eq.0)) THEN
             CALL GState_update_from(field_nxt)
          ENDIF
 
-! Every 'tstep' steps, stores the fields 
+! Every 'tstep' steps, stores the fields
 ! in binary files (with the auxiliary arrays of the solver,
 ! which are brought to the host only here)
  BIN:    IF ((timet.eq.tstep).and.(bench.eq.0)) THEN
@@ -233,7 +273,17 @@
             CALL fluid%write_states(field_nxt,planio)
          ENDIF BIN
 
-! Every 'cstep' steps, generates external files 
+! Every 'pstep' steps, stores the particle states
+         IF (dopart) THEN
+            IF ((timep.eq.pstep).and.(bench.eq.0)) THEN
+               timep = 0
+               pind = pind+1
+               CALL GPState_update_from(part_nxt) ! host copies for the I/O
+               CALL particle%write_pstate((t-1)*dt,fluid,field_nxt,part_nxt)
+            ENDIF
+         ENDIF
+
+! Every 'cstep' steps, generates external files
 ! with global quantities.
 
          IF ((timec.eq.cstep).and.(bench.eq.0)) THEN
@@ -247,13 +297,27 @@
          IF (forcing_changed(forcemethod)) CALL GState_update_to(force)
 
 ! Time step (GHOST Canuto stepper): field keeps the state at the
-! beginning of the step and field_nxt is advanced
+! beginning of the step and field_nxt is advanced (and likewise
+! part/part_nxt when running with particles)
          gdev_active = .TRUE.
-         CALL GState_copy(field,field_nxt)
-         CALL stepper%gstep((t-1)*dt,field,force,dt,field_nxt)
+         IF (dopart) THEN
+            CALL GState_copy(field,field_nxt)
+            CALL GPState_copy(part,part_nxt)
+            CALL stepper%gstep((t-1)*dt,field,part,force,dt,field_nxt,part_nxt)
+         ELSE
+            CALL GState_copy(field,field_nxt)
+            CALL stepper%gstep((t-1)*dt,field,force,dt,field_nxt)
+         ENDIF
          gdev_active = .FALSE.
 
+! Per-step particle diagnostics (particle_diag.txt: global count,
+! z-range, deposition and reflection counters)
+         IF (dopart.and.(bench.eq.0)) THEN
+            CALL particle%write_diag(part_nxt,t,t*dt)
+         ENDIF
+
          timet = timet+1
+         timep = timep+1
          timec = timec+1
       END DO RK
 !
@@ -289,6 +353,28 @@
             ENDIF
             CLOSE(1)
          ENDIF
+! Particle benchmark (host-side timers; the totals are reliable,
+! the per-phase GPU timers are not: read the kernel stats instead)
+         IF (dopart) THEN
+            rbal = GetLoadBal(particle)
+            IF (myrank.eq.0) THEN
+               INQUIRE( file='gpbenchmark.txt', exist=bbenchexist )
+               OPEN(2,file='gpbenchmark.txt',position='append')
+               IF ( .NOT. bbenchexist ) THEN
+                  WRITE(2,*) '# maxparts nsteps nprocs nth rbal ',  &
+                     'TSTEP TCOMM TSPLINE TTRANSP TDATAEX TINTERP TPUPDATE'
+               ENDIF
+               WRITE(2,*) maxparts,(step-ini+1),nprocs,nth,rbal,    &
+                  GetTime(particle,GPTIME_STEP)   /(step-ini+1),    &
+                  GetTime(particle,GPTIME_COMM)   /(step-ini+1),    &
+                  GetTime(particle,GPTIME_SPLINE) /(step-ini+1),    &
+                  GetTime(particle,GPTIME_TRANSP) /(step-ini+1),    &
+                  GetTime(particle,GPTIME_DATAEX) /(step-ini+1),    &
+                  GetTime(particle,GPTIME_INTERP) /(step-ini+1),    &
+                  GetTime(particle,GPTIME_PUPDATE)/(step-ini+1)
+               CLOSE(2)
+            ENDIF
+         ENDIF
       ENDIF
 
 ! Peak usage of the pool of temporary arrays
@@ -309,6 +395,10 @@
       CALL GState_dealloc(field)
       CALL GState_dealloc(field_nxt)
       CALL GState_dealloc(force)
+      IF (dopart) THEN
+         CALL GPState_dealloc(part)
+         CALL GPState_dealloc(part_nxt)
+      ENDIF
 
       CALL gfree( x )
       CALL gfree( y )

@@ -7,10 +7,11 @@ add_library(stepper_lib STATIC
 target_include_directories(stepper_lib PUBLIC
   ${CMAKE_SOURCE_DIR}/src/steppers
   ${CMAKE_BINARY_DIR}/src/steppers
+  ${CMAKE_BINARY_DIR}/src/particles
 )
 
-# Make sure dependencies are satisfied
-add_dependencies(stepper_lib pdes_lib)
+# Dependencies
+add_dependencies(stepper_lib pdes_lib particles_lib)
 
 # Link libraries
-target_link_libraries(stepper_lib PUBLIC pdes_lib)
+target_link_libraries(stepper_lib PUBLIC pdes_lib particles_lib)

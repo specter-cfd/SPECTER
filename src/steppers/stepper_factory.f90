@@ -1,8 +1,8 @@
 ! ===================================================================
 ! Factory for all allowed time stepper objects
 !
-! SPECTER version of GHOST's stepper_factory.f90 (new_paradigm branch),
-! without particles and with the Canuto stepper only.
+! SPECTER version of GHOST's stepper_factory.f90 (new_paradigm),
+! with the Canuto stepper (TRADITIONAL) only.
 !
 ! DATE : 02/8/26 (DLR)
 ! ===================================================================
@@ -22,13 +22,15 @@ contains
   ! allocates temporaries with device copies (GEXRK), and returning
   ! the object as a function result would copy them into new host
   ! arrays without device copies while finalizing the registered ones.
-  subroutine build_stepper_from_file(infile, new_object, workspace, solver)
+  subroutine build_stepper_from_file(infile, new_object, workspace, solver, psolver)
     use equationbase_mod
+    use particlebase_mod
     use commtypes
-    class(GStepperBase), allocatable, intent(out) :: new_object
-    class  (GWorkspace), intent(inout)            :: workspace
-    class(EquationBase), intent   (in), target    :: solver
-    character   (len=*), intent   (in)            :: infile
+    class(GStepperBase), allocatable, intent(out)        :: new_object
+    class  (GWorkspace), intent(inout)                   :: workspace
+    class(EquationBase), intent   (in), target           :: solver
+    class(ParticleBase), intent   (in), target, optional :: psolver
+    character   (len=*), intent   (in)                   :: infile
 
     ! Temporary data to read from namelists:
     integer                                :: itype,norder,nstage
@@ -60,6 +62,13 @@ contains
     straits%norder  = norder
     straits%nstage  = nstage
     straits%nstate  = solver%state_size()
+    if (present(psolver)) then
+      straits%dopart  = .true.
+      straits%npstate = psolver%state_size()
+    else
+      straits%dopart  = .false.
+      straits%npstate = 0
+    endif
 
     ! Allocate child object:
     select case (trim(adjustl(sname)))
@@ -70,7 +79,11 @@ contains
     end select
 
     ! Call constructor:
-    call new_object%GStepper_ctor(straits,workspace,solver)
+    if (straits%dopart) then
+      call new_object%GStepper_ctor(straits,workspace,solver,psolver)
+    else
+      call new_object%GStepper_ctor(straits,workspace,solver)
+    endif
   end subroutine build_stepper_from_file
 
 end module stepper_factory

@@ -23,7 +23,7 @@ MODULE gtimer
 
 !
 ! Methods:
-      PUBLIC                            :: GTStop, GTStart, GTAcc, GTFree
+      PUBLIC                            :: GTStop, GTStart, GTInitHandle, GTAcc, GTFree
       PUBLIC                            :: GTGetTime, GTValidHandle, GTReset
       PUBLIC                            :: GTGetHandle
       PRIVATE                           :: GTbasic, GTStartnew, GTStartold
@@ -38,6 +38,27 @@ MODULE gtimer
       CONTAINS
 
 
+      SUBROUTINE GTInitHandle(ih,itype)
+!-----------------------------------------------------------------
+!-----------------------------------------------------------------
+! DESCRIPTION: Name used in GHOST (rama new_paradigm) for
+! GTStartnew: initializes a time level and returns its handle.
+! Added so the particle classes ported from GHOST compile
+! unchanged.
+!
+! ARGUMENTS  :
+!     ih     : (returned), Integer handle to timer level
+!     itype  : timer type to use. See GT PARAMETERS for valid types
+!-----------------------------------------------------------------
+      IMPLICIT NONE
+      INTEGER, INTENT(INOUT)                     :: ih
+      INTEGER, INTENT   (IN)                     :: itype
+      CALL GTStartnew(ih,itype)
+      END SUBROUTINE GTInitHandle
+!-----------------------------------------------------------------
+!-----------------------------------------------------------------
+!
+!
       SUBROUTINE GTStartnew(ih,itype)
 !-----------------------------------------------------------------
 !-----------------------------------------------------------------
