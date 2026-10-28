@@ -10,21 +10,9 @@
 !              State sector ids are:
 !                VELOCITY (VELOCITY+1, VELOCITY+2)
 !
-! Versión de SPECTER del hd_solver.f90 de GHOST (rama new_paradigm,
-! cb6943d). init lee &HD y &velbound, arma el plan de bordes, y
-! reserva e inicializa la presión (init_pressure: cero en una corrida
-! nueva, leída del archivo pr al continuar una); dudt calcula el lado
-! derecho sin la presión y end_stage impone las paredes y proyecta
-! después de cada etapa del RK (las llama el integrador,
-! src/steppers/canuto_stepper.f90); global y write_states escriben las
-! salidas, y sync_device y sync_host mueven la presión entre el host y
-! el dispositivo en las compilaciones para GPU. De &HD faltan la rotación, los escalares pasivos y spectlod
-! de GHOST, que SPECTER no tiene.
-!
-! La presión pr_ (p' = p.dt, en el dominio (z,ky,kx)) es un arreglo
-! auxiliar del solver, como los de los solvers cuánticos de GHOST: no
-! es parte del estado que avanza el integrador, sobrevive entre etapas
-! y pasos de tiempo, y la usan la proyección y la escritura.
+! SPECTER version of GHOST's hd_solver.f90 (new_paradigm branch),
+! with the boundary conditions and the pressure projection of the
+! HD solver of SPECTER (M. Fontana).
 !
 ! INPUT FILE : looks for a "&HD" namelist with:
 !              fidir   : changes class binary input  dir (default: idir)
@@ -61,10 +49,10 @@ module hd_mod
     ! Member data:
     logical           :: binit_  = .false. ! is initialized?
     type (NHTraits)   :: traits_
-    type  (BCPLAN)    :: vplanbc_          ! plan de bordes de la velocidad
-    real (kind=GP)    :: vzsta_(2)         ! (vx,vy) de la pared en z=0
-    real (kind=GP)    :: vzend_(2)         ! (vx,vy) de la pared en z=Lz
-    complex(kind=GP), allocatable, dimension(:,:,:) :: pr_ ! presión p'
+    type  (BCPLAN)    :: vplanbc_          ! velocity boundary plan
+    real (kind=GP)    :: vzsta_(2)         ! wall velocity at z=0
+    real (kind=GP)    :: vzend_(2)         ! wall velocity at z=Lz
+    complex(kind=GP), allocatable, dimension(:,:,:) :: pr_ ! pressure p'=p*dt
   CONTAINS
     procedure, public :: init          =>          init_impl ! init method
     procedure, public :: dudt          =>          dudt_impl ! RHS method
@@ -87,10 +75,8 @@ CONTAINS
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Subroutine to initialize the solver
-  !! Reads the &HD and &velbound namelists, sets up the
-  !! boundary conditions, allocates and initializes the
-  !! pressure and sets sector indices. Uses the FC-Gram plan,
-  !! so it must be called after fcgram_create_plan.
+  !! Reads the &HD and &velbound namelists, sets up the boundary
+  !! conditions and the pressure, and sets sector indices
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine init_impl(this)
     use commtypes
@@ -169,16 +155,15 @@ CONTAINS
     this%vzsta_ = (/ vxzsta, vyzsta /)
     this%vzend_ = (/ vxzend, vyzend /)
 
-    ! Pressure (auxiliary array of the solver)
+    ! Pressure
     call galloc(this%pr_, nz, ny, ista, iend)
 
-    ! Set I/O from inputfile data (if present in &HD, replaces the
-    ! class defaults)
-    this%idir_  = fidir
-    this%odir_  = fodir
-    this%todir_ = todir
+    ! Set I/O from inputfile data:
+    this%idir_  = fidir ! If present in &HD, replaces the class default idir
+    this%odir_  = fodir ! If present in &HD, replaces the class default odir
+    this%todir_ = todir ! If present in &HD, replaces the class default todir
 
-    ! Initial pressure (uses idir_)
+    ! Initial pressure
     call init_pressure(this)
 
     this%nd_      = 3                        ! 3d
@@ -196,11 +181,7 @@ CONTAINS
   ! ===================================================================
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Computes the RHS of the momentum equation without the
-  !! pressure, which is taken into account by end_stage:
-  !!   dudt = nu Del^2 v - (v.Grad) v + f
-  !! The nonlinear term is filtered (FC-Gram dealiasing). uin
-  !! and dudt can be the same array (the stepper does that).
+  !! Function to compute RHS without the pressure (see end_stage)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine dudt_impl(this, time, uin, uf, dt, dudt)
     use grid
@@ -242,11 +223,16 @@ CONTAINS
     dy => dudt(this%VELOCITY+1)%ccomp
     dz => dudt(this%VELOCITY+2)%ccomp
 
-    call gradre(vx,vy,vz,C4,C5,C6)   ! (v.Grad) v
-    call fc_filter(C4)               ! dealiasing of the
-    call fc_filter(C5)               ! nonlinear term
+    ! Non-linear term
+    call gradre(vx,vy,vz,C4,C5,C6)
+
+    ! Dealias non-linear
+    call fc_filter(C4)
+    call fc_filter(C5)
     call fc_filter(C6)
-    call laplak(vx,C1)               ! Del^2 v
+
+    ! Laplacian
+    call laplak(vx,C1)
     call laplak(vy,C2)
     call laplak(vz,C3)
 
@@ -275,10 +261,7 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Correction after each RK stage o (norder, ..., 1): imposes
-  !! the velocity of the walls and projects v onto solenoidal
-  !! fields. The pressure p' of the previous stage is used for
-  !! the walls, and the new one is left in pr_.
+  !! Apply boundary conditions and project onto solenoidal space
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine end_stage_impl(this, uout, o, norder)
     use fft
@@ -301,9 +284,6 @@ CONTAINS
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Function to compute and write global quantities
-  !!   balance.txt          : energy, enstrophy and injection rate
-  !!   helicity.txt         : kinetic helicity
-  !!   noslip_diagnostic.txt: divergence and boundary conditions
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine global_impl(this, uin, uf, t)
     use status
@@ -319,14 +299,17 @@ CONTAINS
     fx => uf (this%VELOCITY  )%ccomp
     fy => uf (this%VELOCITY+1)%ccomp
     fz => uf (this%VELOCITY+2)%ccomp
+
+    ! Save energy, enstrophy and bulk injection rate
     call hdcheck(vx,vy,vz,fx,fy,fz,t,dt,1)
+
+    ! Print diagnostic quantities
     call vdiagnostic(this%vplanbc_,planfc,vx,vy,vz,t,dt)
   end subroutine global_impl
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Writes the states and the vorticity (write_states of
-  !! EquationBase) and the pressure, transformed from p' to p
+  !! Writes the states, the vorticity and the pressure
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine write_states_impl(this, uin, planio)
     use grid
@@ -366,8 +349,7 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Copia la presión pr_ al dispositivo, después de
-  !! inicializarla (init_pressure lo hace en el host)
+  !! Copies the pressure to the device
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine sync_device_impl(this)
     use gmem
@@ -377,8 +359,7 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Copia al host la presión pr_, que end_stage actualiza en
-  !! el dispositivo, antes de escribirla
+  !! Copies the pressure to the host
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine sync_host_impl(this)
     use gmem
@@ -392,9 +373,7 @@ CONTAINS
   ! ===================================================================
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Presión inicial p' = p.dt: cero en una corrida nueva
-  !! (stat=0); al continuar una corrida se lee del archivo pr
-  !! numerado por stat, como la velocidad (ic/ic_velocity.f90)
+  !! Initial pressure: zero if stat=0, read from file otherwise
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine init_pressure(this)
     use grid

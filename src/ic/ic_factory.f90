@@ -4,9 +4,8 @@
 ! This factory applies chain operation to create multiple initial
 ! conditions for all fields in a pde solver.
 !
-! Versión de SPECTER del ic_factory.f90 de GHOST (rama new_paradigm,
-! cb6943d), con las condiciones iniciales de la velocidad que ya están
-! en ic_velocity.f90.
+! SPECTER version of GHOST's ic_factory.f90 (new_paradigm branch),
+! with the initial conditions of the velocity.
 !
 ! DATE : 04/08/26 (PDM)
 ! ===================================================================

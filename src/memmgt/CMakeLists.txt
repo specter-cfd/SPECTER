@@ -1,5 +1,3 @@
-# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
-
 # gdevice: device management, no dependencies inside GHOST
 add_library(gdevice_lib STATIC gdevice_mod.f90)
 target_include_directories(gdevice_lib PUBLIC ${CMAKE_BINARY_DIR})

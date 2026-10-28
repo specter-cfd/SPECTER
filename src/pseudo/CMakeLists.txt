@@ -1,7 +1,6 @@
-# Cambios respecto del de GHOST: ver CMAKE_CHANGES_FROM_GHOST.txt en la raíz
-# pseudobase: grilla, números de onda, caja y plan del FC-Gram, que
-# necesita la gestión de memoria antes de poder armar los núcleos
-# pseudoespectrales
+# pseudobase: the basic modules (grid, wavenumbers, box, fft plans,
+# random numbers), needed by the memory management before the
+# pseudospectral kernels can be built
 add_library(pseudobase_lib STATIC
   pseudospec_mod.f90
 )
@@ -15,8 +14,8 @@ target_include_directories(pseudobase_lib PUBLIC
 add_dependencies(pseudobase_lib fftp_lib gmem_lib)
 target_link_libraries(pseudobase_lib PUBLIC project_mpi fftp_lib gmem_lib)
 
-# pseudo: los núcleos pseudoespectrales de HD; toman sus temporarios
-# del pool del workspace (memmgt_lib)
+# pseudo: the pseudospectral kernels; they take their temporaries
+# from the workspace pool (memmgt_lib)
 add_library(pseudo_lib STATIC
   pseudospec_hd.f90
 )
@@ -27,8 +26,8 @@ target_include_directories(pseudo_lib PUBLIC
   ${CMAKE_BINARY_DIR}/src/memmgt
 )
 
-# Dependencias
+# Make sure dependencies are satisfied
 add_dependencies(pseudo_lib fftp_lib pseudobase_lib memmgt_lib)
 
-# Bibliotecas
+# Link libraries
 target_link_libraries(pseudo_lib PUBLIC project_mpi fftp_lib pseudobase_lib memmgt_lib)

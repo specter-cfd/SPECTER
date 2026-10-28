@@ -14,11 +14,8 @@
 ! Update methods available:
 !   constant_fv: Constant forcing (no method)
 !
-! Versión de SPECTER del force_velocity.f90 de GHOST (rama
-! new_paradigm, cb6943d). null_fv es el de GHOST y uniform_fv es el
-! src/initialfv.f90 de SPECTER. tg_fv, abc_fv y random_fv, y los
-! métodos shift_fv y shuffle_fv, no están: suponen un dominio
-! periódico en las tres direcciones.
+! SPECTER version of GHOST's force_velocity.f90 (new_paradigm branch).
+! uniform_fv is the forcing of initialfv.f90 of SPECTER (M. Fontana).
 !
 ! DATE       : 01/18/26 (PDM)
 ! =====================================================================
@@ -37,6 +34,10 @@ module force_velocity
     contains
       procedure :: init_GForce => init_uniformfv
   end type forceUniform_fv
+! type, extends(forceBase) :: forceUserdef_fv
+!   contains
+!     procedure :: init_GForce => init_userdefv
+! end type forceUserdef_fv
 
 CONTAINS
 
@@ -78,12 +79,9 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Forzado uniforme en x, f = (f0,0,0): el gradiente de
-  !! presión medio que mueve el flujo de Poiseuille. En Fourier
-  !! es solo el modo (kz,ky,kx) = (0,0,0), multiplicado por
-  !! nx.ny.nz porque la antitransformada no normaliza.
+  !! Uniform forcing along x (mean pressure gradient)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !   f0: amplitud del forzado
+  !   f0: amplitude of the forcing
   subroutine init_uniformfv(this,solver,state)
     use gstate_mod
     use hd_mod
@@ -118,7 +116,7 @@ CONTAINS
             END DO
          END DO
       END DO
-    ! El modo (0,0,0) lo tiene la tarea con kx = 0 (ista = 1)
+    ! The (0,0,0) mode is in the task with ista = 1
     if ( ista .eq. 1 ) then
       state(solver%VELOCITY)%ccomp(1,1,1) = &
            f0*real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP)

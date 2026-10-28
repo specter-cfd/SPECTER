@@ -16,6 +16,9 @@
 !      Facultad de Ciencias Exactas y Naturales.
 !      Universidad de Buenos Aires.
 !      e-mail: mfontana@df.uba.ar
+!
+! 17 Oct 2026: Enstrophy in energy (kin=0) sums the three
+!              components of the curl (J. Cullen & G. Marchetti)
 !=================================================================
 
 !******************************************************************
@@ -155,9 +158,6 @@
 !          =2 computes the y-component
 !          =3 computes the z-component
 !
-! Each component is computed in one pass, c = i (k_2 b - k_1 a),
-! without temporaries (rotor3 de GHOST).
-!
       USE fprecision
       USE kes
       USE var
@@ -239,9 +239,6 @@
 !     d: product (A.grad)A_x in Fourier space [output]
 !     e: product (A.grad)A_y in Fourier space [output]
 !     f: product (A.grad)A_z in Fourier space [output]
-!
-! Los temporarios salen del pool del workspace (gws), como en el
-! gradre3 de GHOST, para que existan en el dispositivo.
 !
       USE fprecision
       USE commtypes
@@ -376,9 +373,6 @@
 !     e  : product [curl(A)xA]_y in Fourier space [output]
 !     f  : product [curl(A)xA]_z in Fourier space [output]
 !
-! Los temporarios salen del pool del workspace (gws), como en el
-! prodre3 de GHOST, para que existan en el dispositivo.
-!
       USE fprecision
       USE commtypes
       USE mpivars
@@ -470,10 +464,6 @@
 !     kin: =0 computes the energy of the curl of the field
 !          =1 computes the energy of the field
 !          =2 computes the energy of the curl^2 of the field
-!
-! Los temporarios salen del pool solo del host (gws), como en GHOST.
-! Las tres componentes (V1, V2, V3) se suman en el mismo orden en
-! que se acumulaban en un arreglo real.
 !
       USE fprecision
       USE commtypes
@@ -595,11 +585,6 @@
 !     c: input matrix in the z-direction
 !     d: at the output contains the helicity
 !
-! Los temporarios salen del pool solo del host (gws), como en GHOST:
-! c1, c2, c3 tienen el campo y c4, c5, c6 su rotor. Los productos de
-! las tres componentes se suman en el mismo orden en que se
-! acumulaban en un arreglo real.
-!
       USE fprecision
       USE commtypes
       USE fft
@@ -712,11 +697,6 @@
 !     g  : at the output contains the inner product
 !     kin: =0 computes the inner product of the curls
 !          =1 computes the inner product of the fields
-!
-! Los temporarios salen del pool solo del host (gws), como en GHOST:
-! c1, c2, c3 tienen el primer campo y c4, c5, c6 el segundo. Los
-! productos de las tres componentes se suman en doble precisión y en
-! el mismo orden en que se acumulaban en un arreglo real.
 !
       USE fprecision
       USE commtypes
@@ -1021,7 +1001,7 @@
       SUBROUTINE copy(a,b)
 !-----------------------------------------------------------------
 !
-! Copies the complex matrix 'a' into 'b', b = a (copy3 de GHOST)
+! Copies the complex matrix 'a' into 'b', b = a
 !
       USE fprecision
       USE grid
@@ -1054,7 +1034,7 @@
 !
 ! Sets one element of the matrix 'a', a(k,j,i) = val, in the
 ! copy of the matrix being worked on (the device copy while
-! gdev_active is set) (setmode3 de GHOST)
+! gdev_active is set)
 !
       USE fprecision
       USE grid

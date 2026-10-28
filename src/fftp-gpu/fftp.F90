@@ -16,25 +16,20 @@
 ! transforms are unnormalized and the layout of the output is the
 ! one of fftp with FFTW, so both backends are interchangeable.
 !
+! You should use the FFTPLANS and MPIVARS modules (see the file
+! 'fftp_mod.F90') in each program that calls any of the subroutines
+! in this file. Also, you must create plans for the parallel FFT
+! using the 'fftp3d_create_plan' subroutine.
+!
 ! When dealing with non-periodic data, an FC-Gram scheme
 ! is utilized to eliminate Gibbs phenomenon.
 !
-! Versión de SPECTER del fftp3D.F90 de fftp-gpu de GHOST. Como en
-! src/fftp, solo la dirección z puede ser no periódica, y cada
-! transformada se parte en dos mitades que también se usan por
-! separado, para trabajar en el dominio mixto (z,ky,kx):
-! fftp2d_*_xy, con la FFT 2D en (x,y), el intercambio y la
-! transposición, y fftp1d_*_z, con la FFT en z y, en la directa, la
-! continuación del FC-Gram. Cada mitad elige su camino con
-! gdev_active. El camino del dispositivo es el de GHOST partido en
-! el mismo lugar, más el kernel de continuación fftp3d_cont_z_dev.
-!
 ! 2007 Pablo D. Mininni.
 !      National Center for Atmospheric Research.
-!      e-mail: mininni@ucar.uba.ar 
+!      e-mail: mininni@ucar.edu
 !
 ! 16 Feb 2004: Performs complex FFTs in place.
-!  8 Jul 2004: itype pointers only used to store datatypes of 
+!  8 Jul 2004: itype pointers only used to store datatypes of
 !              blocks in the row and column each processor is.
 !  9 Jul 2004: Transposition uses data cache blocking.
 ! 13 Feb 2007: Transposition uses strip mining (rreddy@psc.edu)
@@ -42,9 +37,10 @@
 ! 30 Aug 2009: SINGLE/DOUBLE precision (D. Rosenberg & P. Mininni)
 !  3 Jan 2017: Anisotropic boxes (P. Mininni)
 ! 29 Aug 2019: FC-Gram (M. Fontana)
-!    Dec 2020: Updated calls to MPI3 and MPI4 practices. (P. Mininni)
 ! 30 Jan 2020: First GPU version with cuFFT (D. Rosenberg)
+!    Dec 2020: Updated calls to MPI3 and MPI4 practices. (P. Mininni)
 !  2 Sep 2026: Full GPU version with cuFFT/hipFFT and OpenMP offload
+! 14 Oct 2026: FC-Gram continuation on the device (M. Ramdan)
 !
 ! References:
 ! Lyon, M.; SIAM J. Sci. Comp., 33(6) (2011). DOI:10.1137/11082436X
@@ -511,12 +507,8 @@
       SUBROUTINE fftp3d_cont_z_dev(nz,ny,C,d,dir,a)
 !-----------------------------------------------------------------
 !
-! Continuación del FC-Gram en z en el dispositivo (propio de
-! SPECTER): llena los últimos C puntos de cada línea en z de a a
-! partir de sus primeros y últimos d puntos, con las mismas cuentas
-! y en el mismo orden que el lazo del host en
-! fftp1d_real_to_complex_z. La tabla dir (C x d) tiene su copia en el
-! dispositivo desde que se crea el plan (ver specter.F90).
+! FC-Gram continuation along z on the device, with the same
+! operations as the host loop in fftp1d_real_to_complex_z
 !-----------------------------------------------------------------
       USE fprecision
       USE mpivars

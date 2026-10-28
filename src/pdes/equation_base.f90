@@ -2,17 +2,8 @@
 ! NAME       : equation_base.f90
 ! DESCRIPTION: Forms base class for all PDEs
 !
-! Versión de SPECTER del equation_base.f90 de GHOST (rama new_paradigm,
-! cb6943d). Quedan solo EquationBase y VelocityBase (sin escalares
-! pasivos), que es lo que usa HD. Se agrega end_stage, que el integrador
-! llama después de actualizar cada etapa; por defecto no hace nada, y
-! los solvers con paredes lo usan para imponer los bordes y proyectar.
-! También se agrega sync_host, la contraparte de sync_device: copia al
-! host, antes de las salidas, los arreglos auxiliares que el solver
-! cambia en el dispositivo durante el paso (en HD, la presión).
-! Los solvers con salidas propias (como la presión en HD) redefinen
-! write_states y llaman antes al procedimiento write_states de este
-! módulo, que escribe los estados y la vorticidad.
+! SPECTER version of GHOST's equation_base.f90 (new_paradigm branch),
+! with end_stage and sync_host.
 !
 ! DATE       : 11/29/25 (DLR)
 ! ===================================================================
@@ -105,9 +96,8 @@ CONTAINS
   ! ===================================================================
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Lo llama el integrador después de actualizar cada etapa
-  !! o (norder, ..., 1) del Runge-Kutta, con el estado ya
-  !! actualizado en uout. Por defecto no hace nada.
+  !! Correction after each RK stage (boundary conditions and
+  !! projection in solvers with walls). Default: no correction.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine end_stage(this, uout, o, norder)
     class (EquationBase), intent(inout)         :: this
@@ -129,11 +119,9 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Copia al host los arreglos auxiliares del solver que
-  !! cambian en el dispositivo durante el paso, antes de
-  !! escribir los campos (write_states; global no los usa)
-  !! (propio de SPECTER). Por defecto el solver no tiene
-  !! arreglos auxiliares.
+  !! Copies the auxiliary arrays of the solver (if any) to the
+  !! host, before the output. Default: the solver has no
+  !! auxiliary arrays.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine sync_host(this)
     class (EquationBase), intent(inout) :: this
@@ -142,10 +130,7 @@ CONTAINS
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! Concrete method to write field states: every state
-  !! component with its name and, for solvers with a velocity
-  !! field and outs >= 1, the vorticity. The fields are
-  !! written in the physical domain, through the FC-Gram plan.
+  !! Concrete method to write field states
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine write_states(this, uin, planio)
     use grid
