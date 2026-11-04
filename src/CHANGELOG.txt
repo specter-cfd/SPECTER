@@ -12,6 +12,8 @@ new_paradigm branch - 10/27/26:
   vorticity (J. Cullen & G. Marchetti).
 - Averages in z use the trapezoid rule over the physical points
   (G. Marchetti).
+- Time dependent random forcing: `cbnoise_fv` with the update
+  method `shuffle_fv` of GHOST (G. Marchetti).
 
 v2.0 - 7/21/21:
 - fcgram module moved from `pseudo` to `fftp` and it now incorporates

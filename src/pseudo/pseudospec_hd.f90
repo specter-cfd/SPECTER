@@ -1030,6 +1030,42 @@
       END SUBROUTINE copy
 
 !*****************************************************************
+      SUBROUTINE saxpby_c(z,x,a,y,b)
+!-----------------------------------------------------------------
+!
+! Computes z = ax + by for complex x, y
+!
+! Parameters
+!     z     : output
+!     x,y   : input arrays
+!     a, b  : constants
+!
+      USE fprecision
+      USE grid, ONLY: ny,nz
+      USE mpivars
+      USE gdevice, ONLY: gdev_active
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(nz,ny,ista:iend) :: z
+      COMPLEX(KIND=GP), INTENT   (IN), DIMENSION(nz,ny,ista:iend) :: x,y
+      REAL   (KIND=GP), INTENT   (IN)                             :: a,b
+      INTEGER                                                     :: i,j,k
+
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
+      DO i = ista,iend
+         DO j = 1,ny
+            DO k = 1,nz
+               z(k,j,i) = a * x(k,j,i) + b * y(k,j,i)
+            END DO
+         END DO
+      END DO
+      END SUBROUTINE saxpby_c
+
+!*****************************************************************
       SUBROUTINE setmode(a,k,j,i,val)
 !-----------------------------------------------------------------
 !

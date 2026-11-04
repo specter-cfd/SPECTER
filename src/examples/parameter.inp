@@ -20,6 +20,7 @@ dt =  1e-3           ! time step
 step = 10001         ! total number of steps
 tstep = 100          ! number of steps between binary output
 cstep = 5            ! number of steps between writing global quantities
+cort = 1000.         ! global correlation time for random forcing methods
 seed = 1000          ! seed for the random number generator
 /
 
@@ -120,7 +121,7 @@ iclist = "cbnoise_v" ! read_v, null_v, cbnoise_v, couette_v, poiseuille_v
 
 ! Incompressible noise that satisfies no-slip at the walls
 &cbnoise_v
-u0 = 1.00            ! amplitude of the velocity
+u0 = 1.00            ! energy of the velocity, <|v|^2>
 kdn = 2.00           ! minimum perpendicular wavenumber
 kup = 4.00           ! maximum perpendicular wavenumber
 nmin = 1             ! minimum Chandrasekhar-Reid harmonic
@@ -143,13 +144,22 @@ nu = 1.e-3           ! kinematic viscosity (as in &HD)
 ! Mechanical forcing (see src/force/force_velocity.f90): pairs
 ! "forcing,update method" separated by ";"
 &forcing
-forces = "uniform_fv,constant_fv" ! null_fv or uniform_fv; constant_fv
-cort = 1000.         ! correlation time of the update methods
+forces = "uniform_fv,constant_fv" ! null_fv, uniform_fv or cbnoise_fv; constant_fv or shuffle_fv
 /
 
 ! Uniform forcing along x (mean pressure gradient)
 &uniform_fv
 f0 = 1.0             ! amplitude of the forcing
+/
+
+! Incompressible noise that satisfies no-slip at the walls
+&cbnoise_fv
+f0 = 1.00            ! energy of the forcing, <|f|^2>
+kdn = 2.00           ! minimum perpendicular wavenumber
+kup = 4.00           ! maximum perpendicular wavenumber
+nmin = 1             ! minimum Chandrasekhar-Reid harmonic
+nmax = 3             ! maximum Chandrasekhar-Reid harmonic
+rphase = .true.      ! random phase for Psi if .true.
 /
 
 ! Parameters for Bousinessq equation's
