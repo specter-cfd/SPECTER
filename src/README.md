@@ -262,11 +262,17 @@ The HD solver reads its parameters from the list 'HD', as in
 ```
 &HD
 nu = 1.e-3        ! kinematic viscosity
+dorot = .FALSE.   ! do rotation
+omegax = 0.0      ! rotation in x (ignored if dorot is FALSE)
+omegay = 0.0      ! rotation in y (ignored if dorot is FALSE)
+omegaz = 0.0      ! rotation in z (ignored if dorot is FALSE)
 /
 ```
 
 where
 - `nu`   : kinematic viscosity.
+- `dorot`: if `.TRUE.`, adds the Coriolis force `2 Omega x v` of a
+    uniform rotation `Omega = (omegax, omegay, omegaz)`.
 - `fidir`, `fodir` and `todir` (optional): directories for the binary
     input, the binary output and the text output of the solver. By
     default they are `idir`, `odir` and the current directory.

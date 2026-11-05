@@ -41,6 +41,10 @@ solver = "HD"        ! the only solver available
 ! Parameters of the HD solver (see src/pdes/hd_solver.f90)
 &HD
 nu = 1.e-3           ! kinematic viscosity
+dorot = .FALSE.      ! do rotation
+omegax = 0.0         ! rotation in x (ignored if dorot is FALSE)
+omegay = 0.0         ! rotation in y (ignored if dorot is FALSE)
+omegaz = 0.0         ! rotation in z (ignored if dorot is FALSE)
 /
 
 ! Time stepper (see src/steppers/stepper_factory.f90)

@@ -4,7 +4,7 @@ The main code is built using CMake (see `build/README`). The solver
 is chosen at run time with the `pdes` namelist in `parameter.inp`.
 The following solvers are currently supported:
 
-   HD         Hydrodynamic solver
+   HD         Hydrodynamic solver (with optional rotation)
 
 Boundary conditions supported
 =============================
