@@ -2,7 +2,7 @@
 ! NAME       : hd_solver.f90
 ! DESCRIPTION: Forms class for incompressible HD solver, computing:
 !
-!              dv/dt + (v.Grad) v = - Grad p + nu Del^2 v + f
+!              dv/dt + (v.Grad) v + 2 Omega x v = - Grad p + nu Del^2 v + f
 !
 !              State ordering is:
 !                vx, vy, vz
@@ -19,6 +19,10 @@
 !              fodir   : changes class binary output dir (default: odir)
 !              todir   : changes the class TXT output dir (default: '.')
 !              nu      : fluid kinematic viscosity
+!              dorot   : do rotation, = .TRUE. or .FALSE.
+!              omegax  : amplitude of the uniform rotation along x
+!              omegay  : amplitude of the uniform rotation along y
+!              omegaz  : amplitude of the uniform rotation along z
 !
 !              and a "&velbound" namelist with:
 !              vbcista : boundary condition in the i direction at the
@@ -40,7 +44,9 @@ module hd_mod
 
   ! ================= Solver traits ===================================
   type, public  :: NHTraits
-    real(kind=GP) :: nu = 0.0_GP  ! kinematic viscosity
+    logical       :: dorot = .FALSE. ! rotation flag
+    real(kind=GP) :: nu = 0.0_GP     ! kinematic viscosity
+    real(kind=GP) :: omega(3)        ! rotation vector
   end type NHTraits
 
   ! ================= Solver ==========================================
@@ -87,12 +93,14 @@ CONTAINS
     ! Temporary data to read from namelists:
     character(len=15)  :: vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
     real  (kind=GP)    :: vxzsta,vxzend,vyzsta,vyzend
-    real  (kind=GP)    :: nu
+    real  (kind=GP)    :: nu,omegax,omegay,omegaz
+    logical            :: dorot
     character(len=128) :: fidir,fodir,todir
     integer            :: ierr
 
     ! Required namelists:
-    namelist / HD       / fidir,fodir,todir,nu
+    namelist / HD       / fidir,fodir,todir,nu,dorot
+    namelist / HD       / omegax,omegay,omegaz
     namelist / velbound / vbcxsta,vbcxend,vbcysta,vbcyend,vbczsta,vbczend
     namelist / velbound / vxzsta,vxzend,vyzsta,vyzend
 
@@ -104,16 +112,24 @@ CONTAINS
     fodir = odir ! Set the default to status odir
     todir = '.'  ! Set the default to the current dir
     nu    = 0.0_GP
+    dorot = .FALSE.
+    omegax = 0.0_GP; omegay = 0.0_GP; omegaz = 0.0_GP
     if ( this%myrank_ .eq. 0 ) then
       open(1,file=this%infile_,status='unknown',form="formatted")
       read(1,NML=HD)
       close(1)
     endif
-    call MPI_BCAST(fidir,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-    call MPI_BCAST(fodir,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-    call MPI_BCAST(todir,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
-    call MPI_BCAST(nu   ,1  ,GC_REAL      ,0,MPI_COMM_WORLD,ierr)
-    this%traits_%nu = nu
+    call MPI_BCAST(fidir ,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(fodir ,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(todir ,128,MPI_CHARACTER,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(nu    ,1  ,GC_REAL      ,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(dorot ,1  ,MPI_LOGICAL  ,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(omegax,1  ,GC_REAL      ,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(omegay,1  ,GC_REAL      ,0,MPI_COMM_WORLD,ierr)
+    call MPI_BCAST(omegaz,1  ,GC_REAL      ,0,MPI_COMM_WORLD,ierr)
+    this%traits_%nu    = nu
+    this%traits_%dorot = dorot
+    this%traits_%omega = (/omegax,omegay,omegaz/)
 
     ! Boundary conditions for the velocity field
     vbcxsta = ""; vbcxend = ""
@@ -197,6 +213,7 @@ CONTAINS
     complex(kind=GP), pointer, dimension(:,:,:) :: dx,dy,dz
     complex(kind=GP), pointer, dimension(:,:,:) :: C1,C2,C3,C4,C5,C6
     real   (kind=GP)                            :: nu
+    real   (kind=GP)                            :: omegax,omegay,omegaz
     integer                                     :: i,j,k
     logical                                     :: bret
 
@@ -225,6 +242,29 @@ CONTAINS
 
     ! Non-linear term
     call gradre(vx,vy,vz,C4,C5,C6)
+
+    if ( this%traits_%dorot ) then
+      omegax = this%traits_%omega(1)
+      omegay = this%traits_%omega(2)
+      omegaz = this%traits_%omega(3)
+      call saxpby_c(C1, vz, 2*omegay, vy, -2.0*omegaz) ! 2 Omega x v
+      call saxpby_c(C2, vx, 2*omegaz, vz, -2.0*omegax)
+      call saxpby_c(C3, vy, 2*omegax, vx, -2.0*omegay)
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
+      do i = ista,iend
+         do j = 1,ny
+           do k = 1,nz
+             C4(k,j,i) = C4(k,j,i) + C1(k,j,i) ! (v.Grad v + 2 Omega x v)_x
+             C5(k,j,i) = C5(k,j,i) + C2(k,j,i) ! (v.Grad v + 2 Omega x v)_y
+             C6(k,j,i) = C6(k,j,i) + C3(k,j,i) ! (v.Grad v + 2 Omega x v)_z
+           end do
+         end do
+      end do
+    endif
 
     ! Dealias non-linear
     call fc_filter(C4)

@@ -139,7 +139,7 @@ CONTAINS
   !! Derivatives in z direction are calculated analytically, to
   !! have a more accurate initial condition (specially the no-slip)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !   u0    : amplitude of the velocity
+  !   u0    : energy of the velocity, <|v|^2> (see normvec)
   !   kdn   : minimum perpendicular wave number
   !   kup   : maximum perpendicular wave number
   !   nmin  : minimum Chandrasekhar-Reid harmonic

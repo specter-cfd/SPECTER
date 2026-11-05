@@ -10,6 +10,12 @@ new_paradigm branch - 10/27/26:
 - MPI calls with `mpi_f08`.
 - Enstrophy in `balance.txt` includes the three components of the
   vorticity (J. Cullen & G. Marchetti).
+- Averages in z use the trapezoid rule over the physical points
+  (G. Marchetti).
+- Time dependent random forcing: `cbnoise_fv` with the update
+  method `shuffle_fv` of GHOST (G. Marchetti).
+- Optional rotation in the HD solver (`dorot`, `omegax`, `omegay` and
+  `omegaz` in `&HD`), as in GHOST.
 
 v2.0 - 7/21/21:
 - fcgram module moved from `pseudo` to `fftp` and it now incorporates

@@ -19,6 +19,7 @@
 !
 ! 17 Oct 2026: Enstrophy in energy (kin=0) sums the three
 !              components of the curl (J. Cullen & G. Marchetti)
+! 02 Nov 2026: Trapezoid rule for the averages in z (G. Marchetti)
 !=================================================================
 
 !******************************************************************
@@ -491,11 +492,11 @@
       CALL gws%get_complex_htmp(C3,bret)
       CALL gws%get_complex_htmp(C4,bret)
       dloc = 0.0D0
-      ! One nx*ny from parsevals, an nx*ny*(nz-Cz) from averaging over
-      ! physical domain and a nz**2 due to fft normalization.
+      ! One nx*ny from parsevals, an nx*ny from averaging over the
+      ! physical domain in x and y, and a nz**2 due to fft
+      ! normalization. The average in z uses the weights zwgt.
       tmp = 1.0_GP/ &
-            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2/ &
-            real((nz-Cz),kind=GP)
+            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
 
       ! Computes the energy of field (a,b,c)
       IF (kin .eq. 1) THEN
@@ -533,7 +534,7 @@
             DO k = 1,nz-Cz
                dloc = dloc + (real(V1(k,j,1),kind=GP)**2+aimag(V1(k,j,1))**2+ &
                               real(V2(k,j,1),kind=GP)**2+aimag(V2(k,j,1))**2+ &
-                              real(V3(k,j,1),kind=GP)**2+aimag(V3(k,j,1))**2)*tmp
+                              real(V3(k,j,1),kind=GP)**2+aimag(V3(k,j,1))**2)*tmp*zwgt(k)
             END DO
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:dloc)
@@ -543,7 +544,7 @@
                DO k = 1,nz-Cz
                   dloc = dloc + 2*(real(V1(k,j,i),kind=GP)**2+aimag(V1(k,j,i))**2+ &
                                    real(V2(k,j,i),kind=GP)**2+aimag(V2(k,j,i))**2+ &
-                                   real(V3(k,j,i),kind=GP)**2+aimag(V3(k,j,i))**2)*tmp
+                                   real(V3(k,j,i),kind=GP)**2+aimag(V3(k,j,i))**2)*tmp*zwgt(k)
                END DO
             END DO
          END DO
@@ -555,7 +556,7 @@
                DO k = 1,nz-Cz
                   dloc = dloc + 2*(real(V1(k,j,i),kind=GP)**2+aimag(V1(k,j,i))**2+ &
                                    real(V2(k,j,i),kind=GP)**2+aimag(V2(k,j,i))**2+ &
-                                   real(V3(k,j,i),kind=GP)**2+aimag(V3(k,j,i))**2)*tmp
+                                   real(V3(k,j,i),kind=GP)**2+aimag(V3(k,j,i))**2)*tmp*zwgt(k)
                END DO
             END DO
          END DO
@@ -612,11 +613,11 @@
       CALL gws%get_complex_htmp(c5,bret)
       CALL gws%get_complex_htmp(c6,bret)
       dloc = 0.0D0
-      ! One nx*ny from parsevals, an nx*ny*(nz-Cz) from averaging over
-      ! physical domain and a nz**2 due to fft normalization.
+      ! One nx*ny from parsevals, an nx*ny from averaging over the
+      ! physical domain in x and y, and a nz**2 due to fft
+      ! normalization. The average in z uses the weights zwgt.
       tmp = 1.0_GP/ &
-            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2 / &
-            real(nz-Cz,kind=GP)
+            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
 
       ! Computes the field and its curl in (z,ky,kx)
       CALL copy(a,c1)
@@ -639,7 +640,7 @@
             DO k = 1,nz-Cz
                dloc = dloc + (real(c1(k,j,1)*conjg(c4(k,j,1)))+ &
                               real(c2(k,j,1)*conjg(c5(k,j,1)))+ &
-                              real(c3(k,j,1)*conjg(c6(k,j,1))))*tmp
+                              real(c3(k,j,1)*conjg(c6(k,j,1))))*tmp*zwgt(k)
             END DO
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:dloc)
@@ -649,7 +650,7 @@
                DO k = 1,nz-Cz
                   dloc = dloc + 2*(real(c1(k,j,i)*conjg(c4(k,j,i)))+ &
                                    real(c2(k,j,i)*conjg(c5(k,j,i)))+ &
-                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp
+                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp*zwgt(k)
                END DO
             END DO
          END DO
@@ -661,7 +662,7 @@
                DO k = 1,nz-Cz
                   dloc = dloc + 2*(real(c1(k,j,i)*conjg(c4(k,j,i)))+ &
                                    real(c2(k,j,i)*conjg(c5(k,j,i)))+ &
-                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp
+                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp*zwgt(k)
                END DO
             END DO
          END DO
@@ -728,11 +729,11 @@
       CALL gws%get_complex_htmp(c5,bret)
       CALL gws%get_complex_htmp(c6,bret)
       gloc = 0.0D0
-      ! One nx*ny from parsevals, an nx*ny*(nz-Cz) from averaging over
-      ! physical domain and a nz**2 due to fft normalization.
+      ! One nx*ny from parsevals, an nx*ny from averaging over the
+      ! physical domain in x and y, and a nz**2 due to fft
+      ! normalization. The average in z uses the weights zwgt.
       tmp = 1.0_GP/ &
-            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2/ &
-            real(nz-Cz, kind=GP)
+            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
 
       ! Computes the fields (or their curls) in (z,ky,kx)
       IF (kin.eq.1) THEN
@@ -764,7 +765,7 @@
             DO k = 1,nz-Cz
                gloc = gloc + (DBLE(real(c1(k,j,1)*conjg(c4(k,j,1))))+ &
                               real(c2(k,j,1)*conjg(c5(k,j,1)))+ &
-                              real(c3(k,j,1)*conjg(c6(k,j,1))))*tmp
+                              real(c3(k,j,1)*conjg(c6(k,j,1))))*tmp*zwgt(k)
             END DO
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:gloc)
@@ -774,7 +775,7 @@
                DO k = 1,nz-Cz
                   gloc = gloc + 2*(DBLE(real(c1(k,j,i)*conjg(c4(k,j,i))))+ &
                                    real(c2(k,j,i)*conjg(c5(k,j,i)))+ &
-                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp
+                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp*zwgt(k)
                END DO
             END DO
          END DO
@@ -786,7 +787,7 @@
                DO k = 1,nz-Cz
                   gloc = gloc + 2*(DBLE(real(c1(k,j,i)*conjg(c4(k,j,i))))+ &
                                    real(c2(k,j,i)*conjg(c5(k,j,i)))+ &
-                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp
+                                   real(c3(k,j,i)*conjg(c6(k,j,i))))*tmp*zwgt(k)
                END DO
             END DO
          END DO
@@ -1029,6 +1030,42 @@
       END SUBROUTINE copy
 
 !*****************************************************************
+      SUBROUTINE saxpby_c(z,x,a,y,b)
+!-----------------------------------------------------------------
+!
+! Computes z = ax + by for complex x, y
+!
+! Parameters
+!     z     : output
+!     x,y   : input arrays
+!     a, b  : constants
+!
+      USE fprecision
+      USE grid, ONLY: ny,nz
+      USE mpivars
+      USE gdevice, ONLY: gdev_active
+      IMPLICIT NONE
+
+      COMPLEX(KIND=GP), INTENT(INOUT), DIMENSION(nz,ny,ista:iend) :: z
+      COMPLEX(KIND=GP), INTENT   (IN), DIMENSION(nz,ny,ista:iend) :: x,y
+      REAL   (KIND=GP), INTENT   (IN)                             :: a,b
+      INTEGER                                                     :: i,j,k
+
+#if defined(GHOST_GPU)
+!$omp target teams distribute parallel do collapse(3) if(target: gdev_active)
+#else
+!$omp parallel do collapse(2) private (k)
+#endif
+      DO i = ista,iend
+         DO j = 1,ny
+            DO k = 1,nz
+               z(k,j,i) = a * x(k,j,i) + b * y(k,j,i)
+            END DO
+         END DO
+      END DO
+      END SUBROUTINE saxpby_c
+
+!*****************************************************************
       SUBROUTINE setmode(a,k,j,i,val)
 !-----------------------------------------------------------------
 !
@@ -1091,11 +1128,11 @@
 
       CALL gws%get_complex_htmp(C1,bret)
       CALL gws%get_complex_htmp(C2,bret)
-      ! One nx*ny from parsevals, an nx*ny*(nz-Cz) from averaging over
-      ! physical domain and a nz**2 due to fft normalization.
+      ! One nx*ny from parsevals, an nx*ny from averaging over the
+      ! physical domain in x and y, and a nz**2 due to fft
+      ! normalization. The average in z uses the weights zwgt.
       tmp = 1.0_GP/ &
-            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2/ &
-            real(nz-Cz,kind=GP)
+            (real(nx,kind=GP)*real(ny,kind=GP)*real(nz,kind=GP))**2
       d = 0d0
       dloc = 0d0
 
@@ -1140,7 +1177,7 @@
 !$omp parallel do private (k) reduction(+:dloc)
          DO j = 1,ny
             DO k = 1,nz-Cz
-               dloc = dloc + (real(C2(k,j,1),kind=GP)**2 + aimag(C2(k,j,1))**2)*tmp
+               dloc = dloc + (real(C2(k,j,1),kind=GP)**2 + aimag(C2(k,j,1))**2)*tmp*zwgt(k)
             END DO
          END DO
 !$omp parallel do if (iend-2.ge.nth) private (j,k) reduction(+:dloc)
@@ -1148,7 +1185,7 @@
 !$omp parallel do if (iend-2.lt.nth) private (k) reduction(+:dloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  dloc = dloc + 2*(real(C2(k,j,i),kind=GP)**2 + aimag(C2(k,j,i))**2)*tmp
+                  dloc = dloc + 2*(real(C2(k,j,i),kind=GP)**2 + aimag(C2(k,j,i))**2)*tmp*zwgt(k)
                END DO
             END DO
          END DO
@@ -1158,7 +1195,7 @@
 !$omp parallel do if (iend-ista.lt.nth) private (k) reduction(+:dloc)
             DO j = 1,ny
                DO k = 1,nz-Cz
-                  dloc = dloc + 2*(real(C2(k,j,i),kind=GP)**2 + aimag(C2(k,j,i))**2)*tmp
+                  dloc = dloc + 2*(real(C2(k,j,i),kind=GP)**2 + aimag(C2(k,j,i))**2)*tmp*zwgt(k)
                END DO
             END DO
          END DO

@@ -220,6 +220,7 @@ dt = 1.0e-3          ! time step
 step = 10001         ! number of steps
 tstep = 500          ! binary output
 cstep = 10           ! global quantities
+cort = 1000.         ! correlation time
 seed = 1000          ! random seed
 /
 ```
@@ -242,6 +243,7 @@ The variables in this list are
 - `step`: controls the total number of time steps the code will do.
 - `tstep` and `cstep`: number of time steps done between exporting
       global quantities (`cstep`), and binary files (`tstep`).
+- `cort`: correlation time for random forcing methods.
 - `seed`: seed for the random number generator.
 
 # 
@@ -260,11 +262,17 @@ The HD solver reads its parameters from the list 'HD', as in
 ```
 &HD
 nu = 1.e-3        ! kinematic viscosity
+dorot = .FALSE.   ! do rotation
+omegax = 0.0      ! rotation in x (ignored if dorot is FALSE)
+omegay = 0.0      ! rotation in y (ignored if dorot is FALSE)
+omegaz = 0.0      ! rotation in z (ignored if dorot is FALSE)
 /
 ```
 
 where
 - `nu`   : kinematic viscosity.
+- `dorot`: if `.TRUE.`, adds the Coriolis force `2 Omega x v` of a
+    uniform rotation `Omega = (omegax, omegay, omegaz)`.
 - `fidir`, `fodir` and `todir` (optional): directories for the binary
     input, the binary output and the text output of the solver. By
     default they are `idir`, `odir` and the current directory.
@@ -303,7 +311,8 @@ applied in order (see `ic/ic_velocity.f90`):
 - `null_v`: null velocity field.
 - `cbnoise_v`: incompressible noise that satisfies no-slip at the
     walls (Clever & Busse), with parameters in the list `cbnoise_v`
-    (`u0`, `kdn`, `kup`, `nmin`, `nmax` and `rphase`).
+    (`u0`, `kdn`, `kup`, `nmin`, `nmax` and `rphase`; `u0` is the
+    energy `<|v|^2>`).
 - `couette_v`: adds to vx the laminar Couette profile between the
     wall velocities `vxzsta` and `vxzend` (list `couette_v`).
 - `poiseuille_v`: adds to vx the laminar Poiseuille profile of the
@@ -319,7 +328,6 @@ The mechanical forcing is set by the list 'forcing':
 ```
 &forcing
 forces = "uniform_fv,constant_fv"
-cort = 1000.
 /
 ```
 
@@ -328,9 +336,14 @@ cort = 1000.
 - `null_fv`: null forcing.
 - `uniform_fv`: uniform forcing `f0` along x, the mean pressure
     gradient of a Poiseuille flow (list `uniform_fv`, with `f0`).
+- `cbnoise_fv`: incompressible noise that satisfies no-slip at the
+    walls (list `cbnoise_fv`, with the parameters of `cbnoise_v` and
+    `f0` instead of `u0`).
 
-and the only update method is `constant_fv` (forcing constant in
-time). `cort` is the correlation time of the update methods.
+and the update methods are `constant_fv` (forcing constant in time)
+and `shuffle_fv`: every `cort` (list 'status') a new random forcing
+is generated, and the forcing is blended linearly from the old one
+to the new one. It needs a random forcing, such as `cbnoise_fv`.
 
 # 
 And then the boundary conditions are specified with
@@ -381,7 +394,9 @@ The binary files of the HD solver are the velocity (`vx`, `vy`, `vz`),
 the vorticity (`wx`, `wy`, `wz`, if `outs` is 1 or larger) and the
 pressure (`pr`). The file `noslip_diagnostic.txt` checks the
 divergence and the boundary conditions. More details are in the
-comments of `pdes/hd_solver.f90`.
+comments of `pdes/hd_solver.f90`. With `shuffle_fv` the old and new
+forcing states are written with the fields (`fvxold`, `fvyold`,
+`fvzold`, `fvxnew`, `fvynew`, `fvznew`) and read to continue a run.
 
 
 4 - FC-Gram continuations

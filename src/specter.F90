@@ -409,5 +409,6 @@
       CALL gfree( kk2 )
       CALL gdev_free(C_LOC(khom))
       DEALLOCATE( khom )
+      DEALLOCATE( zwgt )
 
       END PROGRAM SPECTER

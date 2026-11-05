@@ -2,8 +2,7 @@
 ! NAME       : force_base.f90
 ! DESCRIPTION: Forms base class for all forcing methods
 !
-! SPECTER version of GHOST's force_base.f90 (new_paradigm branch),
-! without blend_forcing (only needed by the shuffle methods).
+! SPECTER version of GHOST's force_base.f90 (new_paradigm branch).
 !
 ! DATE       : 01/16/26 (PDM)
 ! ===================================================================
@@ -22,9 +21,10 @@ module forcebase_mod
 
   type, abstract :: forceUpdt
       ! The old and new forcing states are CONTIGUOUS so that they are
-      ! passed as is to the CONTIGUOUS dummies of gupdate_to: otherwise
-      ! compilers may pass a copy (nvfortran 26.5 does), whose address
-      ! is not in the registry of device copies of gdevice_mod.
+      ! passed as is to the CONTIGUOUS dummies of gupdate_to and to the
+      ! explicit-shape dummies of blend_forcing: otherwise compilers may
+      ! pass a copy (nvfortran 26.5 does), whose address is not in the
+      ! registry of device copies of gdevice_mod.
       complex(kind=GP), pointer, contiguous, dimension(:,:,:) :: fxold_ => null()
       complex(kind=GP), pointer, contiguous, dimension(:,:,:) :: fyold_ => null()
       complex(kind=GP), pointer, contiguous, dimension(:,:,:) :: fzold_ => null()
@@ -158,6 +158,31 @@ CONTAINS
       endif
     end do
   end function forcing_changed
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !! Blend of the old and new forcing states of the shuffle
+  !! update methods, f = (1-rmp).fold + rmp.fnew. With ondevice
+  !! the kernel runs on the device copies of the three arrays
+  !! (offload builds; the host copy of f is left stale and is
+  !! refreshed by the main program before the diagnostics),
+  !! otherwise on the host copies. In host builds it always
+  !! runs on the host.
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine blend_forcing(f, fold, fnew, rmp, ondevice)
+    USE gdevice, only: gdev_active
+    USE grid
+    USE mpivars
+    implicit none
+    complex(kind=GP), intent(inout), dimension(nz,ny,ista:iend) :: f
+    complex(kind=GP), intent   (in), dimension(nz,ny,ista:iend) :: fold,fnew
+    real   (kind=GP), intent   (in)                             :: rmp
+    logical         , intent   (in)                             :: ondevice
+    logical                                                     :: bsave
+    bsave = gdev_active
+    if ( ondevice ) gdev_active = .true.
+    call saxpby_c(f,fold,1.0_GP-rmp,fnew,rmp)
+    gdev_active = bsave
+  end subroutine blend_forcing
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Logical function to keep track of static forcings:

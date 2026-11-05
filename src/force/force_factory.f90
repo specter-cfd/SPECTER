@@ -5,7 +5,7 @@
 ! and forcing update methods for all fields in a pde solver.
 !
 ! SPECTER version of GHOST's force_factory.f90 (new_paradigm branch),
-! with the forcings of the velocity and only constant forcings.
+! with the forcings of the velocity.
 !
 ! DATE : 01/18/26 (PDM)
 ! ===================================================================
@@ -29,7 +29,7 @@ CONTAINS
     character(len=*), intent   (in) :: infile
     ! Temporary data:
     real(kind=GP)      :: cort
-    integer            :: i,fnmb,unmb
+    integer            :: i,fnmb,unmb,poolsz = 0
     character(len=512) :: forces
     character(len= 50) :: forcelist(10)
     character( len=25) :: forcename(2)
@@ -61,6 +61,8 @@ CONTAINS
         allocate( forceNull_fv    :: new_object(i)%force )
       case ('uniform_fv')
         allocate( forceUniform_fv :: new_object(i)%force )
+      case ('cbnoise_fv')
+        allocate( forceCbnoise_fv :: new_object(i)%force )
       case default
         stop 'Unknown forcing function'
       end select
@@ -69,10 +71,24 @@ CONTAINS
       ! Velocity forcing update methods --------
       case ('constant_fv')
         if ( allocated(new_object(i)%update) ) deallocate(new_object(i)%update)
+      case ('shuffle_fv')
+        allocate( shuffleupdt_fv  :: new_object(i)%update )
+        new_object(i)%update%binit_ = .FALSE.
+        poolsz = poolsz + 6
       case default
         stop 'Unknown or undefined forcing update method'
       end select
     end do
+    ! If needed, we increase the pool size here as it is still safe for
+    ! permanent storage: the random forcings keep their old and new
+    ! states in pool arrays that are never released, and the solver's
+    ! pool size (set in the equation factory) does not account for them
+    if ( poolsz .gt. 0 ) then
+      call workspace%add_complex_entries(poolsz)
+      if ( myrank .eq. 0 ) write(*,'(A,I0,A,I0,A)') ' Forcing: ', poolsz,  &
+        ' complex arrays added to the pool for the forcing states (now ',   &
+        workspace%get_complex_tmp_size(), ')'
+    endif
   end function init_forcing_from_file
 
 end module force_factory

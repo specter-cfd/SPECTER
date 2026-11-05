@@ -30,6 +30,9 @@
 !
 ! Unidimensional grids
       REAL(KIND=GP), ALLOCATABLE, DIMENSION(:) :: x,y,z
+!
+! Weights of the averages in z
+      REAL(KIND=GP), ALLOCATABLE, DIMENSION(:) :: zwgt
       SAVE
     CONTAINS
 !-----------------------------------------------------------------
@@ -159,6 +162,7 @@
       CALL galloc( kk2, nz, ny, ista, iend )
       ALLOCATE( khom(ny,ista:iend) )
       CALL gdev_alloc(C_LOC(khom),INT(SIZE(khom),C_SIZE_T)*INT(STORAGE_SIZE(khom)/8,C_SIZE_T))
+      ALLOCATE( zwgt(nz-Cz) )
 
 ! Construct grids
       IF ( Cx .eq. 0 ) THEN
@@ -191,10 +195,14 @@
          ! Periodic in z
          rmp = Lz*2.0_GP*pi/nz
          Dkz = 1.0_GP/Lz
+         zwgt = 1.0_GP/real(nz,kind=GP)
       ELSE
-        ! Non-periodic in z
+        ! Non-periodic in z (trapezoid rule for the averages, G. Marchetti)
         rmp = Lz/(nz-Cz-1)
         Dkz = 2.0_GP*pi/(rmp*nz)
+        zwgt = 1.0_GP/real(nz-Cz-1,kind=GP)
+        zwgt(1) = zwgt(1)/2
+        zwgt(nz-Cz) = zwgt(nz-Cz)/2
       ENDIF
       DO k=1,nz
         z(k) = rmp*(k-1)
